@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block title %}Cours{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>📚 Cours</h1>
+        <p class="muted">{{ courses|length }} cours actif(s)</p>
+    </div>
+    <div class="action-group">
+        <a class="btn btn-primary" href="/add_course">➕ Nouveau cours</a>
+    </div>
+</div>
+
+<div class="grid">
+    {% for course in courses %}
+    <div class="item">
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+                <h3 style="margin:0 0 4px 0">{{ course.name }}</h3>
+                <p class="small muted" style="margin:0">{{ days_names[course.day_of_week] }} {{ course.start_time }} - {{ course.end_time }}</p>
+                {% if course.level %}
+                    <span class="badge badge-primary" style="margin-top:8px">{{ course.level }}</span>
+                {% endif %}
+                {% if course.max_archers %}
+                    <p class="small muted" style="margin:8px 0 0 0">👥 Max: {{ course.max_archers }} archers</p>
+                {% endif %}
+                {% if course.archers %}
+                    <p class="small muted" style="margin:8px 0 0 0">
+                        <strong>Inscrits:</strong> {{ course.archers|length }} archer(s)
+                    </p>
+                {% endif %}
+                {% if course.notes %}
+                    <p class="small muted" style="margin:8px 0 0 0">{{ course.notes }}</p>
+                {% endif %}
+            </div>
+            <div style="padding-top:8px;border-top:1px solid var(--border-light);display:flex;flex-direction:column;gap:8px">
+                <a class="btn btn-outline" href="/course/{{ course.id }}/archers" style="width:100%">👥 Gérer les archers</a>
+                <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="width:100%">✓ Présences</a>
+                <a class="btn btn-outline" href="/edit_course/{{ course.id }}" style="width:100%">✏️ Modifier</a>
+                <form method="POST" action="/delete_course/{{ course.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce cours ?');">
+                    <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer">🗑️ Supprimer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
+        <p class="muted">Aucun cours enregistré pour le moment</p>
+        <a href="/add_course" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier cours</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

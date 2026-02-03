@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block title %}Produits{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>📦 Produits unitaires</h1>
+        <p class="muted">{{ products|length }} produit(s) au total</p>
+    </div>
+    <div class="action-group">
+        <a class="btn btn-primary" href="/add_product">➕ Ajouter un produit</a>
+        <a class="btn btn-outline" href="/export_products">📄 Exporter PDF</a>
+    </div>
+</div>
+
+<div class="grid">
+    {% for p in products %}
+    <div class="item">
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+                <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                    <h3 style="margin:0">{{ p.brand }}</h3>
+                    <span class="badge badge-primary">{{ p.category.name }}</span>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                    {% if p.state == 'stock' %}
+                        <span class="badge badge-success">✓ Disponible</span>
+                    {% elif p.state == 'broken' %}
+                        <span class="badge badge-danger">✗ Cassé</span>
+                    {% endif %}
+                </div>
+                {% if p.custom_values %}
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
+                    {% for k, v in p.custom_values.items() %}
+                        <span class="small" style="margin-right:12px"><strong>{{ k }}:</strong> {{ v }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if p.comments %}
+                <p class="small muted" style="margin-top:8px">💬 {{ p.comments }}</p>
+                {% endif %}
+            </div>
+            <div class="action-group" style="padding-top:8px;border-top:1px solid var(--border-light)">
+                <a class="btn btn-outline" href="/edit_product/{{ p.id }}" style="flex:1">✏️ Modifier</a>
+                <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}" style="flex:1">📋 Dupliquer</a>
+            <form method="POST" action="/delete_product/{{ p.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin:0">🗑️ Supprimer</button>
+            </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
+        <p class="muted">Aucun produit enregistré pour le moment</p>
+        <a href="/add_product" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier produit</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

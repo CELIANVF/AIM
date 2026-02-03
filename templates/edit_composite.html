@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block title %}Modifier Arc{% endblock %}
+
+{% block content %}
+<h1>Modifier un arc</h1>
+<form method="post">
+    <label>Nom/Référence: <input type="text" name="name" value="{{ composite.name }}" required></label><br>
+    <label>Type:
+        <select name="type">
+            <option value="BB" {% if composite.type == 'BB' %}selected{% endif %}>BB (Bare Bow)</option>
+            <option value="CL" {% if composite.type == 'CL' %}selected{% endif %}>CL (Classique)</option>
+        </select>
+    </label><br>
+    <label>Statut:
+        <select name="status">
+            <option value="club" {% if composite.status == 'club' %}selected{% endif %}>Au club</option>
+            <option value="loan" {% if composite.status == 'loan' %}selected{% endif %}>En prêt</option>
+        </select>
+    </label><br>
+    <h2>Composants</h2>
+    {% for p in products %}
+    <input type="checkbox" name="components" value="{{ p.id }}" {% if p in composite.components %}checked{% endif %}> {{ p.brand }} - {{ p.category.name }}<br>
+    {% endfor %}
+    <button class="btn" type="submit">Modifier</button>
+</form>
+{% endblock %}

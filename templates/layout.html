@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AIM{% endblock %} - ANC93</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="top-bar">
+        <div class="container">
+            <div class="logo">
+                <h2>🏹 ANC93</h2>
+            </div>
+            <div class="search">
+                <form action="/search" method="get">
+                    <input type="text" name="q" placeholder="Rechercher un produit, archer, catégorie...">
+                </form>
+            </div>
+            <div class="user-menu">
+                <span>👤 Utilisateur</span>
+                <a href="#">Déconnexion</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <aside class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">🏠 Accueil</a></li>
+                    <li><a href="/categories" class="{% if request.path.startswith('/categories') %}active{% endif %}">📁 Catégories</a></li>
+                    <li><a href="/products" class="{% if request.path.startswith('/products') %}active{% endif %}">📦 Produits</a></li>
+                    <li><a href="/composites" class="{% if request.path.startswith('/composites') %}active{% endif %}">🎯 Arcs</a></li>
+                    <li><a href="/archers" class="{% if request.path.startswith('/archers') %}active{% endif %}">👥 Archers</a></li>
+                    <li><a href="/assignments" class="{% if request.path.startswith('/assignments') %}active{% endif %}">🔄 Assignations</a></li>
+                    <li><a href="/courses" class="{% if request.path.startswith('/courses') %}active{% endif %}">📚 Cours</a></li>
+                    <li><a href="/history" class="{% if request.path.startswith('/history') %}active{% endif %}">🕒 Historique</a></li>
+                </ul>
+            </nav>
+        </aside>
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

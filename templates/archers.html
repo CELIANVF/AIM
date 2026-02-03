@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+
+{% block title %}Archers{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>👥 Archers</h1>
+        <p class="muted">{{ archers|length }} archer(s) enregistré(s)</p>
+    </div>
+    <div class="action-group">
+        <a class="btn btn-primary" href="/add_archer">➕ Ajouter un archer</a>
+        <a class="btn btn-outline" href="/export_archers">📄 Exporter PDF</a>
+    </div>
+</div>
+
+<div class="grid">
+    {% for a in archers %}
+    <div class="item">
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+                <h3 style="margin:0 0 8px 0">{{ (a.first_name + ' ' if a.first_name else '') + (a.last_name or '') or 'Sans nom' }}</h3>
+                <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                    {% if a.age %}
+                        <span class="badge badge-primary">🎂 {{ a.age }} ans</span>
+                    {% endif %}
+                    {% if a.license_number %}
+                        <span class="badge badge-success">🎫 {{ a.license_number }}</span>
+                    {% endif %}
+                </div>
+                {% if a.bow_type or a.bow_length or a.draw_length %}
+                <div style="padding-top:8px;border-top:1px solid var(--border-light)">
+                    {% if a.bow_type %}
+                        <p class="small" style="margin:4px 0"><strong>Type d'arc:</strong> {{ a.bow_type }}</p>
+                    {% endif %}
+                    {% if a.bow_length %}
+                        <p class="small" style="margin:4px 0"><strong>Longueur:</strong> {{ a.bow_length }}</p>
+                    {% endif %}
+                    {% if a.draw_length %}
+                        <p class="small" style="margin:4px 0"><strong>Tirage:</strong> {{ a.draw_length }}</p>
+                    {% endif %}
+                    {% if a.current_assignment %}
+                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span></p>
+                    {% else %}
+                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="muted">Aucun</span></p>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div style="padding-top:8px;border-top:1px solid var(--border-light)">
+                    {% if a.current_assignment %}
+                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span></p>
+                    {% else %}
+                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="muted">Aucun</span></p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div style="padding-top:8px;border-top:1px solid var(--border-light)">
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <a class="btn btn-outline" href="/edit_archer/{{ a.id }}" style="flex:1">✏️ Modifier</a>
+                    {% if a.current_assignment %}
+                    <form method="POST" action="/return/{{ a.current_assignment.id }}" style="flex:1" onsubmit="return confirm('Retourner l\'arc {{ a.current_assignment.composite.name }} ?');">
+                        <button type="submit" class="btn btn-warning" style="width:100%;cursor:pointer">↩️ Retourner arc</button>
+                    </form>
+                    {% else %}
+                    <a class="btn btn-success" href="/assign?archer_id={{ a.id }}" style="flex:1;text-align:center">🎯 Assigner arc</a>
+                    {% endif %}
+                    <form method="POST" action="/delete_archer/{{ a.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
+                        <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer">🗑️ Supprimer</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
+        <p class="muted">Aucun archer enregistré pour le moment</p>
+        <a href="/add_archer" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier archer</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

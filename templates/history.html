@@ -1,0 +1,136 @@
+{% extends "layout.html" %}
+
+{% block title %}Historique{% endblock %}
+
+{% block content %}
+<h1>🕒 Historique</h1>
+
+<div class="card" style="margin-bottom:24px">
+    <h2>Assignations</h2>
+    {% if assignment_events %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Détails</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in assignment_events %}
+            <tr>
+                <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    {% if event.event_type == 'assignment' %}
+                        Assignation
+                    {% else %}
+                        Retour
+                    {% endif %}
+                </td>
+                <td>{{ event.summary }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="muted">Aucune assignation dans l'historique.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:24px">
+    <h2>Changements de composition d'arc</h2>
+    {% if composite_events %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Détails</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in composite_events %}
+            <tr>
+                <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    {% if event.event_type == 'composite_created' %}
+                        Création
+                    {% elif event.event_type == 'composite_deleted' %}
+                        Suppression
+                    {% else %}
+                        Modification
+                    {% endif %}
+                </td>
+                <td>
+                    <div>{{ event.summary }}</div>
+                    {% if event.details and event.details.get('before') %}
+                        <div class="small muted" style="margin-top:6px">
+                            <strong>Avant:</strong>
+                            {{ event.details.get('before')|join(', ') if event.details.get('before') else '—' }}
+                        </div>
+                    {% endif %}
+                    {% if event.details and event.details.get('after') %}
+                        <div class="small muted" style="margin-top:4px">
+                            <strong>Après:</strong>
+                            {{ event.details.get('after')|join(', ') if event.details.get('after') else '—' }}
+                        </div>
+                    {% endif %}
+                    {% if event.details and event.details.get('components') %}
+                        <div class="small muted" style="margin-top:6px">
+                            <strong>Composants:</strong>
+                            {{ event.details.get('components')|join(', ') if event.details.get('components') else '—' }}
+                        </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="muted">Aucun changement de composition enregistré.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Produits</h2>
+    {% if product_events %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Détails</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in product_events %}
+            <tr>
+                <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    {% if event.event_type == 'product_created' %}
+                        Création
+                    {% elif event.event_type == 'product_deleted' %}
+                        Suppression
+                    {% else %}
+                        Modification
+                    {% endif %}
+                </td>
+                <td>
+                    <div>{{ event.summary }}</div>
+                    {% if event.details and event.details.get('changes') %}
+                        <ul class="small muted" style="margin:6px 0 0 16px">
+                            {% for key, change in event.details.get('changes').items() %}
+                                <li><strong>{{ key }}:</strong> {{ change.get('from') or '—' }} → {{ change.get('to') or '—' }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="muted">Aucun historique de produits.</p>
+    {% endif %}
+</div>
+{% endblock %}

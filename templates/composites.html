@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block title %}Arcs{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>🎯 Arcs composés</h1>
+        <p class="muted">{{ composites|length }} arc(s) enregistré(s)</p>
+    </div>
+    <div class="action-group">
+        <a class="btn btn-primary" href="/add_composite">➕ Nouvel arc</a>
+        <a class="btn btn-outline" href="/export_composites">📄 Exporter PDF</a>
+    </div>
+</div>
+
+<div class="grid">
+    {% for c in composites %}
+    <div class="item">
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+                <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                    <h3 style="margin:0">{{ c.name }}</h3>
+                    <span class="badge badge-primary">{{ c.type }}</span>
+                    {% if c.status == 'club' %}
+                        <span class="badge badge-success">✓ Au club</span>
+                    {% elif c.status == 'loan' %}
+                        <span class="badge badge-warning">→ En prêt</span>
+                    {% endif %}
+                </div>
+                {% if c.components %}
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
+                    <p class="small muted" style="margin:0 0 6px 0"><strong>Composants:</strong></p>
+                    {% for comp in c.components %}
+                        <span class="small" style="display:block;margin:4px 0">• {{ comp.brand }} - {{ comp.category.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div style="padding-top:8px;border-top:1px solid var(--border-light)">
+                <a class="btn btn-outline" href="/edit_composite/{{ c.id }}" style="width:100%">✏️ Modifier</a>
+                <form method="POST" action="/delete_composite/{{ c.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet arc ? Cette action est irréversible.');">
+                    <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin-top:8px">🗑️ Supprimer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
+        <p class="muted">Aucun arc enregistré pour le moment</p>
+        <a href="/add_composite" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier arc</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

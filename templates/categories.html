@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block title %}Catégories{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>📁 Catégories de produits</h1>
+        <p class="muted">{{ categories|length }} catégorie(s) disponible(s)</p>
+    </div>
+    <a class="btn btn-primary" href="/add_category">➕ Nouvelle catégorie</a>
+</div>
+
+<div class="grid">
+    {% for cat in categories %}
+    <div class="item">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="flex:1">
+                <h3 style="margin:0 0 8px 0">{{ cat.name }}</h3>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    {% if cat.has_size %}
+                        <span class="badge badge-primary">📏 Taille</span>
+                    {% endif %}
+                    {% if cat.has_power %}
+                        <span class="badge badge-success">⚡ Puissance</span>
+                    {% endif %}
+                    {% if cat.has_model %}
+                        <span class="badge badge-warning">🏷️ Modèle</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <a class="btn btn-outline" href="/edit_category/{{ cat.id }}">✏️ Modifier</a>
+                <form method="POST" action="/delete_category/{{ cat.id }}" onsubmit="return confirm('⚠️ Supprimer cette catégorie et tous ses produits ? Cette action est irréversible.');">
+                    <button type="submit" class="btn btn-danger" style="cursor:pointer">🗑️ Supprimer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
+        <p class="muted">Aucune catégorie créée pour le moment</p>
+        <a href="/add_category" class="btn btn-primary" style="margin-top:16px">➕ Créer la première catégorie</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

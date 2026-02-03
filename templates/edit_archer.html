@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+
+{% block title %}Modifier un archer{% endblock %}
+
+{% block content %}
+<h1>Modifier un archer</h1>
+<form method="post" class="form-card">
+  <h3>Informations personnelles</h3>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="first_name">Prénom</label>
+      <input type="text" id="first_name" name="first_name" value="{{ archer.first_name }}">
+    </div>
+    <div class="form-group">
+      <label for="last_name">Nom</label>
+      <input type="text" id="last_name" name="last_name" value="{{ archer.last_name }}" required>
+    </div>
+    <div class="form-group">
+      <label for="age">Âge</label>
+      <input type="number" id="age" name="age" value="{{ archer.age }}" min="0">
+    </div>
+    <div class="form-group">
+      <label for="license">Numéro de licence</label>
+      <input type="text" id="license" name="license" value="{{ archer.license_number }}" required>
+    </div>
+  </div>
+
+  <h3 style="margin-top:12px">Informations d'archer</h3>
+  <div class="form-row">
+    <div class="form-group">
+      <label for="bow_type">Type d'arc</label>
+      <input type="text" id="bow_type" name="bow_type" value="{{ archer.bow_type }}">
+    </div>
+    <div class="form-group">
+      <label for="bow_length">Longueur d'arc</label>
+      <input type="text" id="bow_length" name="bow_length" value="{{ archer.bow_length }}">
+    </div>
+    <div class="form-group">
+      <label for="draw_length">Longueur de tirage</label>
+      <input type="text" id="draw_length" name="draw_length" value="{{ archer.draw_length }}">
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <label for="notes">Notes</label>
+    <textarea id="notes" name="notes" rows="3">{{ archer.notes }}</textarea>
+  </div>
+
+  <div style="margin-top:12px">
+    <button class="btn btn-primary" type="submit">Enregistrer</button>
+    <a class="btn btn-outline" href="{{ url_for('archers') }}">Annuler</a>
+  </div>
+</form>
+{% endblock %}

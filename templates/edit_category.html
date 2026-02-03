@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+
+{% block title %}Modifier Catégorie{% endblock %}
+
+{% block content %}
+<h1>Modifier une catégorie</h1>
+<form method="post">
+    <label>Nom: <input type="text" name="name" value="{{ category.name }}" required></label><br>
+    <label>Champs disponibles:</label><br>
+    <input type="checkbox" name="has_size" value="1" {% if category.has_size %}checked{% endif %}> Taille<br>
+    <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance<br>
+    <input type="checkbox" name="has_model" value="1" {% if category.has_model %}checked{% endif %}> Modèle<br>
+    <label>Champs personnalisés (un par ligne):</label><br>
+    <textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur&#10;Diamètre">{{ category.custom_fields or '' }}</textarea><br>
+    <button class="btn" type="submit">Modifier</button>
+</form>
+{% endblock %}

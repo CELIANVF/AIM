@@ -1,0 +1,127 @@
+{% extends "layout.html" %}
+
+{% block title %}Modifier Produit{% endblock %}
+
+{% block content %}
+<h1>Modifier un produit unitaire</h1>
+<form method="post">
+    <label>Catégorie:
+        <select name="category_id" id="category_select" required>
+            {% for c in categories %}
+            <option value="{{ c.id }}" {% if c.id == product.category_id %}selected{% endif %} data-has-size="{{ c.has_size|lower }}" data-has-power="{{ c.has_power|lower }}" data-has-model="{{ c.has_model|lower }}" data-custom-fields="{{ c.custom_fields or '' }}">{{ c.name }}</option>
+            {% endfor %}
+        </select>
+    </label><br>
+    <label>Marque: <input type="text" name="brand" value="{{ product.brand }}"></label><br>
+    <label>État:
+        <select name="state">
+            <option value="stock" {% if product.state == 'stock' %}selected{% endif %}>En stock</option>
+            <option value="loan" {% if product.state == 'loan' %}selected{% endif %}>En prêt</option>
+            <option value="broken" {% if product.state == 'broken' %}selected{% endif %}>Cassé</option>
+        </select>
+    </label><br>
+    <label>Localisation:
+        <select name="location">
+            <option value="club" {% if product.location == 'club' %}selected{% endif %}>Au club</option>
+            <option value="loan" {% if product.location == 'loan' %}selected{% endif %}>En prêt</option>
+        </select>
+    </label><br>
+    <label>Commentaires: <textarea name="comments">{{ product.comments }}</textarea></label><br>
+    <div id="size_field" style="display: none;">
+        <label>Taille: <input type="text" name="size" value="{{ product.size }}"></label><br>
+    </div>
+    <div id="power_field" style="display: none;">
+        <label>Puissance: <input type="text" name="power" value="{{ product.power }}"></label><br>
+    </div>
+    <div id="model_field">
+        <label>Modèle: <input type="text" name="model" value="{{ product.model }}"></label><br>
+    </div>
+    <div id="custom_fields">
+        <!-- Custom fields will be added here -->
+    </div>
+    <button class="btn" type="submit">Modifier</button>
+</form>
+<p><a href="/products">Retour</a></p>
+
+<script>
+    const categorySelect = document.getElementById('category_select');
+    const sizeField = document.getElementById('size_field');
+    const powerField = document.getElementById('power_field');
+    const modelField = document.getElementById('model_field');
+    const customFieldsDiv = document.getElementById('custom_fields');
+
+    function updateFields() {
+        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+        const hasSize = selectedOption.getAttribute('data-has-size') === 'true';
+        const hasPower = selectedOption.getAttribute('data-has-power') === 'true';
+        const hasModel = selectedOption.getAttribute('data-has-model') === 'true';
+        const customFields = selectedOption.getAttribute('data-custom-fields') || '';
+
+        sizeField.style.display = hasSize ? 'block' : 'none';
+        powerField.style.display = hasPower ? 'block' : 'none';
+        modelField.style.display = hasModel ? 'block' : 'none';
+
+        // Clear existing custom fields
+        customFieldsDiv.innerHTML = '';
+
+        // Add custom fields
+        if (customFields.trim()) {
+            const fields = customFields.split('\n').map(f => f.trim()).filter(f => f);
+            const existingValues = {{ product.custom_values|tojson if product.custom_values else '{}' }};
+
+            // helper to lookup value case-insensitively and normalized
+            function valueFor(labelText) {
+                const keyNorm = labelText.replace(/\s+/g, ' ').toLowerCase();
+                for (const k in existingValues) {
+                    if (k.replace(/\s+/g, ' ').toLowerCase() === keyNorm) return existingValues[k];
+                }
+                return undefined;
+            }
+
+            fields.forEach(field => {
+                const parts = field.split(':');
+                const labelText = parts[0].trim();
+                const spec = parts[1] ? parts[1].trim() : null;
+                const nameAttr = 'custom_' + labelText.replace(/\s+/g, '_').toLowerCase();
+                const existing = valueFor(labelText);
+
+                const label = document.createElement('label');
+                label.textContent = labelText + ': ';
+
+                if (spec && spec.includes('/')) {
+                    const select = document.createElement('select');
+                    select.name = nameAttr;
+                    spec.split('/').map(o => o.trim()).filter(o => o).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        if (existing && existing === opt) option.selected = true;
+                        select.appendChild(option);
+                    });
+                    label.appendChild(select);
+                } else if (spec && spec.toLowerCase() === 'date') {
+                    const input = document.createElement('input');
+                    input.type = 'date';
+                    input.name = nameAttr;
+                    if (existing) input.value = existing;
+                    label.appendChild(input);
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.name = nameAttr;
+                    if (existing) input.value = existing;
+                    label.appendChild(input);
+                }
+
+                customFieldsDiv.appendChild(label);
+                customFieldsDiv.appendChild(document.createElement('br'));
+            });
+        }
+    }
+
+    categorySelect.addEventListener('change', updateFields);
+    // Initial call
+    updateFields();
+</script>
+{% endblock %}
+

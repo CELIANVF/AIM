@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block title %}Assigner Arc{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+    <div>
+        <h1 style="margin:0">🎯 Assigner un arc à un archer</h1>
+        <p class="muted" style="margin:4px 0 0 0">Sélectionnez un archer et un arc disponible</p>
+    </div>
+    <a href="{{ url_for('assignments') }}" class="btn btn-outline">← Retour aux assignations</a>
+</div>
+
+<div class="card" style="max-width:600px">
+    <form method="post" style="display:flex;flex-direction:column;gap:16px">
+        <div class="form-group">
+            <label for="archer_id" style="display:block;margin-bottom:8px;font-weight:500">Archer</label>
+            <select name="archer_id" id="archer_id" required style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius)">
+                <option value="">-- Sélectionnez un archer --</option>
+                {% for a in archers %}
+                <option value="{{ a.id }}"{% if selected_archer and selected_archer.id == a.id %} selected{% endif %}>{{ a.name }} ({{ a.license_number }}){% if a.current_assignment %} - Arc: {{ a.current_assignment.composite.name }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="composite_id" style="display:block;margin-bottom:8px;font-weight:500">Arc disponible</label>
+            <select name="composite_id" id="composite_id" required style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius)">
+                <option value="">-- Sélectionnez un arc --</option>
+                {% for c in composites %}
+                <option value="{{ c.id }}">{{ c.name }} ({{ c.type }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display:flex;gap:12px">
+            <button class="btn btn-primary" type="submit" {% if not composites %}disabled{% endif %}>✓ Assigner l'arc</button>
+            <a class="btn btn-outline" href="{{ url_for('assignments') }}">Annuler</a>
+        </div>
+    </form>
+</div>
+
+{% if not composites and all_composites %}
+<div class="card" style="margin-top:24px;background-color:rgba(255,191,0,0.1);border-color:var(--warning)">
+    <h3 style="margin-top:0">ℹ️ Arcs non disponibles</h3>
+    <p class="small muted">Les arcs suivants ne sont pas disponibles au club mais peuvent être rendus disponibles:</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        {% for c in all_composites %}
+            {% if c.status != 'club' %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:white;border-radius:4px;border:1px solid var(--border-light)">
+                <span><strong>{{ c.name }}</strong> ({{ c.type }}) - Statut: <code>{{ c.status }}</code></span>
+                <form method="POST" action="{{ url_for('reset_composite_status', comp_id=c.id) }}" style="display:inline;margin:0">
+                    <button type="submit" class="btn btn-small btn-warning">Rendre disponible</button>
+                </form>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

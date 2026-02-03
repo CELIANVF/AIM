@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+
+{% block title %}Ajouter Arc{% endblock %}
+
+{% block content %}
+<h1>Ajouter un arc</h1>
+<form method="post">
+    <label>Nom/Référence: <input type="text" name="name" required></label><br>
+    <label>Type:
+        <select name="type">
+            <option value="BB">BB (Bare Bow)</option>
+            <option value="CL">CL (Classique)</option>
+        </select>
+    </label><br>
+    <label>Statut:
+        <select name="status">
+            <option value="club">Au club</option>
+            <option value="loan">En prêt</option>
+        </select>
+    </label><br>
+    <h2>Composants</h2>
+    {% for c in categories %}
+        <h3>{{ c.name }}</h3>
+        {% if c.products %}
+            {% for p in c.products %}
+                <label><input type="checkbox" name="components" value="{{ p.id }}"> {{ p.brand }} {% if p.model %}({{ p.model }}){% endif %}</label><br>
+            {% endfor %}
+        {% else %}
+            <em>Aucun produit</em><br>
+        {% endif %}
+    {% endfor %}
+    <button class="btn" type="submit">Ajouter</button>
+</form>
+{% endblock %}

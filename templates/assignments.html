@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block title %}Assignations{% endblock %}
+
+{% block content %}
+<h1>Assignations actuelles</h1>
+<div class="grid">
+    {% for ass in assignments %}
+    <div class="item">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+                <div style="display:flex;gap:8px;align-items:baseline">
+                    <h3 style="margin:0">{{ ass.composite.name }}</h3>
+                    <span class="muted small">&mdash; {{ ass.archer.name }}</span>
+                </div>
+                <p class="small muted" style="margin:6px 0 0 0">Assigné le {{ ass.date_assigned.strftime('%d/%m/%Y') }}</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" style="display:inline;">
+                    <button class="btn btn-outline" type="submit">Retourner</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
+    <a class="btn btn-secondary" href="/export_assignments">Exporter en PDF</a>
+</p>
+{% endblock %}

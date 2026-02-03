@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+
+{% block title %}Archers du cours{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+    <div>
+        <h1 style="margin:0">👥 {{ course.name }}</h1>
+        <p class="muted" style="margin:4px 0 0 0">Gestion des archers inscrits</p>
+    </div>
+    <a href="{{ url_for('courses') }}" class="btn btn-outline">← Retour aux cours</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+    <div>
+        <h2>Archers inscrits</h2>
+        {% if course.archers %}
+            <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden">
+                {% for archer in course.archers %}
+                    <div style="padding:16px;border-bottom:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <p style="margin:0;font-weight:500">{{ archer.name }}</p>
+                            <p class="small muted" style="margin:4px 0 0 0">Licence: {{ archer.license_number }}</p>
+                        </div>
+                        <form method="POST" action="{{ url_for('remove_archer_from_course', course_id=course.id, archer_id=archer.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-danger" style="padding:8px 12px;font-size:12px">Retirer</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card">
+                <p class="muted" style="text-align:center">Aucun archer inscrit pour le moment</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div>
+        <h2>Ajouter un archer</h2>
+        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);max-height:500px;overflow-y:auto">
+            {% for archer in all_archers %}
+                {% if archer not in course.archers %}
+                    <div style="padding:16px;border-bottom:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <p style="margin:0;font-weight:500">{{ archer.name }}</p>
+                            <p class="small muted" style="margin:4px 0 0 0">Licence: {{ archer.license_number }}</p>
+                        </div>
+                        <form method="POST" action="{{ url_for('add_archer_to_course', course_id=course.id, archer_id=archer.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-primary" style="padding:8px 12px;font-size:12px">Ajouter</button>
+                        </form>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
