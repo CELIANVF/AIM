@@ -12,7 +12,7 @@
     <input type="checkbox" name="has_size" value="1" {% if category.has_size %}checked{% endif %}> Taille<br>
     <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance<br>
     <label>Champs personnalisés (un par ligne):</label><br>
-<textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields.replace(',', '&#10;') }}{% endif %}</textarea><br>
+<textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur: rouge/bleu/jaune&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields.replace(',', '&#10;') }}{% endif %}</textarea><br>
     <button class="btn" type="submit">Modifier</button>
 </form>
 {% endblock %}

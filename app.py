@@ -146,9 +146,9 @@ def add_category():
         has_power = 'has_power' in request.form
         has_model = 'has_model' in request.form
         has_brand = 'has_brand' in request.form
-        # Convertir les champs personnalisés (un par ligne) en virgules séparées, en enlevant la partie après ":"
+        # Convertir les champs personnalisés (un par ligne) en virgules séparées, en préservant la partie après ":"
         custom_fields_raw = request.form.get('custom_fields', '').strip()
-        custom_fields = ','.join(line.split(':')[0].strip() for line in custom_fields_raw.split('\n') if line.strip())
+        custom_fields = ','.join(line.strip() for line in custom_fields_raw.split('\n') if line.strip())
         cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields)
         db.session.add(cat)
         db.session.commit()
@@ -166,9 +166,9 @@ def edit_category(cat_id):
         cat.has_power = 'has_power' in request.form
         cat.has_model = 'has_model' in request.form
         cat.has_brand = 'has_brand' in request.form
-        # Convertir les champs personnalisés (un par ligne) en virgules séparées, en enlevant la partie après ":"
+        # Convertir les champs personnalisés (un par ligne) en virgules séparées, en préservant la partie après ":"
         custom_fields_raw = request.form.get('custom_fields', '').strip()
-        cat.custom_fields = ','.join(line.split(':')[0].strip() for line in custom_fields_raw.split('\n') if line.strip())
+        cat.custom_fields = ','.join(line.strip() for line in custom_fields_raw.split('\n') if line.strip())
         db.session.commit()
         return redirect(url_for('categories'))
     return render_template('edit_category.html', category=cat)
@@ -952,6 +952,245 @@ def import_archers():
                                      error=f"Erreur lors de la lecture du fichier: {str(e)}")
     
     return render_template('import_archers.html')
+
+# Routes d'export CSV
+@app.route('/export_products_csv')
+@login_required
+@require_permission('view_equipment')
+def export_products_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Catégorie', 'Marque', 'Modèle', 'Taille', 'Puissance', 'État', 'Lieu', 'Commentaires'])
+    
+    # Data
+    prods = Product.query.join(Category).order_by(Category.name, Product.brand).all()
+    for prod in prods:
+        writer.writerow([
+            prod.id,
+            prod.category.name if prod.category else '',
+            prod.brand or '',
+            prod.model or '',
+            prod.size or '',
+            prod.power or '',
+            prod.state or '',
+            prod.location or '',
+            prod.comments or ''
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'produits_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/export_archers_csv')
+@login_required
+def export_archers_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Prénom', 'Nom', 'Numéro Licence', 'Âge', 'Catégorie', 'Type d\'arc', 'Personnel', 'Archer'])
+    
+    # Data
+    archers = Archer.query.all()
+    for archer in archers:
+        writer.writerow([
+            archer.id,
+            archer.first_name or '',
+            archer.last_name or '',
+            archer.license_number or '',
+            archer.age or '',
+            archer.categorie or '',
+            archer.bow_type or '',
+            'Oui' if archer.personal_equipment else 'Non',
+            'Oui' if archer.is_archer else 'Non'
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'archers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/export_composites_csv')
+@login_required
+def export_composites_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Nom', 'Type', 'Statut', 'Composants'])
+    
+    # Data
+    comps = CompositeProduct.query.all()
+    for comp in comps:
+        components_str = ' | '.join([f"{p.brand} ({p.category.name})" for p in comp.components])
+        writer.writerow([
+            comp.id,
+            comp.name or '',
+            comp.type or '',
+            comp.status or '',
+            components_str
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'arcs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/export_assignments_csv')
+@login_required
+@require_permission('view_assignments')
+def export_assignments_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Archer', 'Arc', 'Date d\'assignation', 'Date de retour', 'Durée (jours)', 'Statut'])
+    
+    # Data
+    assigns = Assignment.query.all()
+    for ass in assigns:
+        duration = ''
+        status = 'Actif'
+        if ass.date_returned:
+            duration = (ass.date_returned - ass.date_assigned).days
+            status = 'Retourné'
+        else:
+            duration = (datetime.now().date() - ass.date_assigned.date()).days if isinstance(ass.date_assigned, datetime) else ''
+        
+        writer.writerow([
+            ass.id,
+            f"{ass.archer.first_name} {ass.archer.last_name}" if ass.archer else '',
+            ass.composite.name if ass.composite else '',
+            ass.date_assigned.strftime('%d/%m/%Y') if ass.date_assigned else '',
+            ass.date_returned.strftime('%d/%m/%Y') if ass.date_returned else '',
+            duration,
+            status
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'assignations_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/export_categories_csv')
+@login_required
+@require_permission('view_equipment')
+def export_categories_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Nom', 'Taille', 'Puissance', 'Modèle', 'Marque', 'Champs personnalisés', 'Nombre de produits'])
+    
+    # Data
+    cats = Category.query.all()
+    for cat in cats:
+        writer.writerow([
+            cat.id,
+            cat.name or '',
+            'Oui' if cat.has_size else 'Non',
+            'Oui' if cat.has_power else 'Non',
+            'Oui' if cat.has_model else 'Non',
+            'Oui' if cat.has_brand else 'Non',
+            cat.custom_fields or '',
+            len(cat.products)
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'categories_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/export_courses_csv')
+@login_required
+@require_permission('view_courses')
+def export_courses_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Nom', 'Date', 'Heure', 'Lieu', 'Nombre d\'archers inscrits', 'Capacité', 'Statut'])
+    
+    # Data
+    courses = Course.query.all()
+    for course in courses:
+        writer.writerow([
+            course.id,
+            course.name or '',
+            course.date.strftime('%d/%m/%Y') if hasattr(course, 'date') and course.date else '',
+            course.time.strftime('%H:%M') if hasattr(course, 'time') and course.time else '',
+            course.location or '',
+            len(course.archers) if hasattr(course, 'archers') else 0,
+            getattr(course, 'capacity', ''),
+            'Actif' if not hasattr(course, 'cancelled') or not course.cancelled else 'Annulé'
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'cours_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/export_users_csv')
+@login_required
+@require_permission('admin')
+def export_users_csv():
+    from io import BytesIO
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers
+    writer.writerow(['ID', 'Nom d\'utilisateur', 'Rôle'])
+    
+    # Data
+    all_users = User.query.all()
+    for user in all_users:
+        writer.writerow([
+            user.id,
+            user.username or '',
+            user.role or ''
+        ])
+    
+    buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'utilisateurs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mimetype='text/csv'
+    )
 
 # Routes de gestion des utilisateurs (Admin only)
 @app.route('/users')

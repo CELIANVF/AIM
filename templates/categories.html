@@ -8,9 +8,12 @@
         <h1>📁 Catégories de produits</h1>
         <p class="muted">{{ categories|length }} catégorie(s) disponible(s)</p>
     </div>
-    {% if current_user.can_edit() %}
-    <a class="btn btn-primary" href="/add_category">➕ Nouvelle catégorie</a>
-    {% endif %}
+    <div class="action-group">
+        {% if current_user.can_edit() %}
+        <a class="btn btn-primary" href="/add_category">➕ Nouvelle catégorie</a>
+        {% endif %}
+        <a class="btn btn-outline" href="/export_categories_csv">📊 Exporter CSV</a>
+    </div>
 </div>
 
 <div class="grid">

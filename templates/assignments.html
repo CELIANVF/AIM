@@ -31,6 +31,7 @@
     {% if current_user.can_manage_assignments_for_coach() %}
     <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
     {% endif %}
-    <a class="btn btn-secondary" href="/export_assignments">Exporter en PDF</a>
+    <a class="btn btn-secondary" href="/export_assignments">📄 Exporter en PDF</a>
+    <a class="btn btn-outline" href="/export_assignments_csv">📊 Exporter en CSV</a>
 </p>
 {% endblock %}

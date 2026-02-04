@@ -66,7 +66,7 @@
 
         // Add custom fields
         if (customFields.trim()) {
-            const fields = customFields.split('\n').map(f => f.trim()).filter(f => f);
+            const fields = customFields.split(',').map(f => f.trim()).filter(f => f);
             const existingValues = {{ product.custom_values|tojson if product.custom_values else '{}' }};
 
             // helper to lookup value case-insensitively and normalized
