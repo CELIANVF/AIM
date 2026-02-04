@@ -192,7 +192,14 @@ def delete_category(cat_id):
 @require_permission('view_equipment')
 def products():
     prods = Product.query.join(Category).order_by(Category.name, Product.brand).all()
-    return render_template('products.html', products=prods)
+    
+    # Group products by category
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for product in prods:
+        grouped[product.category.name].append(product)
+    
+    return render_template('products.html', products=prods, grouped_products=grouped)
 
 @app.route('/add_product', methods=['GET', 'POST'])
 @login_required

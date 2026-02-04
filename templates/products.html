@@ -3,6 +3,59 @@
 {% block title %}Produits{% endblock %}
 
 {% block content %}
+<style>
+    .accordion {
+        margin-bottom: 16px;
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .accordion-header {
+        background-color: var(--background-secondary, #f5f5f5);
+        padding: 16px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+        transition: background-color 0.2s;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .accordion-header:hover {
+        background-color: var(--background-tertiary, #efefef);
+    }
+
+    .accordion-header.collapsed {
+        border-bottom: none;
+    }
+
+    .accordion-icon {
+        transition: transform 0.2s;
+        display: inline-block;
+    }
+
+    .accordion-header.collapsed .accordion-icon {
+        transform: rotate(-90deg);
+    }
+
+    .accordion-content {
+        padding: 16px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        max-height: 10000px;
+        overflow: hidden;
+        transition: max-height 0.3s ease-in-out;
+    }
+
+    .accordion-content.collapsed {
+        max-height: 0;
+        padding: 0;
+    }
+</style>
+
 <div class="header-with-actions">
     <div>
         <h1>📦 Produits unitaires</h1>
@@ -17,53 +70,73 @@
     </div>
 </div>
 
-<div class="grid">
-    {% for p in products %}
-    <div class="item">
-        <div style="display:flex;flex-direction:column;gap:12px">
-            <div>
-                <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                    <h3 style="margin:0">{{ p.brand }}</h3>
-                    <span class="badge badge-primary">{{ p.category.name }}</span>
+{% if products %}
+    {% for category_name, products_by_category in grouped_products.items() %}
+    <div class="accordion">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+            <span>{{ category_name }} ({{ products_by_category|length }})</span>
+            <span class="accordion-icon">▼</span>
+        </div>
+        <div class="accordion-content">
+            {% for p in products_by_category %}
+            <div class="item">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                            <h3 style="margin:0">{{ p.brand }}</h3>
+                            {% if p.model %}
+                            <span class="badge badge-info">{{ p.model }}</span>
+                            {% endif %}
+                        </div>
+                        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                            {% if p.state == 'stock' %}
+                                <span class="badge badge-success">✓ Disponible</span>
+                            {% elif p.state == 'broken' %}
+                                <span class="badge badge-danger">✗ Cassé</span>
+                            {% endif %}
+                        </div>
+                        {% if p.custom_values %}
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
+                            {% for k, v in p.custom_values.items() %}
+                                <span class="small" style="margin-right:12px"><strong>{{ k }}:</strong> {{ v }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% if p.comments %}
+                        <p class="small muted" style="margin-top:8px">💬 {{ p.comments }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="action-group" style="padding-top:8px;border-top:1px solid var(--border-light)">
+                        {% if current_user.can_edit() %}
+                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}" style="flex:1">✏️ Modifier</a>
+                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}" style="flex:1">📋 Dupliquer</a>
+                        {% endif %}
+                        {% if current_user.can_delete() %}
+                        <form method="POST" action="/delete_product/{{ p.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin:0">🗑️ Supprimer</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
-                <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                    {% if p.state == 'stock' %}
-                        <span class="badge badge-success">✓ Disponible</span>
-                    {% elif p.state == 'broken' %}
-                        <span class="badge badge-danger">✗ Cassé</span>
-                    {% endif %}
-                </div>
-                {% if p.custom_values %}
-                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
-                    {% for k, v in p.custom_values.items() %}
-                        <span class="small" style="margin-right:12px"><strong>{{ k }}:</strong> {{ v }}</span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                {% if p.comments %}
-                <p class="small muted" style="margin-top:8px">💬 {{ p.comments }}</p>
-                {% endif %}
             </div>
-            <div class="action-group" style="padding-top:8px;border-top:1px solid var(--border-light)">
-                {% if current_user.can_edit() %}
-                <a class="btn btn-outline" href="/edit_product/{{ p.id }}" style="flex:1">✏️ Modifier</a>
-                <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}" style="flex:1">📋 Dupliquer</a>
-                {% endif %}
-                {% if current_user.can_delete() %}
-                <form method="POST" action="/delete_product/{{ p.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
-                    <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin:0">🗑️ Supprimer</button>
-                </form>
-                {% endif %}
-            </div>
+            {% endfor %}
         </div>
     </div>
-    {% else %}
-    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
+    {% endfor %}
+{% else %}
+    <div class="card" style="text-align:center;padding:48px 24px">
         <p class="muted">Aucun produit enregistré pour le moment</p>
         {% if current_user.can_edit() %}
         <a href="/add_product" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier produit</a>
         {% endif %}
     </div>
-    {% endfor %}
-</div>
+{% endif %}
+
+<script>
+function toggleAccordion(header) {
+    const content = header.nextElementSibling;
+    header.classList.toggle('collapsed');
+    content.classList.toggle('collapsed');
+}
+</script>
 {% endblock %}
