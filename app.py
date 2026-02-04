@@ -117,33 +117,9 @@ def log_history(event_type, entity_type, entity_id, summary, details=None):
     db.session.add(event)
     return event
 
-def seed_categories():
-    default_categories = {
-        'viseur': {'has_size': False, 'has_power': False, 'has_model': True, 'has_brand': True},
-        'stab': {'has_size': False, 'has_power': False, 'has_model': True, 'has_brand': True}
-    }
-    with app.app_context():
-        for cat_name, attrs in default_categories.items():
-            cat = Category.query.filter_by(name=cat_name).first()
-            if not cat:
-                cat = Category(name=cat_name, **attrs)
-                db.session.add(cat)
-            else:
-                # update if not set
-                if cat.has_size is None:
-                    cat.has_size = attrs['has_size']
-                if cat.has_power is None:
-                    cat.has_power = attrs['has_power']
-                if cat.has_model is None:
-                    cat.has_model = attrs['has_model']
-                if cat.has_brand is None:
-                    cat.has_brand = attrs['has_brand']
-        db.session.commit()
-
 @app.route('/')
 @login_required
 def index():
-    seed_categories()
     products_count = Product.query.count()
     archers_count = Archer.query.count()
     composites_count = CompositeProduct.query.count()
