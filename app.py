@@ -23,8 +23,8 @@ def log_history(event_type, entity_type, entity_id, summary, details=None):
 
 def seed_categories():
     default_categories = {
-        'viseur': {'has_size': False, 'has_power': False, 'has_model': False},
-        'stab': {'has_size': False, 'has_power': False, 'has_model': False}
+        'viseur': {'has_size': False, 'has_power': False, 'has_model': True, 'has_brand': True},
+        'stab': {'has_size': False, 'has_power': False, 'has_model': True, 'has_brand': True}
     }
     with app.app_context():
         for cat_name, attrs in default_categories.items():
@@ -40,6 +40,8 @@ def seed_categories():
                     cat.has_power = attrs['has_power']
                 if cat.has_model is None:
                     cat.has_model = attrs['has_model']
+                if cat.has_brand is None:
+                    cat.has_brand = attrs['has_brand']
         db.session.commit()
 
 @app.route('/')
@@ -67,8 +69,9 @@ def add_category():
         has_size = 'has_size' in request.form
         has_power = 'has_power' in request.form
         has_model = 'has_model' in request.form
+        has_brand = 'has_brand' in request.form
         custom_fields = request.form.get('custom_fields', '').strip()
-        cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, custom_fields=custom_fields)
+        cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields)
         db.session.add(cat)
         db.session.commit()
         return redirect(url_for('categories'))
@@ -82,6 +85,7 @@ def edit_category(cat_id):
         cat.has_size = 'has_size' in request.form
         cat.has_power = 'has_power' in request.form
         cat.has_model = 'has_model' in request.form
+        cat.has_brand = 'has_brand' in request.form
         cat.custom_fields = request.form.get('custom_fields', '').strip()
         db.session.commit()
         return redirect(url_for('categories'))

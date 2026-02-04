@@ -24,8 +24,18 @@
                     {% if cat.has_power %}
                         <span class="badge badge-success">⚡ Puissance</span>
                     {% endif %}
+                    {% if cat.has_brand %}
+                        <span class="badge badge-info">🏷️ Marque</span>
+                    {% endif %}
                     {% if cat.has_model %}
-                        <span class="badge badge-warning">🏷️ Modèle</span>
+                        <span class="badge badge-warning">📦 Modèle</span>
+                    {% endif %}
+                    {% if cat.custom_fields %}
+                        {% for field in cat.custom_fields.split(',') %}
+                            {% if field.strip() %}
+                                <span class="badge badge-info">🔧 {{ field.strip() }}</span>
+                            {% endif %}
+                        {% endfor %}
                     {% endif %}
                 </div>
             </div>

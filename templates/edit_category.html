@@ -9,6 +9,7 @@
     <label>Champs disponibles:</label><br>
     <input type="checkbox" name="has_size" value="1" {% if category.has_size %}checked{% endif %}> Taille<br>
     <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance<br>
+    <input type="checkbox" name="has_brand" value="1" {% if category.has_brand %}checked{% endif %}> Marque<br>
     <input type="checkbox" name="has_model" value="1" {% if category.has_model %}checked{% endif %}> Modèle<br>
     <label>Champs personnalisés (un par ligne):</label><br>
     <textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur&#10;Diamètre">{{ category.custom_fields or '' }}</textarea><br>

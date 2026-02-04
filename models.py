@@ -8,7 +8,8 @@ class Category(db.Model):
     name = db.Column(db.String(50), unique=True, nullable=False)
     has_size = db.Column(db.Boolean, default=False)
     has_power = db.Column(db.Boolean, default=False)
-    has_model = db.Column(db.Boolean, default=False)
+    has_model = db.Column(db.Boolean, default=True)
+    has_brand = db.Column(db.Boolean, default=True)
     custom_fields = db.Column(db.Text)  # comma-separated field names
 
 class Product(db.Model):
