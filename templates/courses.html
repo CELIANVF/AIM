@@ -45,6 +45,8 @@
                 <form method="POST" action="/delete_course/{{ course.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce cours ?');">
                     <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer">🗑️ Supprimer</button>
                 </form>
+                {% elif current_user.can_manage_attendance() %}
+                <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="width:100%">✓ Présences</a>
                 {% endif %}
             </div>
         </div>

@@ -54,6 +54,18 @@ def require_permission(permission_type):
                 flash('Seuls les responsables et administrateurs peuvent gérer les cours.', 'error')
                 return redirect(url_for('index'))
             
+            elif permission_type == 'manage_attendance' and not current_user.can_manage_attendance():
+                flash('Vous n\'avez pas la permission pour gérer les présences.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'view_equipment' and not current_user.can_view_equipment():
+                flash('Vous n\'avez pas la permission pour voir le matériel.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'manage_assignments_for_coach' and not current_user.can_manage_assignments_for_coach():
+                flash('Vous n\'avez pas la permission pour gérer les assignations.', 'error')
+                return redirect(url_for('index'))
+            
             elif permission_type == 'view_courses' and not current_user.can_view_courses():
                 flash('Vous n\'avez pas la permission pour voir les cours.', 'error')
                 return redirect(url_for('index'))
@@ -201,6 +213,7 @@ def delete_category(cat_id):
 
 @app.route('/products')
 @login_required
+@require_permission('view_equipment')
 def products():
     prods = Product.query.join(Category).order_by(Category.name, Product.brand).all()
     return render_template('products.html', products=prods)
@@ -474,7 +487,7 @@ def assignments():
 
 @app.route('/return/<int:assign_id>', methods=['POST'])
 @login_required
-@require_permission('edit')
+@require_permission('manage_assignments_for_coach')
 def return_assignment(assign_id):
     assign = Assignment.query.get_or_404(assign_id)
     assign.date_returned = db.func.now()
@@ -543,7 +556,7 @@ def delete_composite(comp_id):
 
 @app.route('/assign', methods=['GET', 'POST'])
 @login_required
-@require_permission('edit')
+@require_permission('manage_assignments_for_coach')
 def assign():
     if request.method == 'POST':
         archer_id = request.form['archer_id']
@@ -571,7 +584,7 @@ def assign():
 
 @app.route('/reset_composite_status/<int:comp_id>', methods=['POST'])
 @login_required
-@require_permission('edit')
+@require_permission('manage_assignments_for_coach')
 def reset_composite_status(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     comp.status = 'club'
@@ -709,7 +722,7 @@ def remove_archer_from_course(course_id, archer_id):
 
 @app.route('/course/<int:course_id>/attendance')
 @login_required
-@require_permission('manage_courses')
+@require_permission('manage_attendance')
 def course_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     today = date.today()
@@ -725,7 +738,7 @@ def course_attendance(course_id):
 
 @app.route('/course/<int:course_id>/mark_attendance', methods=['POST'])
 @login_required
-@require_permission('manage_courses')
+@require_permission('manage_attendance')
 def mark_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     attendance_date = request.form.get('date')

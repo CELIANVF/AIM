@@ -39,8 +39,14 @@ class User(UserMixin, db.Model):
     def can_manage_equipment(self):
         return self.role in ('admin', 'responsable', 'editeur')
     
+    def can_view_equipment(self):
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'coach')
+    
     def can_manage_courses(self):
         return self.role in ('admin', 'responsable')
+    
+    def can_manage_attendance(self):
+        return self.role in ('admin', 'responsable', 'coach')
     
     def can_view_courses(self):
         return self.role in ('admin', 'responsable', 'lecteur', 'coach')
@@ -48,11 +54,14 @@ class User(UserMixin, db.Model):
     def can_manage_assignments(self):
         return self.role in ('admin', 'responsable', 'editeur')
     
+    def can_manage_assignments_for_coach(self):
+        return self.role in ('admin', 'responsable', 'editeur', 'coach')
+    
     def can_view_assignments(self):
-        return self.role in ('admin', 'responsable', 'editeur', 'lecteur')
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'coach')
     
     def can_view_history(self):
-        return self.role in ('admin', 'responsable', 'editeur', 'lecteur')
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'coach')
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
