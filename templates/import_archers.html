@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+
+{% block title %}Importer Archers{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <h1>📥 Importer des Archers</h1>
+    
+    {% if success %}
+    <div class="alert alert-success" style="padding: 16px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 16px;">
+        <h3 style="margin-top: 0;">✅ Import réussi!</h3>
+        <p><strong>{{ imported }} archer(s) importé(s)</strong></p>
+        {% if errors %}
+            <p><strong>Erreurs ({{ errors|length }}):</strong></p>
+            <ul style="margin: 8px 0; padding-left: 20px;">
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        <a href="/archers" class="btn btn-primary" style="margin-top: 12px;">Voir les archers</a>
+    </div>
+    {% endif %}
+    
+    {% if error %}
+    <div class="alert alert-danger" style="padding: 16px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 16px;">
+        <h3 style="margin-top: 0;">⚠️ Erreur</h3>
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+    
+    <div class="card" style="padding: 24px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 24px;">
+        <h2 style="margin-top: 0;">Format requis</h2>
+        <p>Le fichier CSV doit contenir les colonnes suivantes (séparées par des points-virgules):</p>
+        <ul style="background-color: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto;">
+            <li>Code adhérent <span style="color: red;">*</span></li>
+            <li>Civilité</li>
+            <li>Nom <span style="color: red;">*</span></li>
+            <li>Prénom</li>
+            <li>DDN</li>
+            <li>Nationalité</li>
+            <li>Type licence</li>
+            <li>Saison</li>
+            <li>Discipline(s)</li>
+            <li>Catégorie âge sportif</li>
+            <li>Catégorie âge</li>
+            <li>Code structure</li>
+            <li>Nom structure</li>
+            <li>Nom du responsable légal</li>
+            <li>Prénom du responsable légal</li>
+            <li>Téléphone du responsable légal</li>
+            <li>Mail du responsable légal</li>
+            <li>Nom du responsable légal secondaire</li>
+            <li>Prénom du responsable légal secondaire</li>
+            <li>Téléphone du responsable légal secondaire</li>
+            <li>Mail du responsable légal secondaire</li>
+        </ul>
+        <p><span style="color: red;">*</span> Champs obligatoires</p>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" style="background-color: #f9f9f9; padding: 24px; border-radius: 8px; border: 2px dashed #ddd;">
+        <div style="margin-bottom: 16px;">
+            <label for="file" style="display: block; font-weight: bold; margin-bottom: 8px;">Sélectionner un fichier CSV:</label>
+            <input 
+                type="file" 
+                name="file" 
+                id="file" 
+                accept=".csv" 
+                required
+                style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box;"
+            >
+            <small style="color: #666; display: block; margin-top: 8px;">Formats acceptés: CSV (séparé par des points-virgules)</small>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">📥 Importer</button>
+    </form>
+    
+    <div style="margin-top: 24px; padding: 16px; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+        <h3 style="margin-top: 0;">💡 Conseil</h3>
+        <p>Assurez-vous que:</p>
+        <ul style="margin: 8px 0;">
+            <li>Le fichier utilise des points-virgules (;) comme séparateur</li>
+            <li>Les codes adhérents sont uniques</li>
+            <li>Les dates de naissance sont au format JJ/MM/AAAA ou DD/MM/YYYY</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

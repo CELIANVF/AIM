@@ -4,6 +4,9 @@ from flask_migrate import Migrate
 from config import Config
 from models import db, Category, Product, CompositeProduct, Archer, Assignment, HistoryEvent, Course, Attendance
 from datetime import datetime, date, timedelta
+from dateutil import parser as date_parser
+import csv
+from io import StringIO
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -647,6 +650,107 @@ def export_composites():
     p.save()
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name='composites.pdf', mimetype='application/pdf')
+
+@app.route('/import_archers', methods=['GET', 'POST'])
+def import_archers():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            return redirect(request.url)
+        if file and file.filename.endswith('.csv'):
+            try:
+                # Lire le fichier avec gestion des guillemets et BOM
+                content = file.stream.read().decode("UTF-8-sig")  # UTF-8-sig supprime le BOM
+                stream = StringIO(content, newline=None)
+                csv_reader = csv.DictReader(stream, delimiter=';', quotechar='"')
+                
+                imported = 0
+                errors = []
+                
+                # Afficher les fieldnames pour debug
+                fieldnames = csv_reader.fieldnames
+                if not fieldnames:
+                    return render_template('import_archers.html', 
+                                         error="Le fichier CSV est vide ou mal formaté")
+                
+                # Fonction pour nettoyer les clés
+                def clean_key(key):
+                    if key is None:
+                        return None
+                    return key.strip().strip('"').strip()
+                
+                # Créer un mapping des colonnes nettoyées
+                clean_fieldnames = {clean_key(f): f for f in fieldnames if f}
+                
+                # Fonction pour trouver la colonne correspondante
+                def find_column(row_dict, *possible_names):
+                    for name in possible_names:
+                        clean_name = clean_key(name)
+                        # Chercher dans les fieldnames nettoyées
+                        if clean_name in clean_fieldnames:
+                            original_field = clean_fieldnames[clean_name]
+                            value = row_dict.get(original_field, '')
+                            return value.strip() if isinstance(value, str) else ''
+                        # Chercher directement dans la ligne
+                        for key, value in row_dict.items():
+                            if clean_key(key) == clean_name:
+                                return value.strip() if isinstance(value, str) else ''
+                    # Si rien n'est trouvé, chercher la première colonne (qui peut être le code)
+                    if len(row_dict) > 0:
+                        first_value = list(row_dict.values())[0]
+                        return first_value.strip() if isinstance(first_value, str) else ''
+                    return ''
+                
+                for row_num, row in enumerate(csv_reader, start=2):
+                    try:
+                        license_number = find_column(row, 'Code adhérent').strip()
+                        first_name = find_column(row, 'Prénom').strip()
+                        last_name = find_column(row, 'Nom').strip()
+                        dob_str = find_column(row, 'DDN').strip()
+                        
+                        if not license_number or not last_name:
+                            errors.append(f"Ligne {row_num}: Code adhérent et Nom sont obligatoires (reçu: code='{license_number}', nom='{last_name}')")
+                            continue
+                        
+                        # Vérifier si l'archer existe déjà
+                        existing = Archer.query.filter_by(license_number=license_number).first()
+                        if existing:
+                            errors.append(f"Ligne {row_num}: L'archer avec le code '{license_number}' existe déjà")
+                            continue
+                        
+                        # Calculer l'âge à partir de la date de naissance
+                        age = None
+                        if dob_str:
+                            try:
+                                dob = date_parser.parse(dob_str, dayfirst=True).date()
+                                today = date.today()
+                                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                            except:
+                                pass  # Si la date n'est pas valide, on la ignore
+                        
+                        archer = Archer(
+                            first_name=first_name,
+                            last_name=last_name,
+                            license_number=license_number,
+                            age=age
+                        )
+                        db.session.add(archer)
+                        imported += 1
+                    except Exception as e:
+                        errors.append(f"Ligne {row_num}: Erreur - {str(e)}")
+                
+                db.session.commit()
+                return render_template('import_archers.html', 
+                                     success=True,
+                                     imported=imported,
+                                     errors=errors)
+            except Exception as e:
+                return render_template('import_archers.html', 
+                                     error=f"Erreur lors de la lecture du fichier: {str(e)}")
+    
+    return render_template('import_archers.html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=80, host='0.0.0.0')
