@@ -18,8 +18,12 @@
                 </form>
             </div>
             <div class="user-menu">
-                <span>👤 Utilisateur</span>
-                <a href="#">Déconnexion</a>
+                {% if current_user.is_authenticated %}
+                <span>👤 {{ current_user.username }}</span>
+                <a href="{{ url_for('logout') }}">Déconnexion</a>
+                {% else %}
+                <a href="{{ url_for('login') }}">Connexion</a>
+                {% endif %}
             </div>
         </div>
     </div>

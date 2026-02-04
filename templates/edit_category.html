@@ -12,7 +12,7 @@
     <input type="checkbox" name="has_brand" value="1" {% if category.has_brand %}checked{% endif %}> Marque<br>
     <input type="checkbox" name="has_model" value="1" {% if category.has_model %}checked{% endif %}> Modèle<br>
     <label>Champs personnalisés (un par ligne):</label><br>
-    <textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur&#10;Diamètre">{{ category.custom_fields or '' }}</textarea><br>
+<textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields.replace(',', '&#10;') }}{% endif %}</textarea><br>
     <button class="btn" type="submit">Modifier</button>
 </form>
 {% endblock %}

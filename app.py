@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file
+from flask import Flask, render_template, request, redirect, url_for, send_file, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
-from models import db, Category, Product, CompositeProduct, Archer, Assignment, HistoryEvent, Course, Attendance
+from models import db, User, Category, Product, CompositeProduct, Archer, Assignment, HistoryEvent, Course, Attendance
 from datetime import datetime, date, timedelta
 from dateutil import parser as date_parser
 import csv
@@ -10,8 +11,40 @@ from io import StringIO
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.secret_key = 'your-secret-key-change-this'  # À changer en production
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# Initialiser Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Vous devez vous connecter pour accéder à cette page.'
+login_manager.login_message_category = 'info'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
 def log_history(event_type, entity_type, entity_id, summary, details=None):
     event = HistoryEvent(
@@ -48,6 +81,7 @@ def seed_categories():
         db.session.commit()
 
 @app.route('/')
+@login_required
 def index():
     seed_categories()
     products_count = Product.query.count()
@@ -61,11 +95,13 @@ def index():
                          categories_count=categories_count)
 
 @app.route('/categories')
+@login_required
 def categories():
     cats = Category.query.all()
     return render_template('categories.html', categories=cats)
 
 @app.route('/add_category', methods=['GET', 'POST'])
+@login_required
 def add_category():
     if request.method == 'POST':
         name = request.form['name']
@@ -73,7 +109,9 @@ def add_category():
         has_power = 'has_power' in request.form
         has_model = 'has_model' in request.form
         has_brand = 'has_brand' in request.form
-        custom_fields = request.form.get('custom_fields', '').strip()
+        # Convertir les champs personnalisés (un par ligne) en virgules séparées, en enlevant la partie après ":"
+        custom_fields_raw = request.form.get('custom_fields', '').strip()
+        custom_fields = ','.join(line.split(':')[0].strip() for line in custom_fields_raw.split('\n') if line.strip())
         cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields)
         db.session.add(cat)
         db.session.commit()
@@ -81,6 +119,7 @@ def add_category():
     return render_template('add_category.html')
 
 @app.route('/edit_category/<int:cat_id>', methods=['GET', 'POST'])
+@login_required
 def edit_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
     if request.method == 'POST':
@@ -89,12 +128,15 @@ def edit_category(cat_id):
         cat.has_power = 'has_power' in request.form
         cat.has_model = 'has_model' in request.form
         cat.has_brand = 'has_brand' in request.form
-        cat.custom_fields = request.form.get('custom_fields', '').strip()
+        # Convertir les champs personnalisés (un par ligne) en virgules séparées, en enlevant la partie après ":"
+        custom_fields_raw = request.form.get('custom_fields', '').strip()
+        cat.custom_fields = ','.join(line.split(':')[0].strip() for line in custom_fields_raw.split('\n') if line.strip())
         db.session.commit()
         return redirect(url_for('categories'))
     return render_template('edit_category.html', category=cat)
 
 @app.route('/delete_category/<int:cat_id>', methods=['POST'])
+@login_required
 def delete_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
     products = Product.query.filter_by(category_id=cat_id).all()
@@ -107,11 +149,13 @@ def delete_category(cat_id):
     return redirect(url_for('categories'))
 
 @app.route('/products')
+@login_required
 def products():
     prods = Product.query.join(Category).order_by(Category.name, Product.brand).all()
     return render_template('products.html', products=prods)
 
 @app.route('/add_product', methods=['GET', 'POST'])
+@login_required
 def add_product():
     if request.method == 'POST':
         cat_id = request.form.get('category_id')
@@ -153,6 +197,7 @@ def add_product():
     return render_template('add_product.html', categories=cats)
 
 @app.route('/edit_product/<int:prod_id>', methods=['GET', 'POST'])
+@login_required
 def edit_product(prod_id):
     prod = Product.query.get_or_404(prod_id)
     if request.method == 'POST':
@@ -211,6 +256,7 @@ def edit_product(prod_id):
     return render_template('edit_product.html', product=prod, categories=cats)
 
 @app.route('/duplicate_product/<int:prod_id>')
+@login_required
 def duplicate_product(prod_id):
     original = Product.query.get_or_404(prod_id)
     # Create a new product with the same attributes
@@ -230,11 +276,13 @@ def duplicate_product(prod_id):
     return redirect(url_for('products'))
 
 @app.route('/composites')
+@login_required
 def composites():
     comps = CompositeProduct.query.all()
     return render_template('composites.html', composites=comps)
 
 @app.route('/add_composite', methods=['GET', 'POST'])
+@login_required
 def add_composite():
     if request.method == 'POST':
         name = request.form['name']
@@ -264,6 +312,7 @@ def add_composite():
     return render_template('add_composite.html', categories=cats)
 
 @app.route('/edit_composite/<int:comp_id>', methods=['GET', 'POST'])
+@login_required
 def edit_composite(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     if request.method == 'POST':
@@ -294,11 +343,13 @@ def edit_composite(comp_id):
     return render_template('edit_composite.html', composite=comp, products=prods)
 
 @app.route('/archers')
+@login_required
 def archers():
     archs = Archer.query.all()
     return render_template('archers.html', archers=archs)
 
 @app.route('/add_archer', methods=['GET', 'POST'])
+@login_required
 def add_archer():
     if request.method == 'POST':
         first_name = request.form.get('first_name')
@@ -317,6 +368,7 @@ def add_archer():
 
 
 @app.route('/edit_archer/<int:archer_id>', methods=['GET', 'POST'])
+@login_required
 def edit_archer(archer_id):
     arch = Archer.query.get_or_404(archer_id)
     if request.method == 'POST':
@@ -334,11 +386,13 @@ def edit_archer(archer_id):
     return render_template('edit_archer.html', archer=arch)
 
 @app.route('/assignments')
+@login_required
 def assignments():
     assigns = Assignment.query.filter_by(date_returned=None).all()
     return render_template('assignments.html', assignments=assigns)
 
 @app.route('/return/<int:assign_id>', methods=['POST'])
+@login_required
 def return_assignment(assign_id):
     assign = Assignment.query.get_or_404(assign_id)
     assign.date_returned = db.func.now()
@@ -354,6 +408,7 @@ def return_assignment(assign_id):
     return redirect(url_for('assignments'))
 
 @app.route('/delete_archer/<int:archer_id>', methods=['POST'])
+@login_required
 def delete_archer(archer_id):
     arch = Archer.query.get_or_404(archer_id)
     # Delete associated assignments
@@ -363,6 +418,7 @@ def delete_archer(archer_id):
     return redirect(url_for('archers'))
 
 @app.route('/delete_product/<int:prod_id>', methods=['POST'])
+@login_required
 def delete_product(prod_id):
     prod = Product.query.get_or_404(prod_id)
     # Remove from any composites
@@ -380,6 +436,7 @@ def delete_product(prod_id):
     return redirect(url_for('products'))
 
 @app.route('/delete_composite/<int:comp_id>', methods=['POST'])
+@login_required
 def delete_composite(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     # Delete associated assignments
@@ -398,6 +455,7 @@ def delete_composite(comp_id):
     return redirect(url_for('composites'))
 
 @app.route('/assign', methods=['GET', 'POST'])
+@login_required
 def assign():
     if request.method == 'POST':
         archer_id = request.form['archer_id']
@@ -424,6 +482,7 @@ def assign():
     return render_template('assign.html', archers=archs, composites=comps, selected_archer=selected_archer, all_composites=all_comps)
 
 @app.route('/reset_composite_status/<int:comp_id>', methods=['POST'])
+@login_required
 def reset_composite_status(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     comp.status = 'club'
@@ -431,6 +490,7 @@ def reset_composite_status(comp_id):
     return redirect(url_for('assign'))
 
 @app.route('/history')
+@login_required
 def history():
     events = HistoryEvent.query.order_by(HistoryEvent.created_at.desc()).all()
     assignment_events = [e for e in events if e.event_type in ('assignment', 'assignment_return')]
@@ -444,12 +504,14 @@ def history():
     )
 
 @app.route('/courses')
+@login_required
 def courses():
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
     courses_list = Course.query.filter_by(active=True).order_by(Course.day_of_week, Course.start_time).all()
     return render_template('courses.html', courses=courses_list, days_names=days_names)
 
 @app.route('/add_course', methods=['GET', 'POST'])
+@login_required
 def add_course():
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
     if request.method == 'POST':
@@ -487,6 +549,7 @@ def add_course():
     return render_template('add_course.html', days_names=days_names)
 
 @app.route('/edit_course/<int:course_id>', methods=['GET', 'POST'])
+@login_required
 def edit_course(course_id):
     course = Course.query.get_or_404(course_id)
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
@@ -504,6 +567,7 @@ def edit_course(course_id):
     return render_template('edit_course.html', course=course, days_names=days_names)
 
 @app.route('/delete_course/<int:course_id>', methods=['POST'])
+@login_required
 def delete_course(course_id):
     course = Course.query.get_or_404(course_id)
     # Soft delete by marking as inactive
@@ -513,12 +577,14 @@ def delete_course(course_id):
     return redirect(url_for('courses'))
 
 @app.route('/course/<int:course_id>/archers')
+@login_required
 def course_archers(course_id):
     course = Course.query.get_or_404(course_id)
     all_archers = Archer.query.all()
     return render_template('course_archers.html', course=course, all_archers=all_archers)
 
 @app.route('/course/<int:course_id>/add_archer/<int:archer_id>', methods=['POST'])
+@login_required
 def add_archer_to_course(course_id, archer_id):
     course = Course.query.get_or_404(course_id)
     archer = Archer.query.get_or_404(archer_id)
@@ -536,6 +602,7 @@ def add_archer_to_course(course_id, archer_id):
     return redirect(url_for('course_archers', course_id=course_id))
 
 @app.route('/course/<int:course_id>/remove_archer/<int:archer_id>', methods=['POST'])
+@login_required
 def remove_archer_from_course(course_id, archer_id):
     course = Course.query.get_or_404(course_id)
     archer = Archer.query.get_or_404(archer_id)
@@ -545,6 +612,7 @@ def remove_archer_from_course(course_id, archer_id):
     return redirect(url_for('course_archers', course_id=course_id))
 
 @app.route('/course/<int:course_id>/attendance')
+@login_required
 def course_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     today = date.today()
@@ -559,6 +627,7 @@ def course_attendance(course_id):
     return render_template('course_attendance.html', course=course, attendance_records=attendance_records, today=today)
 
 @app.route('/course/<int:course_id>/mark_attendance', methods=['POST'])
+@login_required
 def mark_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     attendance_date = request.form.get('date')
@@ -588,6 +657,7 @@ def mark_attendance(course_id):
     return redirect(url_for('course_attendance', course_id=course_id))
 
 @app.route('/export_products')
+@login_required
 def export_products():
     from reportlab.pdfgen import canvas
     from io import BytesIO
@@ -608,6 +678,7 @@ def export_products():
     return send_file(buffer, as_attachment=True, download_name='products.pdf', mimetype='application/pdf')
 
 @app.route('/export_assignments')
+@login_required
 def export_assignments():
     from reportlab.pdfgen import canvas
     from io import BytesIO
@@ -628,6 +699,7 @@ def export_assignments():
     return send_file(buffer, as_attachment=True, download_name='assignments.pdf', mimetype='application/pdf')
 
 @app.route('/export_composites')
+@login_required
 def export_composites():
     from reportlab.pdfgen import canvas
     from io import BytesIO
@@ -652,6 +724,7 @@ def export_composites():
     return send_file(buffer, as_attachment=True, download_name='composites.pdf', mimetype='application/pdf')
 
 @app.route('/import_archers', methods=['GET', 'POST'])
+@login_required
 def import_archers():
     if request.method == 'POST':
         if 'file' not in request.files:

@@ -33,7 +33,8 @@
                     {% if cat.custom_fields %}
                         {% for field in cat.custom_fields.split(',') %}
                             {% if field.strip() %}
-                                <span class="badge badge-info">🔧 {{ field.strip() }}</span>
+                                {% set field_name = field.strip().split(':')[0] %}
+                                <span class="badge badge-secondary">🔧 {{ field_name }}</span>
                             {% endif %}
                         {% endfor %}
                     {% endif %}
