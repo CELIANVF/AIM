@@ -40,8 +40,6 @@
                                 <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Admin - Accès complet + gestion des utilisateurs</option>
                             {% elif role == 'responsable' %}
                                 <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Responsable - Gestion complète des données</option>
-                            {% elif role == 'editeur' %}
-                                <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Éditeur - Ajouter/modifier/supprimer</option>
                             {% elif role == 'lecteur' %}
                                 <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Lecteur - Consultation uniquement</option>
                             {% elif role == 'entraineur' %}

@@ -57,10 +57,6 @@
                                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 600;">
                                         <span>📋</span> Responsable
                                     </span>
-                                {% elif user.role == 'editeur' %}
-                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #dbeafe; color: #0c4a6e; font-size: 13px; font-weight: 600;">
-                                        <span>✏️</span> Éditeur
-                                    </span>
                                 {% elif user.role == 'lecteur' %}
                                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e5e7eb; color: #374151; font-size: 13px; font-weight: 600;">
                                         <span>👁️</span> Lecteur
@@ -112,13 +108,6 @@
                     <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Responsable</h4>
                 </div>
                 <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion complète (archers, équipements, cours + assignations)</p>
-            </div>
-            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">✏️</span>
-                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Éditeur</h4>
-                </div>
-                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion archers et équipements + assignations (PAS accès aux cours)</p>
             </div>
             <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">

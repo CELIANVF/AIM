@@ -959,7 +959,7 @@ def import_archers():
 @require_permission('admin')
 def users():
     all_users = User.query.all()
-    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'coach']
+    roles = ['admin', 'responsable', 'lecteur', 'entraineur']
     return render_template('users.html', users=all_users, roles=roles)
 
 @app.route('/add_user', methods=['GET', 'POST'])
@@ -969,7 +969,7 @@ def add_user():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        role = request.form.get('role', 'editeur')
+        role = request.form.get('role', 'responsable')
         
         # Vérifier que l'utilisateur n'existe pas déjà
         if User.query.filter_by(username=username).first():
@@ -994,7 +994,7 @@ def add_user():
         flash(f'Utilisateur "{username}" créé avec succès.', 'success')
         return redirect(url_for('users'))
     
-    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'entraineur']
+    roles = ['admin', 'responsable', 'lecteur', 'entraineur']
     return render_template('add_user.html', roles=roles)
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
@@ -1034,7 +1034,7 @@ def edit_user(user_id):
         flash(f'Utilisateur "{user.username}" modifié avec succès.', 'success')
         return redirect(url_for('users'))
     
-    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'entraineur']
+    roles = ['admin', 'responsable', 'lecteur', 'entraineur']
     return render_template('edit_user.html', user=user, roles=roles)
 
 @app.route('/delete_user/<int:user_id>', methods=['POST'])

@@ -45,8 +45,6 @@
                                 <option value="{{ role }}">Admin - Accès complet + gestion des utilisateurs</option>
                             {% elif role == 'responsable' %}
                                 <option value="{{ role }}">Responsable - Gestion complète (archers, équipements, cours)</option>
-                            {% elif role == 'editeur' %}
-                                <option value="{{ role }}" selected>Éditeur - Archers, équipements (pas cours)</option>
                             {% elif role == 'lecteur' %}
                                 <option value="{{ role }}">Lecteur - Consultation uniquement + historique</option>
                             {% elif role == 'entraineur' %}
