@@ -345,8 +345,30 @@ def edit_composite(comp_id):
 @app.route('/archers')
 @login_required
 def archers():
-    archs = Archer.query.all()
-    return render_template('archers.html', archers=archs)
+    sort_by = request.args.get('sort_by', 'nom')
+    sort_order = request.args.get('sort_order', 'asc')
+    
+    query = Archer.query
+    
+    # Apply sorting
+    if sort_by == 'nom':
+        query = query.order_by(Archer.last_name if sort_order == 'asc' else Archer.last_name.desc())
+    elif sort_by == 'prenom':
+        query = query.order_by(Archer.first_name if sort_order == 'asc' else Archer.first_name.desc())
+    elif sort_by == 'age':
+        query = query.order_by(Archer.age if sort_order == 'asc' else Archer.age.desc())
+    elif sort_by == 'licence':
+        query = query.order_by(Archer.license_number if sort_order == 'asc' else Archer.license_number.desc())
+    elif sort_by == 'categorie':
+        query = query.order_by(Archer.categorie if sort_order == 'asc' else Archer.categorie.desc())
+    elif sort_by == 'arc':
+        query = query.order_by(Archer.last_name if sort_order == 'asc' else Archer.last_name.desc())
+    else:
+        query = query.order_by(Archer.last_name.asc())
+    
+    archs = query.all()
+    current_sort = {'by': sort_by, 'order': sort_order}
+    return render_template('archers.html', archers=archs, current_sort=current_sort)
 
 @app.route('/add_archer', methods=['GET', 'POST'])
 @login_required
@@ -411,7 +433,9 @@ def return_assignment(assign_id):
 @login_required
 def delete_archer(archer_id):
     arch = Archer.query.get_or_404(archer_id)
-    # Delete associated assignments
+    # Delete associated attendance records
+    Attendance.query.filter_by(archer_id=archer_id).delete()
+    # Delete associated assignments (cascade will also handle this now)
     Assignment.query.filter_by(archer_id=archer_id).delete()
     db.session.delete(arch)
     db.session.commit()
@@ -782,15 +806,10 @@ def import_archers():
                         first_name = find_column(row, 'Prénom').strip()
                         last_name = find_column(row, 'Nom').strip()
                         dob_str = find_column(row, 'DDN').strip()
+                        categorie = find_column(row, 'Catégorie âge sportif').strip()
                         
                         if not license_number or not last_name:
                             errors.append(f"Ligne {row_num}: Code adhérent et Nom sont obligatoires (reçu: code='{license_number}', nom='{last_name}')")
-                            continue
-                        
-                        # Vérifier si l'archer existe déjà
-                        existing = Archer.query.filter_by(license_number=license_number).first()
-                        if existing:
-                            errors.append(f"Ligne {row_num}: L'archer avec le code '{license_number}' existe déjà")
                             continue
                         
                         # Calculer l'âge à partir de la date de naissance
@@ -803,14 +822,30 @@ def import_archers():
                             except:
                                 pass  # Si la date n'est pas valide, on la ignore
                         
-                        archer = Archer(
-                            first_name=first_name,
-                            last_name=last_name,
-                            license_number=license_number,
-                            age=age
-                        )
-                        db.session.add(archer)
-                        imported += 1
+                        # Vérifier si l'archer existe déjà
+                        existing = Archer.query.filter_by(license_number=license_number).first()
+                        if existing:
+                            # Mettre à jour les données existantes
+                            if first_name:
+                                existing.first_name = first_name
+                            if last_name:
+                                existing.last_name = last_name
+                            if age is not None:
+                                existing.age = age
+                            if categorie:
+                                existing.categorie = categorie
+                            imported += 1
+                        else:
+                            # Créer un nouvel archer
+                            archer = Archer(
+                                first_name=first_name,
+                                last_name=last_name,
+                                license_number=license_number,
+                                age=age,
+                                categorie=categorie if categorie else None
+                            )
+                            db.session.add(archer)
+                            imported += 1
                     except Exception as e:
                         errors.append(f"Ligne {row_num}: Erreur - {str(e)}")
                 

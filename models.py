@@ -57,11 +57,15 @@ class Archer(db.Model):
     last_name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=True)
     license_number = db.Column(db.String(20), unique=True, nullable=False)
+    categorie = db.Column(db.String(50), nullable=True)
     # Archer-specific fields
     bow_length = db.Column(db.String(50))
     draw_length = db.Column(db.String(50))
     bow_type = db.Column(db.String(50))
     notes = db.Column(db.Text)
+    # Relationships with cascade delete
+    assignments = db.relationship('Assignment', backref='archer', cascade='all, delete-orphan')
+    attendances = db.relationship('Attendance', backref='archer', cascade='all, delete-orphan')
 
     @hybrid_property
     def name(self):
@@ -80,7 +84,6 @@ class Assignment(db.Model):
     composite_id = db.Column(db.Integer, db.ForeignKey('composite_product.id'), nullable=False)
     date_assigned = db.Column(db.DateTime, default=db.func.now())
     date_returned = db.Column(db.DateTime, nullable=True)
-    archer = db.relationship('Archer', backref='assignments')
     composite = db.relationship('CompositeProduct', backref='assignments')
 
 class HistoryEvent(db.Model):
@@ -117,5 +120,4 @@ class Attendance(db.Model):
     present = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text)
     recorded_at = db.Column(db.DateTime, default=db.func.now())
-    archer = db.relationship('Archer', backref='attendances')
     course = db.relationship('Course', backref='attendances')

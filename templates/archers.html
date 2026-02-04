@@ -15,6 +15,29 @@
     </div>
 </div>
 
+<div style="margin-bottom: 20px; padding: 16px; background-color: #f9f9f9; border-radius: 8px; border: 1px solid #ddd;">
+    <label style="font-weight: bold; margin-bottom: 8px; display: block;">📊 Trier par:</label>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+        <form method="GET" action="/archers" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0;">
+            <select name="sort_by" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+                <option value="nom" {% if current_sort.by == 'nom' %}selected{% endif %}>Nom</option>
+                <option value="prenom" {% if current_sort.by == 'prenom' %}selected{% endif %}>Prénom</option>
+                <option value="age" {% if current_sort.by == 'age' %}selected{% endif %}>Âge</option>
+                <option value="licence" {% if current_sort.by == 'licence' %}selected{% endif %}>Numéro de licence</option>
+                <option value="categorie" {% if current_sort.by == 'categorie' %}selected{% endif %}>Catégorie</option>
+                <option value="arc" {% if current_sort.by == 'arc' %}selected{% endif %}>Arc assigné</option>
+            </select>
+            
+            <select name="sort_order" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+                <option value="asc" {% if current_sort.order == 'asc' %}selected{% endif %}>↑ Croissant</option>
+                <option value="desc" {% if current_sort.order == 'desc' %}selected{% endif %}>↓ Décroissant</option>
+            </select>
+            
+            <a href="/archers" class="btn btn-outline" style="padding: 8px 12px; font-size: 14px;">↻ Réinitialiser</a>
+        </form>
+    </div>
+</div>
+
 <div class="grid">
     {% for a in archers %}
     <div class="item">
@@ -27,6 +50,9 @@
                     {% endif %}
                     {% if a.license_number %}
                         <span class="badge badge-success">🎫 {{ a.license_number }}</span>
+                    {% endif %}
+                    {% if a.categorie %}
+                        <span class="badge" style="background-color: #e3f2fd; color: #1976d2;">📌 {{ a.categorie }}</span>
                     {% endif %}
                 </div>
                 {% if a.bow_type or a.bow_length or a.draw_length %}
