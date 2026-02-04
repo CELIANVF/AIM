@@ -9,7 +9,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default='editeur', nullable=False)  # admin, responsable, editeur, lecteur, coach
+    role = db.Column(db.String(20), default='editeur', nullable=False)  # admin, responsable, editeur, lecteur, entraineur
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -40,28 +40,28 @@ class User(UserMixin, db.Model):
         return self.role in ('admin', 'responsable', 'editeur')
     
     def can_view_equipment(self):
-        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'coach')
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'entraineur')
     
     def can_manage_courses(self):
         return self.role in ('admin', 'responsable')
     
     def can_manage_attendance(self):
-        return self.role in ('admin', 'responsable', 'coach')
+        return self.role in ('admin', 'responsable', 'entraineur')
     
     def can_view_courses(self):
-        return self.role in ('admin', 'responsable', 'lecteur', 'coach')
+        return self.role in ('admin', 'responsable', 'lecteur', 'entraineur')
     
     def can_manage_assignments(self):
         return self.role in ('admin', 'responsable', 'editeur')
     
     def can_manage_assignments_for_coach(self):
-        return self.role in ('admin', 'responsable', 'editeur', 'coach')
+        return self.role in ('admin', 'responsable', 'editeur', 'entraineur')
     
     def can_view_assignments(self):
-        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'coach')
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'entraineur')
     
     def can_view_history(self):
-        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'coach')
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur', 'entraineur')
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)

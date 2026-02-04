@@ -1018,7 +1018,7 @@ def add_user():
         flash(f'Utilisateur "{username}" créé avec succès.', 'success')
         return redirect(url_for('users'))
     
-    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'coach']
+    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'entraineur']
     return render_template('add_user.html', roles=roles)
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
@@ -1058,7 +1058,7 @@ def edit_user(user_id):
         flash(f'Utilisateur "{user.username}" modifié avec succès.', 'success')
         return redirect(url_for('users'))
     
-    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'coach']
+    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'entraineur']
     return render_template('edit_user.html', user=user, roles=roles)
 
 @app.route('/delete_user/<int:user_id>', methods=['POST'])

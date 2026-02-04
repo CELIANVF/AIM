@@ -44,8 +44,8 @@
                                 <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Éditeur - Ajouter/modifier/supprimer</option>
                             {% elif role == 'lecteur' %}
                                 <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Lecteur - Consultation uniquement</option>
-                            {% elif role == 'coach' %}
-                                <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Coach - Gestion des cours</option>
+                            {% elif role == 'entraineur' %}
+                                <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>Entraîneur - Gestion des cours et matériel</option>
                             {% endif %}
                         {% endfor %}
                     </select>
@@ -74,7 +74,7 @@
             <li><strong>Responsable</strong>: Gestion complète (archers, équipements, cours + assignations)</li>
             <li><strong>Éditeur</strong>: Gestion archers et équipements + assignations (PAS accès aux cours)</li>
             <li><strong>Lecteur</strong>: Consultation uniquement (historique inclus)</li>
-            <li><strong>Coach</strong>: Consultation uniquement (cours et historique)</li>
+            <li><strong>Entraîneur</strong>: Gestion des cours, présences et assignation du matériel</li>
         </ul>
     </div>
 </div>

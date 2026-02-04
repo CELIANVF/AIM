@@ -49,8 +49,8 @@
                                 <option value="{{ role }}" selected>Éditeur - Archers, équipements (pas cours)</option>
                             {% elif role == 'lecteur' %}
                                 <option value="{{ role }}">Lecteur - Consultation uniquement + historique</option>
-                            {% elif role == 'coach' %}
-                                <option value="{{ role }}">Coach - Consultation (cours et historique)</option>
+                            {% elif role == 'entraineur' %}
+                                <option value="{{ role }}">Entraîneur - Gestion des cours et matériel</option>
                             {% endif %}
                         {% endfor %}
                     </select>
