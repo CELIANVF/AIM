@@ -24,47 +24,66 @@
 
     {% if users %}
         <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
+            <table class="table">
+                <thead>
                     <tr>
-                        <th>Nom d'utilisateur</th>
-                        <th>Rôle</th>
-                        <th>Actions</th>
+                        <th style="width: 40%;">Nom d'utilisateur</th>
+                        <th style="width: 30%;">Rôle</th>
+                        <th style="width: 30%; text-align: right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for user in users %}
                         <tr>
                             <td>
-                                <strong>{{ user.username }}</strong>
-                                {% if user.id == current_user.id %}
-                                    <span class="badge bg-info">Vous</span>
-                                {% endif %}
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--primary);">
+                                        {{ user.username[0]|upper }}
+                                    </div>
+                                    <div>
+                                        <strong style="font-size: 15px;">{{ user.username }}</strong>
+                                        {% if user.id == current_user.id %}
+                                            <span class="badge" style="background: #e0f2fe; color: #0369a1; margin-left: 8px;">Vous</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 {% if user.role == 'admin' %}
-                                    <span class="badge bg-danger">Admin</span>
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fee2e2; color: #991b1b; font-size: 13px; font-weight: 600;">
+                                        <span>👑</span> Admin
+                                    </span>
                                 {% elif user.role == 'responsable' %}
-                                    <span class="badge bg-warning">Responsable</span>
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 600;">
+                                        <span>📋</span> Responsable
+                                    </span>
                                 {% elif user.role == 'editeur' %}
-                                    <span class="badge bg-primary">Éditeur</span>
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #dbeafe; color: #0c4a6e; font-size: 13px; font-weight: 600;">
+                                        <span>✏️</span> Éditeur
+                                    </span>
                                 {% elif user.role == 'lecteur' %}
-                                    <span class="badge bg-secondary">Lecteur</span>
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e5e7eb; color: #374151; font-size: 13px; font-weight: 600;">
+                                        <span>👁️</span> Lecteur
+                                    </span>
                                 {% elif user.role == 'coach' %}
-                                    <span class="badge bg-info">Coach</span>
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e0f2fe; color: #0369a1; font-size: 13px; font-weight: 600;">
+                                        <span>🏆</span> Coach
+                                    </span>
                                 {% endif %}
                             </td>
-                            <td>
-                                <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-pencil"></i> Modifier
-                                </a>
-                                {% if user.id != current_user.id %}
-                                    <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur?');">
-                                        <button type="submit" class="btn btn-sm btn-danger">
-                                            <i class="bi bi-trash"></i> Supprimer
-                                        </button>
-                                    </form>
-                                {% endif %}
+                            <td style="text-align: right;">
+                                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn" style="background: var(--primary); color: white; padding: 8px 14px; font-size: 13px;">
+                                        ✏️ Modifier
+                                    </a>
+                                    {% if user.id != current_user.id %}
+                                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur?');">
+                                            <button type="submit" class="btn" style="background: var(--danger); color: white; padding: 8px 14px; font-size: 13px;">
+                                                🗑️ Supprimer
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}
@@ -77,15 +96,45 @@
         </div>
     {% endif %}
 
-    <div class="mt-4 p-3 bg-light rounded">
-        <h5>Niveaux de permission:</h5>
-        <ul class="mb-0">
-            <li><strong>Admin</strong>: Accès complet + gestion des utilisateurs</li>
-            <li><strong>Responsable</strong>: Gestion complète (archers, équipements, cours + assignations)</li>
-            <li><strong>Éditeur</strong>: Gestion archers et équipements + assignations (PAS accès aux cours)</li>
-            <li><strong>Lecteur</strong>: Consultation uniquement (historique inclus)</li>
-            <li><strong>Coach</strong>: Consultation uniquement (cours et historique)</li>
-        </ul>
+    <div style="margin-top: 40px;">
+        <h3 style="margin-bottom: 20px;">📋 Niveaux de permission</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span style="font-size: 28px;">👑</span>
+                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Admin</h4>
+                </div>
+                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Accès complet + gestion des utilisateurs</p>
+            </div>
+            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span style="font-size: 28px;">📋</span>
+                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Responsable</h4>
+                </div>
+                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion complète (archers, équipements, cours + assignations)</p>
+            </div>
+            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span style="font-size: 28px;">✏️</span>
+                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Éditeur</h4>
+                </div>
+                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion archers et équipements + assignations (PAS accès aux cours)</p>
+            </div>
+            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span style="font-size: 28px;">👁️</span>
+                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Lecteur</h4>
+                </div>
+                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Consultation uniquement (historique inclus)</p>
+            </div>
+            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span style="font-size: 28px;">🏆</span>
+                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Coach</h4>
+                </div>
+                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Consultation uniquement (cours et historique)</p>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
