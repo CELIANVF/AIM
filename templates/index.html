@@ -9,8 +9,10 @@
 		<p class="muted">Bienvenue dans le système de gestion du matériel de tir à l'arc</p>
 	</div>
 	<div class="action-group">
+		{% if current_user.can_edit() %}
 		<a href="{{ url_for('add_product') }}" class="btn btn-primary">➕ Nouveau produit</a>
 		<a href="{{ url_for('assign') }}" class="btn btn-outline">🔄 Nouvelle affectation</a>
+		{% endif %}
 	</div>
 </div>
 
@@ -37,11 +39,13 @@
 	<div class="card">
 		<h2>🚀 Actions rapides</h2>
 		<ul style="list-style:none;padding:0;margin:16px 0 0 0">
+			{% if current_user.can_edit() %}
 			<li style="margin-bottom:12px"><a href="{{ url_for('add_product') }}" style="font-weight:500">➕ Ajouter un produit</a></li>
 			<li style="margin-bottom:12px"><a href="{{ url_for('add_category') }}" style="font-weight:500">📁 Créer une catégorie</a></li>
 			<li style="margin-bottom:12px"><a href="{{ url_for('add_composite') }}" style="font-weight:500">🎯 Enregistrer un arc</a></li>
 			<li style="margin-bottom:12px"><a href="{{ url_for('add_archer') }}" style="font-weight:500">👤 Ajouter un archer</a></li>
 			<li style="margin-bottom:0"><a href="{{ url_for('assign') }}" style="font-weight:500">🔄 Nouvelle affectation</a></li>
+			{% endif %}
 		</ul>
 	</div>
 	

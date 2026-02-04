@@ -9,7 +9,9 @@
         <p class="muted">{{ courses|length }} cours actif(s)</p>
     </div>
     <div class="action-group">
+        {% if current_user.can_manage_courses() %}
         <a class="btn btn-primary" href="/add_course">➕ Nouveau cours</a>
+        {% endif %}
     </div>
 </div>
 
@@ -36,19 +38,23 @@
                 {% endif %}
             </div>
             <div style="padding-top:8px;border-top:1px solid var(--border-light);display:flex;flex-direction:column;gap:8px">
+                {% if current_user.can_manage_courses() %}
                 <a class="btn btn-outline" href="/course/{{ course.id }}/archers" style="width:100%">👥 Gérer les archers</a>
                 <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="width:100%">✓ Présences</a>
                 <a class="btn btn-outline" href="/edit_course/{{ course.id }}" style="width:100%">✏️ Modifier</a>
                 <form method="POST" action="/delete_course/{{ course.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce cours ?');">
                     <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer">🗑️ Supprimer</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
     {% else %}
     <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
         <p class="muted">Aucun cours enregistré pour le moment</p>
+        {% if current_user.can_manage_courses() %}
         <a href="/add_course" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier cours</a>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

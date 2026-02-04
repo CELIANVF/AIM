@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h1>Créer un nouvel utilisateur</h1>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+
+    {% if get_flashed_messages() %}
+        {% for message in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ message[0] }} alert-dismissible fade show" role="alert">
+                {{ message[1] }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" class="needs-validation">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Nom d'utilisateur <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="username" name="username" required placeholder="Entrez le nom d'utilisateur">
+                    <small class="form-text text-muted">Doit être unique</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">Mot de passe <span class="text-danger">*</span></label>
+                    <input type="password" class="form-control" id="password" name="password" required placeholder="Entrez le mot de passe">
+                    <small class="form-text text-muted">Au moins 8 caractères recommandés</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="role" class="form-label">Rôle <span class="text-danger">*</span></label>
+                    <select class="form-select" id="role" name="role" required>
+                        {% for role in roles %}
+                            {% if role == 'admin' %}
+                                <option value="{{ role }}">Admin - Accès complet + gestion des utilisateurs</option>
+                            {% elif role == 'responsable' %}
+                                <option value="{{ role }}">Responsable - Gestion complète (archers, équipements, cours)</option>
+                            {% elif role == 'editeur' %}
+                                <option value="{{ role }}" selected>Éditeur - Archers, équipements (pas cours)</option>
+                            {% elif role == 'lecteur' %}
+                                <option value="{{ role }}">Lecteur - Consultation uniquement + historique</option>
+                            {% elif role == 'coach' %}
+                                <option value="{{ role }}">Coach - Consultation (cours et historique)</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Créer l'utilisateur
+                    </button>
+                    <a href="{{ url_for('users') }}" class="btn btn-outline-secondary">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Bootstrap form validation
+    (function() {
+        'use strict';
+        window.addEventListener('load', function() {
+            var forms = document.querySelectorAll('.needs-validation');
+            Array.prototype.slice.call(forms).forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        }, false);
+    })();
+</script>
+{% endblock %}

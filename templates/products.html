@@ -9,7 +9,9 @@
         <p class="muted">{{ products|length }} produit(s) au total</p>
     </div>
     <div class="action-group">
+        {% if current_user.can_edit() %}
         <a class="btn btn-primary" href="/add_product">➕ Ajouter un produit</a>
+        {% endif %}
         <a class="btn btn-outline" href="/export_products">📄 Exporter PDF</a>
     </div>
 </div>
@@ -42,18 +44,24 @@
                 {% endif %}
             </div>
             <div class="action-group" style="padding-top:8px;border-top:1px solid var(--border-light)">
+                {% if current_user.can_edit() %}
                 <a class="btn btn-outline" href="/edit_product/{{ p.id }}" style="flex:1">✏️ Modifier</a>
                 <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}" style="flex:1">📋 Dupliquer</a>
-            <form method="POST" action="/delete_product/{{ p.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
-                <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin:0">🗑️ Supprimer</button>
-            </form>
+                {% endif %}
+                {% if current_user.can_delete() %}
+                <form method="POST" action="/delete_product/{{ p.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                    <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin:0">🗑️ Supprimer</button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>
     {% else %}
     <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
         <p class="muted">Aucun produit enregistré pour le moment</p>
+        {% if current_user.can_edit() %}
         <a href="/add_product" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier produit</a>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

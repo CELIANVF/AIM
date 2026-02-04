@@ -40,6 +40,10 @@
                     <li><a href="/assignments" class="{% if request.path.startswith('/assignments') %}active{% endif %}">🔄 Assignations</a></li>
                     <li><a href="/courses" class="{% if request.path.startswith('/courses') %}active{% endif %}">📚 Cours</a></li>
                     <li><a href="/history" class="{% if request.path.startswith('/history') %}active{% endif %}">🕒 Historique</a></li>
+                    {% if current_user.is_authenticated and current_user.is_admin() %}
+                    <li><hr></li>
+                    <li><a href="/users" class="{% if request.path.startswith('/users') %}active{% endif %}">👤 Utilisateurs</a></li>
+                    {% endif %}
                 </ul>
             </nav>
         </aside>

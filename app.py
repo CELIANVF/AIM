@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, session
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -8,6 +8,7 @@ from datetime import datetime, date, timedelta
 from dateutil import parser as date_parser
 import csv
 from io import StringIO
+from functools import wraps
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -25,6 +26,53 @@ login_manager.login_message_category = 'info'
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# Décorateurs de permission
+def require_permission(permission_type):
+    """Décorateur pour vérifier les permissions de l'utilisateur"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                flash('Vous devez vous connecter.', 'error')
+                return redirect(url_for('login'))
+            
+            # Vérifications spécifiques par type de permission
+            if permission_type == 'admin' and not current_user.is_admin():
+                flash('Seuls les administrateurs peuvent effectuer cette action.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'delete' and not current_user.can_delete():
+                flash('Seuls les administrateurs peuvent supprimer les données.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'edit' and not current_user.can_edit():
+                flash('Vous n\'avez pas la permission pour modifier cette donnée.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'manage_courses' and not current_user.can_manage_courses():
+                flash('Seuls les responsables et administrateurs peuvent gérer les cours.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'view_courses' and not current_user.can_view_courses():
+                flash('Vous n\'avez pas la permission pour voir les cours.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'manage_assignments' and not current_user.can_manage_assignments():
+                flash('Vous n\'avez pas la permission pour gérer les assignations.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'view_assignments' and not current_user.can_view_assignments():
+                flash('Vous n\'avez pas la permission pour voir les assignations.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'view' and not current_user.can_view():
+                flash('Vous n\'avez pas la permission pour voir cette page.', 'error')
+                return redirect(url_for('index'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -102,6 +150,7 @@ def categories():
 
 @app.route('/add_category', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def add_category():
     if request.method == 'POST':
         name = request.form['name']
@@ -120,6 +169,7 @@ def add_category():
 
 @app.route('/edit_category/<int:cat_id>', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def edit_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
     if request.method == 'POST':
@@ -137,6 +187,7 @@ def edit_category(cat_id):
 
 @app.route('/delete_category/<int:cat_id>', methods=['POST'])
 @login_required
+@require_permission('delete')
 def delete_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
     products = Product.query.filter_by(category_id=cat_id).all()
@@ -156,6 +207,7 @@ def products():
 
 @app.route('/add_product', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def add_product():
     if request.method == 'POST':
         cat_id = request.form.get('category_id')
@@ -198,6 +250,7 @@ def add_product():
 
 @app.route('/edit_product/<int:prod_id>', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def edit_product(prod_id):
     prod = Product.query.get_or_404(prod_id)
     if request.method == 'POST':
@@ -257,6 +310,7 @@ def edit_product(prod_id):
 
 @app.route('/duplicate_product/<int:prod_id>')
 @login_required
+@require_permission('edit')
 def duplicate_product(prod_id):
     original = Product.query.get_or_404(prod_id)
     # Create a new product with the same attributes
@@ -283,6 +337,7 @@ def composites():
 
 @app.route('/add_composite', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def add_composite():
     if request.method == 'POST':
         name = request.form['name']
@@ -313,6 +368,7 @@ def add_composite():
 
 @app.route('/edit_composite/<int:comp_id>', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def edit_composite(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     if request.method == 'POST':
@@ -372,6 +428,7 @@ def archers():
 
 @app.route('/add_archer', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def add_archer():
     if request.method == 'POST':
         first_name = request.form.get('first_name')
@@ -391,6 +448,7 @@ def add_archer():
 
 @app.route('/edit_archer/<int:archer_id>', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def edit_archer(archer_id):
     arch = Archer.query.get_or_404(archer_id)
     if request.method == 'POST':
@@ -409,12 +467,14 @@ def edit_archer(archer_id):
 
 @app.route('/assignments')
 @login_required
+@require_permission('view_assignments')
 def assignments():
     assigns = Assignment.query.filter_by(date_returned=None).all()
     return render_template('assignments.html', assignments=assigns)
 
 @app.route('/return/<int:assign_id>', methods=['POST'])
 @login_required
+@require_permission('edit')
 def return_assignment(assign_id):
     assign = Assignment.query.get_or_404(assign_id)
     assign.date_returned = db.func.now()
@@ -431,6 +491,7 @@ def return_assignment(assign_id):
 
 @app.route('/delete_archer/<int:archer_id>', methods=['POST'])
 @login_required
+@require_permission('delete')
 def delete_archer(archer_id):
     arch = Archer.query.get_or_404(archer_id)
     # Delete associated attendance records
@@ -443,6 +504,7 @@ def delete_archer(archer_id):
 
 @app.route('/delete_product/<int:prod_id>', methods=['POST'])
 @login_required
+@require_permission('delete')
 def delete_product(prod_id):
     prod = Product.query.get_or_404(prod_id)
     # Remove from any composites
@@ -461,6 +523,7 @@ def delete_product(prod_id):
 
 @app.route('/delete_composite/<int:comp_id>', methods=['POST'])
 @login_required
+@require_permission('delete')
 def delete_composite(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     # Delete associated assignments
@@ -480,6 +543,7 @@ def delete_composite(comp_id):
 
 @app.route('/assign', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def assign():
     if request.method == 'POST':
         archer_id = request.form['archer_id']
@@ -507,6 +571,7 @@ def assign():
 
 @app.route('/reset_composite_status/<int:comp_id>', methods=['POST'])
 @login_required
+@require_permission('edit')
 def reset_composite_status(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     comp.status = 'club'
@@ -529,6 +594,7 @@ def history():
 
 @app.route('/courses')
 @login_required
+@require_permission('view_courses')
 def courses():
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
     courses_list = Course.query.filter_by(active=True).order_by(Course.day_of_week, Course.start_time).all()
@@ -536,6 +602,7 @@ def courses():
 
 @app.route('/add_course', methods=['GET', 'POST'])
 @login_required
+@require_permission('manage_courses')
 def add_course():
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
     if request.method == 'POST':
@@ -574,6 +641,7 @@ def add_course():
 
 @app.route('/edit_course/<int:course_id>', methods=['GET', 'POST'])
 @login_required
+@require_permission('manage_courses')
 def edit_course(course_id):
     course = Course.query.get_or_404(course_id)
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
@@ -592,6 +660,7 @@ def edit_course(course_id):
 
 @app.route('/delete_course/<int:course_id>', methods=['POST'])
 @login_required
+@require_permission('manage_courses')
 def delete_course(course_id):
     course = Course.query.get_or_404(course_id)
     # Soft delete by marking as inactive
@@ -602,6 +671,7 @@ def delete_course(course_id):
 
 @app.route('/course/<int:course_id>/archers')
 @login_required
+@require_permission('manage_courses')
 def course_archers(course_id):
     course = Course.query.get_or_404(course_id)
     all_archers = Archer.query.all()
@@ -609,6 +679,7 @@ def course_archers(course_id):
 
 @app.route('/course/<int:course_id>/add_archer/<int:archer_id>', methods=['POST'])
 @login_required
+@require_permission('manage_courses')
 def add_archer_to_course(course_id, archer_id):
     course = Course.query.get_or_404(course_id)
     archer = Archer.query.get_or_404(archer_id)
@@ -627,6 +698,7 @@ def add_archer_to_course(course_id, archer_id):
 
 @app.route('/course/<int:course_id>/remove_archer/<int:archer_id>', methods=['POST'])
 @login_required
+@require_permission('manage_courses')
 def remove_archer_from_course(course_id, archer_id):
     course = Course.query.get_or_404(course_id)
     archer = Archer.query.get_or_404(archer_id)
@@ -637,6 +709,7 @@ def remove_archer_from_course(course_id, archer_id):
 
 @app.route('/course/<int:course_id>/attendance')
 @login_required
+@require_permission('manage_courses')
 def course_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     today = date.today()
@@ -652,6 +725,7 @@ def course_attendance(course_id):
 
 @app.route('/course/<int:course_id>/mark_attendance', methods=['POST'])
 @login_required
+@require_permission('manage_courses')
 def mark_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     attendance_date = request.form.get('date')
@@ -747,8 +821,38 @@ def export_composites():
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name='composites.pdf', mimetype='application/pdf')
 
+@app.route('/export_archers')
+@login_required
+def export_archers():
+    from reportlab.pdfgen import canvas
+    from io import BytesIO
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer)
+    archers = Archer.query.all()
+    p.drawString(100, 800, "Liste des archérs")
+    y = 780
+    for archer in archers:
+        archer_info = f"{archer.name} - License: {archer.license_number}"
+        if archer.age:
+            archer_info += f" - Age: {archer.age}"
+        if archer.categorie:
+            archer_info += f" - Catégorie: {archer.categorie}"
+        p.drawString(100, y, archer_info)
+        y -= 20
+        if archer.bow_type:
+            p.drawString(120, y, f"Type d'arc: {archer.bow_type}")
+            y -= 15
+        if y < 50:
+            p.showPage()
+            y = 800
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name='archers.pdf', mimetype='application/pdf')
+
 @app.route('/import_archers', methods=['GET', 'POST'])
 @login_required
+@require_permission('edit')
 def import_archers():
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -859,6 +963,122 @@ def import_archers():
                                      error=f"Erreur lors de la lecture du fichier: {str(e)}")
     
     return render_template('import_archers.html')
+
+# Routes de gestion des utilisateurs (Admin only)
+@app.route('/users')
+@login_required
+@require_permission('admin')
+def users():
+    all_users = User.query.all()
+    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'coach']
+    return render_template('users.html', users=all_users, roles=roles)
+
+@app.route('/add_user', methods=['GET', 'POST'])
+@login_required
+@require_permission('admin')
+def add_user():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        role = request.form.get('role', 'editeur')
+        
+        # Vérifier que l'utilisateur n'existe pas déjà
+        if User.query.filter_by(username=username).first():
+            flash(f'Un utilisateur avec le nom "{username}" existe déjà.', 'error')
+            return redirect(url_for('add_user'))
+        
+        # Créer le nouvel utilisateur
+        user = User(username=username, role=role)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        
+        log_history(
+            event_type='user_created',
+            entity_type='user',
+            entity_id=user.id,
+            summary=f"Utilisateur créé: {username} (Rôle: {role})",
+            details={'username': username, 'role': role}
+        )
+        db.session.commit()
+        
+        flash(f'Utilisateur "{username}" créé avec succès.', 'success')
+        return redirect(url_for('users'))
+    
+    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'coach']
+    return render_template('add_user.html', roles=roles)
+
+@app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+@require_permission('admin')
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        new_role = request.form.get('role', user.role)
+        password = request.form.get('password', '').strip()
+        
+        old_role = user.role
+        user.role = new_role
+        
+        if password:
+            user.set_password(password)
+        
+        db.session.commit()
+        
+        if old_role != new_role or password:
+            changes = {}
+            if old_role != new_role:
+                changes['role'] = {'from': old_role, 'to': new_role}
+            if password:
+                changes['password'] = 'Mot de passe changé'
+            
+            log_history(
+                event_type='user_updated',
+                entity_type='user',
+                entity_id=user.id,
+                summary=f"Utilisateur modifié: {user.username}",
+                details={'changes': changes}
+            )
+            db.session.commit()
+        
+        flash(f'Utilisateur "{user.username}" modifié avec succès.', 'success')
+        return redirect(url_for('users'))
+    
+    roles = ['admin', 'responsable', 'editeur', 'lecteur', 'coach']
+    return render_template('edit_user.html', user=user, roles=roles)
+
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+@require_permission('admin')
+def delete_user(user_id):
+    # Empêcher la suppression du dernier admin
+    user = User.query.get_or_404(user_id)
+    
+    if user.id == current_user.id:
+        flash('Vous ne pouvez pas supprimer votre propre compte.', 'error')
+        return redirect(url_for('users'))
+    
+    if user.role == 'admin':
+        admin_count = User.query.filter_by(role='admin').count()
+        if admin_count <= 1:
+            flash('Il doit y avoir au moins un administrateur.', 'error')
+            return redirect(url_for('users'))
+    
+    username = user.username
+    db.session.delete(user)
+    
+    log_history(
+        event_type='user_deleted',
+        entity_type='user',
+        entity_id=user.id,
+        summary=f"Utilisateur supprimé: {username}",
+        details={'username': username}
+    )
+    
+    db.session.commit()
+    flash(f'Utilisateur "{username}" supprimé avec succès.', 'success')
+    return redirect(url_for('users'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=80, host='0.0.0.0')

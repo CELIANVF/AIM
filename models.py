@@ -9,12 +9,50 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), default='editeur', nullable=False)  # admin, responsable, editeur, lecteur, coach
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    def is_admin(self):
+        return self.role == 'admin'
+    
+    def is_responsable(self):
+        return self.role in ('admin', 'responsable')
+    
+    def can_delete(self):
+        return self.role == 'admin'
+    
+    def can_edit(self):
+        return self.role in ('admin', 'responsable', 'editeur')
+    
+    def can_view(self):
+        return True
+    
+    # Permissions spécifiques par fonctionnalité
+    def can_manage_archers(self):
+        return self.role in ('admin', 'responsable', 'editeur')
+    
+    def can_manage_equipment(self):
+        return self.role in ('admin', 'responsable', 'editeur')
+    
+    def can_manage_courses(self):
+        return self.role in ('admin', 'responsable')
+    
+    def can_view_courses(self):
+        return self.role in ('admin', 'responsable', 'lecteur', 'coach')
+    
+    def can_manage_assignments(self):
+        return self.role in ('admin', 'responsable', 'editeur')
+    
+    def can_view_assignments(self):
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur')
+    
+    def can_view_history(self):
+        return self.role in ('admin', 'responsable', 'editeur', 'lecteur')
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)

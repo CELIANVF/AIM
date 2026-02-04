@@ -16,9 +16,11 @@
                 <p class="small muted" style="margin:6px 0 0 0">Assigné le {{ ass.date_assigned.strftime('%d/%m/%Y') }}</p>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
+                {% if current_user.can_edit() %}
                 <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" style="display:inline;">
                     <button class="btn btn-outline" type="submit">Retourner</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -26,7 +28,9 @@
 </div>
 
 <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+    {% if current_user.can_edit() %}
     <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
+    {% endif %}
     <a class="btn btn-secondary" href="/export_assignments">Exporter en PDF</a>
 </p>
 {% endblock %}

@@ -8,7 +8,9 @@
         <h1>📁 Catégories de produits</h1>
         <p class="muted">{{ categories|length }} catégorie(s) disponible(s)</p>
     </div>
+    {% if current_user.can_edit() %}
     <a class="btn btn-primary" href="/add_category">➕ Nouvelle catégorie</a>
+    {% endif %}
 </div>
 
 <div class="grid">
@@ -41,10 +43,14 @@
                 </div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
+                {% if current_user.can_edit() %}
                 <a class="btn btn-outline" href="/edit_category/{{ cat.id }}">✏️ Modifier</a>
+                {% endif %}
+                {% if current_user.can_delete() %}
                 <form method="POST" action="/delete_category/{{ cat.id }}" onsubmit="return confirm('⚠️ Supprimer cette catégorie et tous ses produits ? Cette action est irréversible.');">
                     <button type="submit" class="btn btn-danger" style="cursor:pointer">🗑️ Supprimer</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
