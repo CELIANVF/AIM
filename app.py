@@ -454,8 +454,13 @@ def add_composite():
         db.session.commit()
         return redirect(url_for('composites'))
     # pass categories so template can group products by category
+    # Exclude products that are already assigned to an existing composite
     cats = Category.query.order_by(Category.name).all()
-    return render_template('add_composite.html', categories=cats)
+    cats_with_available = []
+    for c in cats:
+        available = [p for p in c.products if not p.composites]
+        cats_with_available.append({'id': c.id, 'name': c.name, 'products': available})
+    return render_template('add_composite.html', categories=cats_with_available)
 
 @app.route('/edit_composite/<int:comp_id>', methods=['GET', 'POST'])
 @login_required
@@ -486,8 +491,13 @@ def edit_composite(comp_id):
             )
         db.session.commit()
         return redirect(url_for('composites'))
+    # When editing a composite, show products that are either unassigned
+    # (not part of any composite) or already part of this composite so the
+    # user can keep/remove them. Do not show products that belong to other
+    # composites.
     prods = Product.query.all()
-    return render_template('edit_composite.html', composite=comp, products=prods)
+    prods_filtered = [p for p in prods if (not p.composites) or (p in comp.components)]
+    return render_template('edit_composite.html', composite=comp, products=prods_filtered)
 
 @app.route('/archers')
 @login_required
