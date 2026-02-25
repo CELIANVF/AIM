@@ -30,18 +30,28 @@
                 <button type="button" class="btn btn-outline comp-filter-apply">Appliquer</button>
                 <button type="button" class="btn btn-outline comp-filter-clear">Réinitialiser</button>
             </div>
-            <div class="components-list">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <button type="button" class="btn btn-outline comp-select-visible">Sélectionner visibles</button>
+                <button type="button" class="btn btn-outline comp-deselect-visible">Désélectionner visibles</button>
+            </div>
+            <div class="components-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;max-height:340px;overflow:auto;padding-right:6px">
             {% for p in c.products %}
-                <label class="component-item" style="display:block;margin:4px 0">
-                    <input type="checkbox" name="components" value="{{ p.id }}"
-                        data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}"
-                        {% if p.custom_values %}
-                            {% for k, v in p.custom_values.items() %}
-                                data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
-                            {% endfor %}
-                        {% endif %}
-                    > {{ p.brand }} {% if p.model %}({{ p.model }}){% endif %}
-                </label>
+                <div class="component-card" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px">
+                    <label style="display:flex;align-items:center;gap:8px">
+                        <input type="checkbox" name="components" value="{{ p.id }}"
+                            data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}"
+                            {% if p.custom_values %}
+                                {% for k, v in p.custom_values.items() %}
+                                    data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
+                                {% endfor %}
+                            {% endif %}
+                        >
+                        <div style="flex:1">
+                            <div style="font-weight:600">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</div>
+                            <div class="small muted">{{ p.category.name }}{% if p.size %} • {{ p.size }}{% endif %}{% if p.power %} • {{ p.power }}{% endif %}</div>
+                        </div>
+                    </label>
+                </div>
             {% endfor %}
             </div>
         {% else %}
@@ -109,6 +119,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
         applyBtn.addEventListener('click', applyFilter);
         clearBtn.addEventListener('click', function(){ fieldSel.value='any'; textInput.value=''; valueSel.innerHTML=''; valueSel.style.display='none'; textInput.style.display='inline-block'; items.forEach(i=> i.closest('.component-item').style.display=''); });
+        // select/deselect visible
+        const selectVisibleBtn = ctrl.parentElement.querySelector('.comp-select-visible');
+        const deselectVisibleBtn = ctrl.parentElement.querySelector('.comp-deselect-visible');
+        if (selectVisibleBtn) selectVisibleBtn.addEventListener('click', function(){ items.forEach(i=>{ const lab=i.closest('.component-item') || i.closest('.component-card'); if (lab && lab.style.display !== 'none') i.checked = true; }); });
+        if (deselectVisibleBtn) deselectVisibleBtn.addEventListener('click', function(){ items.forEach(i=>{ const lab=i.closest('.component-item') || i.closest('.component-card'); if (lab && lab.style.display !== 'none') i.checked = false; }); });
     });
 });
 </script>
