@@ -121,9 +121,12 @@
                             {% endif %}
                         </div>
                         <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                            {% set assigned_comps = p.composites|selectattr('status','equalto','loan')|list %}
+                            {% set comps = p.composites|list %}
+                            {% set assigned_comps = comps|selectattr('status','equalto','loan')|list %}
                             {% if assigned_comps %}
                                 <span class="badge badge-warning">→ Assigné</span>
+                            {% elif comps %}
+                                <span class="badge badge-primary">✓ Monté</span>
                             {% elif p.state == 'stock' %}
                                 <span class="badge badge-success">✓ Disponible</span>
                             {% elif p.state == 'broken' %}
