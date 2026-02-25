@@ -35,6 +35,16 @@
                     <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">🏠 Accueil</a></li>
                     <li><a href="/categories" class="{% if request.path.startswith('/categories') %}active{% endif %}">📁 Catégories</a></li>
                     <li><a href="/products" class="{% if request.path.startswith('/products') %}active{% endif %}">📦 Produits</a></li>
+                        {% if request.path.startswith('/products') and categories %}
+                        <li>
+                            <div id="product-filters" style="padding:8px 0 0 6px;display:flex;flex-direction:column;gap:6px;">
+                                <button class="btn btn-outline" data-filter="all" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;">Tous</button>
+                                {% for c in categories %}
+                                <button class="btn btn-outline" data-filter="{{ c.name|e }}" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;">{{ c.name }}</button>
+                                {% endfor %}
+                            </div>
+                        </li>
+                        {% endif %}
                     <li><a href="/composites" class="{% if request.path.startswith('/composites') %}active{% endif %}">🎯 Arcs</a></li>
                     <li><a href="/archers" class="{% if request.path.startswith('/archers') %}active{% endif %}">👥 Archers</a></li>
                     <li><a href="/assignments" class="{% if request.path.startswith('/assignments') %}active{% endif %}">🔄 Assignations</a></li>

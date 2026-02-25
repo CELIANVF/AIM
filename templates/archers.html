@@ -22,6 +22,26 @@
     <label style="font-weight: bold; margin-bottom: 8px; display: block;">📊 Trier par:</label>
     <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
         <form method="GET" action="/archers" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0;">
+            <input type="text" name="q" placeholder="Recherche (nom/prénom)" style="padding:8px;border:1px solid #ddd;border-radius:4px;" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}">
+            <select name="course_id" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+                <option value="">Tous les cours</option>
+                {% for course in courses %}
+                <option value="{{ course.id }}" {% if current_filters.course_id and (current_filters.course_id|int) == course.id %}selected{% endif %}>{{ course.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="has_arc" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+                <option value="">Arc</option>
+                <option value="yes" {% if current_filters.has_arc == 'yes' %}selected{% endif %}>Assigné</option>
+                <option value="no" {% if current_filters.has_arc == 'no' %}selected{% endif %}>Non assigné</option>
+            </select>
+            <select name="category" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+                <option value="">Toutes catégories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if current_filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="min_age" placeholder="Min âge" style="width:90px;padding:8px;border:1px solid #ddd;border-radius:4px;" value="{% if current_filters.min_age %}{{ current_filters.min_age }}{% endif %}">
+            <input type="number" name="max_age" placeholder="Max âge" style="width:90px;padding:8px;border:1px solid #ddd;border-radius:4px;" value="{% if current_filters.max_age %}{{ current_filters.max_age }}{% endif %}">
             <select name="sort_by" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
                 <option value="nom" {% if current_sort.by == 'nom' %}selected{% endif %}>Nom</option>
                 <option value="prenom" {% if current_sort.by == 'prenom' %}selected{% endif %}>Prénom</option>
@@ -29,6 +49,7 @@
                 <option value="licence" {% if current_sort.by == 'licence' %}selected{% endif %}>Numéro de licence</option>
                 <option value="categorie" {% if current_sort.by == 'categorie' %}selected{% endif %}>Catégorie</option>
                 <option value="arc" {% if current_sort.by == 'arc' %}selected{% endif %}>Arc assigné</option>
+                <option value="course" {% if current_sort.by == 'course' %}selected{% endif %}>Cours assigné</option>
             </select>
             
             <select name="sort_order" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
@@ -37,6 +58,7 @@
             </select>
             
             <a href="/archers" class="btn btn-outline" style="padding: 8px 12px; font-size: 14px;">↻ Réinitialiser</a>
+            <button type="submit" class="btn btn-primary">Appliquer</button>
         </form>
     </div>
 </div>
@@ -57,6 +79,12 @@
                     {% if a.categorie %}
                         <span class="badge" style="background-color: #e3f2fd; color: #1976d2;">📌 {{ a.categorie }}</span>
                     {% endif %}
+                    {% set active_courses = a.courses | selectattr('active') | list %}
+                    {% if active_courses %}
+                        {% for course in active_courses %}
+                            <span class="badge" style="background-color:#fff7ed;color:#92400e">📚 {{ course.name }}</span>
+                        {% endfor %}
+                    {% endif %}
                 </div>
                 {% if a.bow_type or a.bow_length or a.draw_length %}
                 <div style="padding-top:8px;border-top:1px solid var(--border-light)">
@@ -71,8 +99,26 @@
                     {% endif %}
                     {% if a.current_assignment %}
                         <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span></p>
+                        {% if a.courses %}
+                            <p class="small" style="margin:4px 0"><strong>Cours:</strong>
+                                {% for c in a.courses %}
+                                    <span class="muted">{{ c.name }}{% if not loop.last %}, {% endif %}</span>
+                                {% else %}
+                                    <span class="muted">Aucun</span>
+                                {% endfor %}
+                            </p>
+                        {% endif %}
                     {% else %}
                         <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="muted">Aucun</span></p>
+                        {% if a.courses %}
+                            <p class="small" style="margin:4px 0"><strong>Cours:</strong>
+                                {% for c in a.courses %}
+                                    <span class="muted">{{ c.name }}{% if not loop.last %}, {% endif %}</span>
+                                {% else %}
+                                    <span class="muted">Aucun</span>
+                                {% endfor %}
+                            </p>
+                        {% endif %}
                     {% endif %}
                 </div>
                 {% else %}

@@ -43,12 +43,17 @@
     .accordion-content {
         padding: 16px;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
         max-height: 10000px;
         overflow: hidden;
         transition: max-height 0.3s ease-in-out;
     }
+
+    /* Product-specific compact actions */
+    .accordion .item .action-group{padding-top:8px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap}
+    .accordion .item .action-group a.btn, .accordion .item .action-group button.btn{padding:6px 10px;font-size:13px;border-radius:8px;flex:none}
+    .accordion .item .action-group form{margin:0;padding:0}
 
     .accordion-content.collapsed {
         max-height: 0;
@@ -72,14 +77,41 @@
 
 {% if products %}
     {% for category_name, products_by_category in grouped_products.items() %}
-    <div class="accordion">
+    <div class="accordion" data-category="{{ category_name|e }}">
         <div class="accordion-header" onclick="toggleAccordion(this)">
             <span>{{ category_name }} ({{ products_by_category|length }})</span>
             <span class="accordion-icon">▼</span>
         </div>
+        <div class="accordion-controls" style="padding:8px 12px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label class="small muted" style="margin-right:6px">Trier:</label>
+            <select class="sort-select" style="padding:6px;border-radius:8px;border:1px solid var(--border);">
+                <option value="brand">Marque</option>
+                <option value="state">État</option>
+                <option value="size">Taille</option>
+                <option value="model">Modèle</option>
+            </select>
+
+            <label class="small muted" style="margin-left:8px">Filtrer:</label>
+            <select class="filter-field" style="padding:6px;border-radius:8px;border:1px solid var(--border);">
+                <option value="any">Texte</option>
+                <option value="brand">Marque</option>
+                <option value="state">État</option>
+                <option value="size">Taille</option>
+                <option value="model">Modèle</option>
+            </select>
+            <input class="filter-value-input" type="text" placeholder="Valeur libre (ex: 23 gauchère)" style="padding:6px;border-radius:8px;border:1px solid var(--border);min-width:180px;display:inline-block">
+            <select class="filter-value-select" style="padding:6px;border-radius:8px;border:1px solid var(--border);min-width:180px;display:none"></select>
+            <button class="btn btn-outline btn-apply-filter">Appliquer</button>
+            <button class="btn btn-outline btn-clear-filter">Réinitialiser</button>
+        </div>
         <div class="accordion-content">
             {% for p in products_by_category %}
-            <div class="item">
+            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}"
+                {% if p.custom_values %}
+                    {% for k, v in p.custom_values.items() %}
+                        data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
+                    {% endfor %}
+                {% endif %}>
                 <div style="display:flex;flex-direction:column;gap:12px">
                     <div>
                         <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
@@ -106,14 +138,14 @@
                         <p class="small muted" style="margin-top:8px">💬 {{ p.comments }}</p>
                         {% endif %}
                     </div>
-                    <div class="action-group" style="padding-top:8px;border-top:1px solid var(--border-light)">
+                    <div class="action-group">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}" style="flex:1">✏️ Modifier</a>
-                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}" style="flex:1">📋 Dupliquer</a>
+                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}">✏️ Modifier</a>
+                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}">📋 Dupliquer</a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_product/{{ p.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer;margin:0">🗑️ Supprimer</button>
+                        <form method="POST" action="/delete_product/{{ p.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger">🗑️ Supprimer</button>
                         </form>
                         {% endif %}
                     </div>
@@ -139,4 +171,220 @@ function toggleAccordion(header) {
     content.classList.toggle('collapsed');
 }
 </script>
+<script>
+// Filter products by category using sidebar buttons
+document.addEventListener('DOMContentLoaded', function(){
+    const filterContainer = document.getElementById('product-filters');
+    if (!filterContainer) return;
+    const buttons = Array.from(filterContainer.querySelectorAll('button[data-filter]'));
+    const accordions = Array.from(document.querySelectorAll('.accordion[data-category]'));
+
+    function setActiveButton(activeBtn){
+        buttons.forEach(b => b.classList.remove('active-filter'));
+        if (activeBtn) activeBtn.classList.add('active-filter');
+    }
+
+    buttons.forEach(btn => {
+        btn.addEventListener('click', function(){
+            const filter = this.getAttribute('data-filter');
+            setActiveButton(this);
+            accordions.forEach(acc => {
+                const cat = acc.getAttribute('data-category');
+                if (filter === 'all' || cat === filter) {
+                    acc.style.display = '';
+                } else {
+                    acc.style.display = 'none';
+                }
+            });
+        });
+    });
+
+    // default: activate 'Tous' if present
+    const defaultBtn = buttons.find(b => b.getAttribute('data-filter') === 'all');
+    if (defaultBtn) defaultBtn.click();
+});
+</script>
+<script>
+// Per-accordion sort & filter
+document.addEventListener('DOMContentLoaded', function(){
+    const accordions = Array.from(document.querySelectorAll('.accordion'));
+    accordions.forEach(acc => {
+        const content = acc.querySelector('.accordion-content');
+        if (!content) return;
+        const items = () => Array.from(content.querySelectorAll('.item'));
+
+        // build value maps for fields (brand, state, size, model, custom-*)
+        const valueMap = {};
+        const itsAll = Array.from(content.querySelectorAll('.item'));
+        itsAll.forEach(it => {
+            Array.from(it.attributes).forEach(a => {
+                if (!a.name.startsWith('data-')) return;
+                const key = a.name; // e.g. data-brand or data-custom-foo
+                const val = (a.value || '').trim();
+                if (!val) return;
+                if (!valueMap[key]) valueMap[key] = new Set();
+                valueMap[key].add(val);
+            });
+        });
+
+        // populate sort-select and filter-field only with fields present for this category
+        const filterSelect = acc.querySelector('.filter-field');
+        const sortSelect = acc.querySelector('.sort-select');
+        const baseLabels = {brand: 'Marque', state: 'État', size: 'Taille', model: 'Modèle'};
+
+        // build array of available base fields (check data- keys)
+        const available = [];
+        if (valueMap['data-brand']) available.push('brand');
+        if (valueMap['data-state']) available.push('state');
+        if (valueMap['data-size']) available.push('size');
+        if (valueMap['data-model']) available.push('model');
+
+        // custom fields as full data- keys
+        const customKeys = Object.keys(valueMap).filter(k => k.startsWith('data-custom-'));
+
+        // populate sort select (only available fields + custom)
+        if (sortSelect) {
+            sortSelect.innerHTML = '';
+            // prefer brand first if present
+            available.forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = baseLabels[key] || key;
+                sortSelect.appendChild(opt);
+            });
+            customKeys.forEach(k => {
+                const display = k.replace('data-custom-','').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+                const opt = document.createElement('option');
+                opt.value = k; // full data- name
+                opt.textContent = display;
+                sortSelect.appendChild(opt);
+            });
+        }
+
+        // populate filter-field select with 'any' + available base fields + custom
+        if (filterSelect) {
+            filterSelect.innerHTML = '';
+            const anyOpt = document.createElement('option'); anyOpt.value = 'any'; anyOpt.textContent = 'Texte'; filterSelect.appendChild(anyOpt);
+            available.forEach(key => {
+                const o = document.createElement('option'); o.value = key; o.textContent = baseLabels[key] || key; filterSelect.appendChild(o);
+            });
+            customKeys.forEach(k => {
+                const display = k.replace('data-custom-','').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+                const o = document.createElement('option'); o.value = k; o.textContent = display; filterSelect.appendChild(o);
+            });
+        }
+
+        function matchesFilter(item, field, value){
+            if (!value) return true;
+            const terms = value.toLowerCase().split(/\s+/).filter(Boolean);
+            let source = '';
+            if (field === 'any') {
+                source = item.textContent || '';
+            } else if (field && field.startsWith('data-custom-')) {
+                source = item.getAttribute(field) || '';
+            } else {
+                source = item.getAttribute('data-' + field) || '';
+            }
+            source = source.toLowerCase();
+            return terms.every(t => source.indexOf(t) !== -1);
+        }
+
+        function applyAndSort(){
+            const sortSelect = acc.querySelector('.sort-select');
+            const filterField = acc.querySelector('.filter-field');
+            const filterValueInput = acc.querySelector('.filter-value-input');
+            const filterValueSelect = acc.querySelector('.filter-value-select');
+            const sortBy = sortSelect ? sortSelect.value : null;
+            const field = filterField ? filterField.value : 'any';
+            let value = '';
+            if (field === 'any') {
+                value = filterValueInput ? filterValueInput.value.trim() : '';
+            } else {
+                // if a select for values is visible use it
+                if (filterValueSelect && filterValueSelect.style.display !== 'none') {
+                    value = (filterValueSelect.value || '').trim();
+                } else {
+                    value = filterValueInput ? filterValueInput.value.trim() : '';
+                }
+            }
+
+            const its = items();
+            // filter
+            its.forEach(it => {
+                if (matchesFilter(it, field, value)) it.style.display = '';
+                else it.style.display = 'none';
+            });
+
+            // sort visible items
+            const visible = its.filter(i => i.style.display !== 'none');
+            visible.sort((a,b) => {
+                const getVal = (el, key) => {
+                    if (!key) return el.textContent.trim();
+                    if (key.startsWith('data-custom-')) return (el.getAttribute(key) || '').toLowerCase();
+                    return (el.getAttribute('data-' + key) || '').toLowerCase();
+                };
+                const va = getVal(a, sortBy);
+                const vb = getVal(b, sortBy);
+                const na = parseFloat(va.replace(/[^0-9.,-]/g,''));
+                const nb = parseFloat(vb.replace(/[^0-9.,-]/g,''));
+                if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                if (va < vb) return -1;
+                if (va > vb) return 1;
+                return 0;
+            });
+            // append in order
+            visible.forEach(v => content.appendChild(v));
+        }
+
+        // wire controls
+        const applyBtn = acc.querySelector('.btn-apply-filter');
+        const clearBtn = acc.querySelector('.btn-clear-filter');
+        const filterValueInputEl = acc.querySelector('.filter-value-input');
+        const filterValueSelectEl = acc.querySelector('.filter-value-select');
+
+        // when filter-field changes, switch between text input and select populated from valueMap
+        if (filterSelect) {
+            filterSelect.addEventListener('change', function(){
+                const val = this.value;
+                if (val === 'any') {
+                    if (filterValueInputEl) filterValueInputEl.style.display = 'inline-block';
+                    if (filterValueSelectEl) filterValueSelectEl.style.display = 'none';
+                } else {
+                    // populate select with unique values for the chosen key
+                    const key = val.startsWith('data-') ? val : ('data-' + val);
+                    const set = valueMap[key] || new Set();
+                    if (filterValueSelectEl) {
+                        filterValueSelectEl.innerHTML = '';
+                        const anyOpt = document.createElement('option'); anyOpt.value=''; anyOpt.textContent = '-- (tous) --'; filterValueSelectEl.appendChild(anyOpt);
+                        Array.from(set).sort().forEach(v => {
+                            const o = document.createElement('option'); o.value = v; o.textContent = v; filterValueSelectEl.appendChild(o);
+                        });
+                        filterValueSelectEl.style.display = 'inline-block';
+                    }
+                    if (filterValueInputEl) filterValueInputEl.style.display = 'none';
+                }
+            });
+            // trigger initial change to setup value control
+            filterSelect.dispatchEvent(new Event('change'));
+        }
+
+        if (applyBtn) applyBtn.addEventListener('click', applyAndSort);
+        if (clearBtn) clearBtn.addEventListener('click', function(){
+            const ff = acc.querySelector('.filter-field');
+            if (ff) ff.value = 'any';
+            if (filterValueInputEl) filterValueInputEl.value = '';
+            if (filterValueSelectEl) { filterValueSelectEl.innerHTML = ''; filterValueSelectEl.style.display = 'none'; }
+            if (filterSelect) filterSelect.dispatchEvent(new Event('change'));
+            applyAndSort();
+        });
+        const sortSel = acc.querySelector('.sort-select');
+        if (sortSel) sortSel.addEventListener('change', applyAndSort);
+    });
+});
+</script>
+
+<style>
+/* Active filter button look */
+.active-filter{border-color:var(--primary)!important;color:var(--primary)!important;background:var(--primary-light)!important}
+</style>
 {% endblock %}

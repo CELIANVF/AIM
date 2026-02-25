@@ -31,12 +31,45 @@
                         <span class="badge badge-warning">→ En prêt</span>
                     {% endif %}
                 </div>
+                <div style="margin-bottom:8px">
+                    {% set s = composite_summaries.get(c.id) if composite_summaries else None %}
+                    {% if s %}
+                    <p class="small muted" style="margin:0"><strong>Résumé:</strong>
+                        {% if s.handle %} Poignée: {{ s.handle }};{% endif %}
+                        {% if s.branch %} Branche: {{ s.branch }};{% endif %}
+                        {% if s.assigned_to %} Assigné à: {{ s.assigned_to }}{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
                 {% if c.components %}
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
                     <p class="small muted" style="margin:0 0 6px 0"><strong>Composants:</strong></p>
+                    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
                     {% for comp in c.components %}
-                        <span class="small" style="display:block;margin:4px 0">• {{ comp.brand }} - {{ comp.category.name }}</span>
+                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+                            <div style="flex:1">
+                                <div style="font-weight:600">{{ comp.brand }}{% if comp.model %} {{ comp.model }}{% endif %}</div>
+                                <div class="small muted">{{ comp.category.name }}</div>
+                                <div class="small" style="margin-top:6px">
+                                    {% if comp.size %}
+                                        Taille: {{ comp.size }}{% if comp.category and comp.category.field_units and comp.category.field_units.get('size') %} {{ comp.category.field_units.get('size') }}{% endif %}
+                                    {% endif %}
+                                    {% if comp.power %}
+                                        &nbsp; Puissance: {{ comp.power }}{% if comp.category and comp.category.field_units and comp.category.field_units.get('power') %} {{ comp.category.field_units.get('power') }}{% endif %}
+                                    {% endif %}
+                                </div>
+                                {% if comp.custom_values %}
+                                <div class="small muted" style="margin-top:6px">
+                                    {% for k, v in comp.custom_values.items() %}
+                                        <div>{{ k }}: {{ v }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        
+                        </div>
                     {% endfor %}
+                    </div>
                 </div>
                 {% endif %}
             </div>

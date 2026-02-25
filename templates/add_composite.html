@@ -22,13 +22,94 @@
     {% for c in categories %}
         <h3>{{ c.name }}</h3>
         {% if c.products %}
+            <div class="component-controls" data-category-id="{{ c.id }}" style="margin-bottom:8px">
+                <label class="small muted">Filtrer {{ c.name }}:</label>
+                <select class="comp-filter-field"></select>
+                <select class="comp-filter-value" style="display:none"></select>
+                <input class="comp-filter-text" type="text" placeholder="Recherche libre" style="min-width:160px">
+                <button type="button" class="btn btn-outline comp-filter-apply">Appliquer</button>
+                <button type="button" class="btn btn-outline comp-filter-clear">Réinitialiser</button>
+            </div>
+            <div class="components-list">
             {% for p in c.products %}
-                <label><input type="checkbox" name="components" value="{{ p.id }}"> {{ p.brand }} {% if p.model %}({{ p.model }}){% endif %}</label><br>
+                <label class="component-item" style="display:block;margin:4px 0">
+                    <input type="checkbox" name="components" value="{{ p.id }}"
+                        data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}"
+                        {% if p.custom_values %}
+                            {% for k, v in p.custom_values.items() %}
+                                data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
+                            {% endfor %}
+                        {% endif %}
+                    > {{ p.brand }} {% if p.model %}({{ p.model }}){% endif %}
+                </label>
             {% endfor %}
+            </div>
         {% else %}
             <em>Aucun produit</em><br>
         {% endif %}
     {% endfor %}
     <button class="btn" type="submit">Ajouter</button>
 </form>
+<script>
+// Per-category component filtering in add_composite
+document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.component-controls').forEach(ctrl => {
+        const container = ctrl.nextElementSibling; // .components-list
+        const fieldSel = ctrl.querySelector('.comp-filter-field');
+        const valueSel = ctrl.querySelector('.comp-filter-value');
+        const textInput = ctrl.querySelector('.comp-filter-text');
+        const applyBtn = ctrl.querySelector('.comp-filter-apply');
+        const clearBtn = ctrl.querySelector('.comp-filter-clear');
+
+        // build value map from checkboxes in container
+        const items = Array.from(container.querySelectorAll('.component-item input'));
+        const valueMap = {};
+        items.forEach(i => {
+            Array.from(i.attributes).forEach(a => {
+                if (!a.name.startsWith('data-')) return;
+                const key = a.name; const val = (a.value||'').trim();
+                if (!val) return;
+                if (!valueMap[key]) valueMap[key] = new Set();
+                valueMap[key].add(val);
+            });
+        });
+
+        // populate fieldSel
+        fieldSel.innerHTML = '';
+        const anyOpt = document.createElement('option'); anyOpt.value='any'; anyOpt.textContent='Tous (texte)'; fieldSel.appendChild(anyOpt);
+        ['data-brand','data-state','data-size','data-power','data-model'].forEach(k=>{ if (valueMap[k]){ const o=document.createElement('option'); o.value=k; o.textContent=k.replace('data-','').toUpperCase(); fieldSel.appendChild(o);} });
+        Object.keys(valueMap).filter(k=>k.startsWith('data-custom-')).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k.replace('data-custom-','').replace(/_/g,' '); fieldSel.appendChild(o); });
+
+        fieldSel.addEventListener('change', function(){
+            const v = this.value;
+            if (v === 'any'){
+                valueSel.style.display='none'; textInput.style.display='inline-block';
+            } else {
+                // populate values
+                valueSel.innerHTML='';
+                const anyv = document.createElement('option'); anyv.value=''; anyv.textContent='-- (tous) --'; valueSel.appendChild(anyv);
+                Array.from(valueMap[v]||[]).sort().forEach(val=>{ const o=document.createElement('option'); o.value=val; o.textContent=val; valueSel.appendChild(o); });
+                valueSel.style.display='inline-block'; textInput.style.display='none';
+            }
+        });
+        fieldSel.dispatchEvent(new Event('change'));
+
+        function applyFilter(){
+            const field = fieldSel.value;
+            const val = (field==='any') ? (textInput.value||'').toLowerCase().trim() : (valueSel.value||'').toLowerCase().trim();
+            items.forEach(i=>{
+                const lab = i.closest('.component-item');
+                let source = '';
+                if (field === 'any') source = lab.textContent || '';
+                else source = (i.getAttribute(field)||'');
+                if (!val) lab.style.display = '';
+                else lab.style.display = source.toLowerCase().indexOf(val) !== -1 ? '' : 'none';
+            });
+        }
+
+        applyBtn.addEventListener('click', applyFilter);
+        clearBtn.addEventListener('click', function(){ fieldSel.value='any'; textInput.value=''; valueSel.innerHTML=''; valueSel.style.display='none'; textInput.style.display='inline-block'; items.forEach(i=> i.closest('.component-item').style.display=''); });
+    });
+});
+</script>
 {% endblock %}

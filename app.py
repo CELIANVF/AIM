@@ -148,8 +148,28 @@ def add_category():
         has_brand = 'has_brand' in request.form
         # Convertir les champs personnalisés (un par ligne) en virgules séparées, en préservant la partie après ":"
         custom_fields_raw = request.form.get('custom_fields', '').strip()
-        custom_fields = ','.join(line.strip() for line in custom_fields_raw.split('\n') if line.strip())
-        cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields)
+        custom_fields_lines = [line.strip() for line in custom_fields_raw.split('\n') if line.strip()]
+        custom_fields = ','.join(custom_fields_lines)
+        # collect units
+        field_units = {}
+        unit_brand = request.form.get('unit_brand','').strip()
+        unit_model = request.form.get('unit_model','').strip()
+        unit_size = request.form.get('unit_size','').strip()
+        unit_power = request.form.get('unit_power','').strip()
+        if unit_brand: field_units['brand'] = unit_brand
+        if unit_model: field_units['model'] = unit_model
+        if unit_size: field_units['size'] = unit_size
+        if unit_power: field_units['power'] = unit_power
+        # custom field units: one per line matching custom_fields_lines
+        custom_units_raw = request.form.get('custom_field_units','').strip()
+        custom_units_lines = [line.strip() for line in custom_units_raw.split('\n') if line.strip()]
+        for i, label in enumerate(custom_fields_lines):
+            key = label.replace('\s+', ' ')
+            norm = ' '.join(label.split()).lower()
+            if i < len(custom_units_lines) and custom_units_lines[i]:
+                field_units[norm] = custom_units_lines[i]
+
+        cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields, field_units=field_units if field_units else None)
         db.session.add(cat)
         db.session.commit()
         return redirect(url_for('categories'))
@@ -168,7 +188,32 @@ def edit_category(cat_id):
         cat.has_brand = 'has_brand' in request.form
         # Convertir les champs personnalisés (un par ligne) en virgules séparées, en préservant la partie après ":"
         custom_fields_raw = request.form.get('custom_fields', '').strip()
-        cat.custom_fields = ','.join(line.strip() for line in custom_fields_raw.split('\n') if line.strip())
+        custom_fields_lines = [line.strip() for line in custom_fields_raw.split('\n') if line.strip()]
+        cat.custom_fields = ','.join(custom_fields_lines)
+        # update units
+        field_units = cat.field_units or {}
+        unit_brand = request.form.get('unit_brand','').strip()
+        unit_model = request.form.get('unit_model','').strip()
+        unit_size = request.form.get('unit_size','').strip()
+        unit_power = request.form.get('unit_power','').strip()
+        if unit_brand: field_units['brand'] = unit_brand
+        else: field_units.pop('brand', None)
+        if unit_model: field_units['model'] = unit_model
+        else: field_units.pop('model', None)
+        if unit_size: field_units['size'] = unit_size
+        else: field_units.pop('size', None)
+        if unit_power: field_units['power'] = unit_power
+        else: field_units.pop('power', None)
+        # custom field units lines
+        custom_units_raw = request.form.get('custom_field_units','').strip()
+        custom_units_lines = [line.strip() for line in custom_units_raw.split('\n') if line.strip()]
+        for i, label in enumerate(custom_fields_lines):
+            norm = ' '.join(label.split()).lower()
+            if i < len(custom_units_lines) and custom_units_lines[i]:
+                field_units[norm] = custom_units_lines[i]
+            else:
+                field_units.pop(norm, None)
+        cat.field_units = field_units if field_units else None
         db.session.commit()
         return redirect(url_for('categories'))
     return render_template('edit_category.html', category=cat)
@@ -199,7 +244,8 @@ def products():
     for product in prods:
         grouped[product.category.name].append(product)
     
-    return render_template('products.html', products=prods, grouped_products=grouped)
+    cats = Category.query.order_by(Category.name).all()
+    return render_template('products.html', products=prods, grouped_products=grouped, categories=cats)
 
 @app.route('/add_product', methods=['GET', 'POST'])
 @login_required
@@ -329,7 +375,56 @@ def duplicate_product(prod_id):
 @login_required
 def composites():
     comps = CompositeProduct.query.all()
-    return render_template('composites.html', composites=comps)
+    # build summaries for each composite: handle (poignée), branch (branche) and assignment status
+    summaries = {}
+    for comp in comps:
+        handle = None
+        branch = None
+        # find components by category keywords
+        for p in comp.components:
+            cname = (p.category.name or '').lower()
+            if 'poign' in cname or 'handle' in cname:
+                # prefer first matching handle
+                if not handle:
+                    # build descriptive string
+                    parts = []
+                    if p.size:
+                        parts.append(str(p.size))
+                    # lateralite could be in custom_values under various keys
+                    if p.custom_values:
+                        for k in ('latéralité','lateralite','side','hand','lat'):
+                            if k in p.custom_values:
+                                parts.append(str(p.custom_values[k]))
+                                break
+                    handle = ' '.join(parts) if parts else p.brand or ''
+            if 'branche' in cname or 'branch' in cname or 'limb' in cname:
+                if not branch:
+                    parts = []
+                    if p.model:
+                        parts.append(p.model)
+                    if p.size:
+                        parts.append(str(p.size))
+                    if p.power:
+                        parts.append(str(p.power))
+                    # also check custom values for power/size
+                    if p.custom_values and not parts:
+                        if 'size' in p.custom_values:
+                            parts.append(str(p.custom_values['size']))
+                        if 'power' in p.custom_values:
+                            parts.append(str(p.custom_values['power']))
+                    branch = ' '.join(parts) if parts else p.brand or ''
+        # assignment: check for active assignment
+        assigned = None
+        for a in comp.assignments:
+            if not a.date_returned:
+                assigned = a.archer.name if a.archer else 'Assigné'
+                break
+        summaries[comp.id] = {
+            'handle': handle,
+            'branch': branch,
+            'assigned_to': assigned
+        }
+    return render_template('composites.html', composites=comps, composite_summaries=summaries)
 
 @app.route('/add_composite', methods=['GET', 'POST'])
 @login_required
@@ -399,8 +494,52 @@ def edit_composite(comp_id):
 def archers():
     sort_by = request.args.get('sort_by', 'nom')
     sort_order = request.args.get('sort_order', 'asc')
+    # filters
+    filter_q = request.args.get('q', '').strip()
+    filter_course = request.args.get('course_id')
+    filter_has_arc = request.args.get('has_arc')  # 'yes'|'no'|None
+    filter_category = request.args.get('category')
+    filter_min_age = request.args.get('min_age')
+    filter_max_age = request.args.get('max_age')
     
     query = Archer.query
+
+    # apply filters
+    if filter_q:
+        q = f"%{filter_q}%"
+        query = query.filter(db.or_(Archer.first_name.ilike(q), Archer.last_name.ilike(q)))
+
+    if filter_category:
+        query = query.filter(Archer.categorie == filter_category)
+
+    if filter_min_age:
+        try:
+            query = query.filter(Archer.age >= int(filter_min_age))
+        except ValueError:
+            pass
+    if filter_max_age:
+        try:
+            query = query.filter(Archer.age <= int(filter_max_age))
+        except ValueError:
+            pass
+
+    # filter by course
+    if filter_course:
+        try:
+            cid = int(filter_course)
+            query = query.join(Archer.courses).filter(Course.id == cid)
+        except Exception:
+            pass
+
+    # filter by has arc (active assignment)
+    if filter_has_arc in ('yes','no'):
+        from sqlalchemy.orm import aliased
+        AssignmentAlias = aliased(Assignment)
+        if filter_has_arc == 'yes':
+            query = query.join(AssignmentAlias, (AssignmentAlias.archer_id == Archer.id) & (AssignmentAlias.date_returned == None))
+        else:
+            # archers without active assignment
+            query = query.outerjoin(AssignmentAlias, (AssignmentAlias.archer_id == Archer.id) & (AssignmentAlias.date_returned == None)).filter(AssignmentAlias.id == None)
     
     # Apply sorting
     if sort_by == 'nom':
@@ -414,13 +553,36 @@ def archers():
     elif sort_by == 'categorie':
         query = query.order_by(Archer.categorie if sort_order == 'asc' else Archer.categorie.desc())
     elif sort_by == 'arc':
-        query = query.order_by(Archer.last_name if sort_order == 'asc' else Archer.last_name.desc())
+        # sort by currently assigned composite name (if any)
+        from sqlalchemy.orm import aliased
+        AssignmentAlias = aliased(Assignment)
+        CompositeAlias = aliased(CompositeProduct)
+        # left outer join to include archers without assignment
+        query = query.outerjoin(AssignmentAlias, (AssignmentAlias.archer_id == Archer.id) & (AssignmentAlias.date_returned == None)).outerjoin(CompositeAlias, CompositeAlias.id == AssignmentAlias.composite_id)
+        if sort_order == 'asc':
+            query = query.order_by(CompositeAlias.name.asc().nullsfirst(), Archer.last_name.asc())
+        else:
+            query = query.order_by(CompositeAlias.name.desc().nullslast(), Archer.last_name.desc())
+    elif sort_by == 'course':
+        # sort by a course name the archer is enrolled in (left join)
+        from sqlalchemy.orm import aliased
+        CourseAlias = aliased(Course)
+        query = query.outerjoin(CourseAlias, Archer.courses)
+        if sort_order == 'asc':
+            query = query.order_by(CourseAlias.name.asc().nullsfirst(), Archer.last_name.asc())
+        else:
+            query = query.order_by(CourseAlias.name.desc().nullslast(), Archer.last_name.desc())
     else:
         query = query.order_by(Archer.last_name.asc())
     
     archs = query.all()
     current_sort = {'by': sort_by, 'order': sort_order}
-    return render_template('archers.html', archers=archs, current_sort=current_sort)
+    # pass filter options
+    courses = Course.query.order_by(Course.name).all()
+    # distinct categories from archers
+    cats = [c[0] for c in db.session.query(Archer.categorie).distinct().order_by(Archer.categorie).all() if c[0]]
+    current_filters = {'q': filter_q, 'course_id': filter_course, 'has_arc': filter_has_arc, 'category': filter_category, 'min_age': filter_min_age, 'max_age': filter_max_age}
+    return render_template('archers.html', archers=archs, current_sort=current_sort, courses=courses, categories=cats, current_filters=current_filters)
 
 @app.route('/add_archer', methods=['GET', 'POST'])
 @login_required

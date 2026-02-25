@@ -71,6 +71,7 @@ class Category(db.Model):
     has_model = db.Column(db.Boolean, default=True)
     has_brand = db.Column(db.Boolean, default=True)
     custom_fields = db.Column(db.Text)  # comma-separated field names
+    field_units = db.Column(db.JSON)  # mapping field_name -> unit (e.g. {'size':'pouces', 'power':'livres', 'latéralité':'gauche'})
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -7,12 +7,14 @@
 <form method="post">
     <label>Nom: <input type="text" name="name" required></label><br>
     <label>Champs disponibles:</label><br>
-    <input type="checkbox" name="has_size" value="1"> Taille<br>
-    <input type="checkbox" name="has_power" value="1"> Puissance<br>
-    <input type="checkbox" name="has_brand" value="1" checked> Marque<br>
-    <input type="checkbox" name="has_model" value="1" checked> Modèle<br>
+    <input type="checkbox" name="has_size" value="1"> Taille <input type="text" name="unit_size" placeholder="unité (ex: pouces)" style="margin-left:8px"><br>
+    <input type="checkbox" name="has_power" value="1"> Puissance <input type="text" name="unit_power" placeholder="unité (ex: livres)" style="margin-left:8px"><br>
+    <input type="checkbox" name="has_brand" value="1" checked> Marque <input type="text" name="unit_brand" placeholder="unité (optionnel)" style="margin-left:8px"><br>
+    <input type="checkbox" name="has_model" value="1" checked> Modèle <input type="text" name="unit_model" placeholder="unité (optionnel)" style="margin-left:8px"><br>
     <label>Champs personnalisés (un par ligne):</label><br>
     <textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur: rouge/bleu/jaune&#10;Diamètre"></textarea><br>
+    <label>Unités pour champs personnalisés (un par ligne, correspond à l'ordre ci-dessus):</label><br>
+    <textarea name="custom_field_units" rows="3" placeholder="Ex: kg&#10;--&#10;mm"></textarea><br>
     <button class="btn" type="submit">Ajouter</button>
 </form>
 {% endblock %}

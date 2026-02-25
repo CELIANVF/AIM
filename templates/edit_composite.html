@@ -19,9 +19,63 @@
         </select>
     </label><br>
     <h2>Composants</h2>
+    <div class="component-controls-global" style="margin-bottom:8px">
+        <label class="small muted">Filtrer les composants:</label>
+        <select id="global-filter-field"></select>
+        <select id="global-filter-value" style="display:none"></select>
+        <input id="global-filter-text" type="text" placeholder="Recherche libre" style="min-width:160px">
+        <button type="button" class="btn btn-outline" id="global-filter-apply">Appliquer</button>
+        <button type="button" class="btn btn-outline" id="global-filter-clear">Réinitialiser</button>
+    </div>
+    <div id="components-list-global">
     {% for p in products %}
-    <input type="checkbox" name="components" value="{{ p.id }}" {% if p in composite.components %}checked{% endif %}> {{ p.brand }} - {{ p.category.name }}<br>
+    <label class="component-item" style="display:block;margin:4px 0">
+        <input type="checkbox" name="components" value="{{ p.id }}" {% if p in composite.components %}checked{% endif %}
+            data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}"
+            {% if p.custom_values %}
+                {% for k, v in p.custom_values.items() %}
+                    data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
+                {% endfor %}
+            {% endif %}
+        > {{ p.brand }} - {{ p.category.name }}
+    </label>
     {% endfor %}
+    </div>
     <button class="btn" type="submit">Modifier</button>
 </form>
+<script>
+// Global filter for components list in edit composite
+document.addEventListener('DOMContentLoaded', function(){
+    const list = document.getElementById('components-list-global');
+    if (!list) return;
+    const items = Array.from(list.querySelectorAll('.component-item input'));
+    const fieldSel = document.getElementById('global-filter-field');
+    const valueSel = document.getElementById('global-filter-value');
+    const textInput = document.getElementById('global-filter-text');
+    const applyBtn = document.getElementById('global-filter-apply');
+    const clearBtn = document.getElementById('global-filter-clear');
+
+    const valueMap = {};
+    items.forEach(i=>{
+        Array.from(i.attributes).forEach(a=>{
+            if (!a.name.startsWith('data-')) return;
+            const key = a.name; const val = (a.value||'').trim(); if (!val) return;
+            if (!valueMap[key]) valueMap[key]=new Set(); valueMap[key].add(val);
+        });
+    });
+    fieldSel.innerHTML=''; const anyOpt=document.createElement('option'); anyOpt.value='any'; anyOpt.textContent='Tous (texte)'; fieldSel.appendChild(anyOpt);
+    ['data-brand','data-state','data-size','data-power','data-model'].forEach(k=>{ if (valueMap[k]){ const o=document.createElement('option'); o.value=k; o.textContent=k.replace('data-','').toUpperCase(); fieldSel.appendChild(o);} });
+    Object.keys(valueMap).filter(k=>k.startsWith('data-custom-')).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k.replace('data-custom-','').replace(/_/g,' '); fieldSel.appendChild(o); });
+
+    fieldSel.addEventListener('change', function(){ const v=this.value; if (v==='any'){ valueSel.style.display='none'; textInput.style.display='inline-block'; } else { valueSel.innerHTML=''; const a=document.createElement('option'); a.value=''; a.textContent='-- (tous) --'; valueSel.appendChild(a); Array.from(valueMap[v]||[]).sort().forEach(val=>{ const o=document.createElement('option'); o.value=val; o.textContent=val; valueSel.appendChild(o); }); valueSel.style.display='inline-block'; textInput.style.display='none'; } });
+    fieldSel.dispatchEvent(new Event('change'));
+
+    function applyFilter(){
+        const field=fieldSel.value; const val=(field==='any')? (textInput.value||'').toLowerCase().trim() : (valueSel.value||'').toLowerCase().trim();
+        items.forEach(i=>{ const lab=i.closest('.component-item'); let source=''; if (field==='any') source = lab.textContent || ''; else source = (i.getAttribute(field)||''); if (!val) lab.style.display=''; else lab.style.display = source.toLowerCase().indexOf(val)!==-1 ? '' : 'none'; });
+    }
+    applyBtn.addEventListener('click', applyFilter);
+    clearBtn.addEventListener('click', function(){ fieldSel.value='any'; textInput.value=''; valueSel.innerHTML=''; valueSel.style.display='none'; textInput.style.display='inline-block'; items.forEach(i=> i.closest('.component-item').style.display=''); });
+});
+</script>
 {% endblock %}

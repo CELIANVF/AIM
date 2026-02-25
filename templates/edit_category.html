@@ -7,12 +7,25 @@
 <form method="post">
     <label>Nom: <input type="text" name="name" value="{{ category.name }}" required></label><br>
     <label>Champs disponibles:</label><br>
-    <input type="checkbox" name="has_brand" value="1" {% if category.has_brand %}checked{% endif %}> Marque<br>
-    <input type="checkbox" name="has_model" value="1" {% if category.has_model %}checked{% endif %}> Modèle<br>
-    <input type="checkbox" name="has_size" value="1" {% if category.has_size %}checked{% endif %}> Taille<br>
-    <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance<br>
+    <input type="checkbox" name="has_brand" value="1" {% if category.has_brand %}checked{% endif %}> Marque
+    <input type="text" name="unit_brand" placeholder="unité (optionnel)" style="margin-left:8px" value="{{ category.field_units.brand if category.field_units and category.field_units.get('brand') }}"><br>
+    <input type="checkbox" name="has_model" value="1" {% if category.has_model %}checked{% endif %}> Modèle
+    <input type="text" name="unit_model" placeholder="unité (optionnel)" style="margin-left:8px" value="{{ category.field_units.model if category.field_units and category.field_units.get('model') }}"><br>
+    <input type="checkbox" name="has_size" value="1" {% if category.has_size %}checked{% endif %}> Taille
+    <input type="text" name="unit_size" placeholder="unité (ex: pouces)" style="margin-left:8px" value="{{ category.field_units.size if category.field_units and category.field_units.get('size') }}"><br>
+    <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance
+    <input type="text" name="unit_power" placeholder="unité (ex: livres)" style="margin-left:8px" value="{{ category.field_units.power if category.field_units and category.field_units.get('power') }}"><br>
     <label>Champs personnalisés (un par ligne):</label><br>
 <textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur: rouge/bleu/jaune&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields.replace(',', '&#10;') }}{% endif %}</textarea><br>
+    <label>Unités pour champs personnalisés (un par ligne, correspond à l'ordre ci-dessus):</label><br>
+    <textarea name="custom_field_units" rows="3" placeholder="Ex: kg&#10;--&#10;mm">{% if category.custom_fields and category.field_units %}
+        {%- set parts = category.custom_fields.split(',') -%}
+        {%- for p in parts -%}
+            {%- set key = p.strip().lower() -%}
+            {{ category.field_units.get(key,'') }}
+            {%- if not loop.last %}\n{%- endif -%}
+        {%- endfor -%}
+    {% endif %}</textarea><br>
     <button class="btn" type="submit">Modifier</button>
 </form>
 {% endblock %}
