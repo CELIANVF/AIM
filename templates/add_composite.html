@@ -47,10 +47,17 @@
                             {% endif %}
                         >
                         <div style="flex:1">
-                            <div style="font-weight:600"><a href="/edit_product/{{ p.id }}" target="_blank" rel="noopener">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</a></div>
+                            <div style="font-weight:600"><a href="/edit_product/{{ p.id }}" target="_blank" rel="noopener" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</a></div>
                             <div class="small muted">{{ p.category.name }}{% if p.size %} • {{ p.size }}{% endif %}{% if p.power %} • {{ p.power }}{% endif %}</div>
                             <div class="small muted" style="margin-top:6px">État: {% if p.state == 'stock' %}Disponible{% elif p.state == 'loan' %}En prêt{% elif p.state == 'broken' %}Cassé{% else %}{{ p.state }}{% endif %} • Localisation: {% if p.location == 'club' %}Au club{% elif p.location == 'loan' %}En prêt{% else %}{{ p.location }}{% endif %}</div>
                             {% if p.comments %}<div class="small" style="margin-top:6px">💬 {{ p.comments }}</div>{% endif %}
+                            {% if p.custom_values %}
+                            <div class="small muted" style="margin-top:6px">
+                                {% for k, v in p.custom_values.items() %}
+                                    <div>{{ k }}: {{ v }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
                     </label>
                 </div>
