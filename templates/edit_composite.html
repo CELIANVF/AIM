@@ -44,7 +44,7 @@
                 {% endif %}
             >
             <div style="flex:1">
-                <div style="font-weight:600">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</div>
+                <div style="font-weight:600"><a href="/edit_product/{{ p.id }}" target="_blank" rel="noopener">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</a></div>
                 <div class="small muted">{{ p.category.name }}{% if p.size %} • {{ p.size }}{% endif %}{% if p.power %} • {{ p.power }}{% endif %}</div>
             </div>
         </label>
