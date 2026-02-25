@@ -36,7 +36,7 @@
     <div class="component-card" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px">
         <label style="display:flex;align-items:center;gap:8px">
             <input type="checkbox" name="components" value="{{ p.id }}" {% if p in composite.components %}checked{% endif %}
-                data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}"
+                data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}"
                 {% if p.custom_values %}
                     {% for k, v in p.custom_values.items() %}
                         data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
@@ -46,6 +46,8 @@
             <div style="flex:1">
                 <div style="font-weight:600"><a href="/edit_product/{{ p.id }}" target="_blank" rel="noopener">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</a></div>
                 <div class="small muted">{{ p.category.name }}{% if p.size %} • {{ p.size }}{% endif %}{% if p.power %} • {{ p.power }}{% endif %}</div>
+                <div class="small muted" style="margin-top:6px">État: {% if p.state == 'stock' %}Disponible{% elif p.state == 'loan' %}En prêt{% elif p.state == 'broken' %}Cassé{% else %}{{ p.state }}{% endif %} • Localisation: {% if p.location == 'club' %}Au club{% elif p.location == 'loan' %}En prêt{% else %}{{ p.location }}{% endif %}</div>
+                {% if p.comments %}<div class="small" style="margin-top:6px">💬 {{ p.comments }}</div>{% endif %}
             </div>
         </label>
     </div>

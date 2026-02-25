@@ -48,7 +48,7 @@
                     {% for comp in c.components %}
                         <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
                             <div style="flex:1">
-                                <div style="font-weight:600">{{ comp.brand }}{% if comp.model %} {{ comp.model }}{% endif %}</div>
+                                <div style="font-weight:600"><a href="/edit_product/{{ comp.id }}" target="_blank" rel="noopener">{{ comp.brand }}{% if comp.model %} {{ comp.model }}{% endif %}</a></div>
                                 <div class="small muted">{{ comp.category.name }}</div>
                                 <div class="small" style="margin-top:6px">
                                     {% if comp.size %}
@@ -58,6 +58,10 @@
                                         &nbsp; Puissance: {{ comp.power }}{% if comp.category and comp.category.field_units and comp.category.field_units.get('power') %} {{ comp.category.field_units.get('power') }}{% endif %}
                                     {% endif %}
                                 </div>
+                                <div class="small muted" style="margin-top:6px">État: {% if comp.state == 'stock' %}Disponible{% elif comp.state == 'loan' %}En prêt{% elif comp.state == 'broken' %}Cassé{% else %}{{ comp.state }}{% endif %} • Localisation: {% if comp.location == 'club' %}Au club{% elif comp.location == 'loan' %}En prêt{% else %}{{ comp.location }}{% endif %}</div>
+                                {% if comp.comments %}
+                                <div class="small" style="margin-top:6px">💬 {{ comp.comments }}</div>
+                                {% endif %}
                                 {% if comp.custom_values %}
                                 <div class="small muted" style="margin-top:6px">
                                     {% for k, v in comp.custom_values.items() %}
