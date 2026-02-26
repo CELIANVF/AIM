@@ -16,16 +16,17 @@
     <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance
     <input type="text" name="unit_power" placeholder="unité (ex: livres)" style="margin-left:8px" value="{{ category.field_units.power if category.field_units and category.field_units.get('power') }}"><br>
     <label>Champs personnalisés (un par ligne):</label><br>
-<textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur: rouge/bleu/jaune&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields.replace(',', '&#10;') }}{% endif %}</textarea><br>
+<textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur: rouge/bleu/jaune&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields|replace(',', '\n') }}{% endif %}</textarea><br>
     <label>Unités pour champs personnalisés (un par ligne, correspond à l'ordre ci-dessus):</label><br>
-    <textarea name="custom_field_units" rows="3" placeholder="Ex: kg&#10;--&#10;mm">{% if category.custom_fields and category.field_units %}
+    <textarea name="custom_field_units" rows="3" placeholder="Ex: kg&#10;--&#10;mm">{% if category.custom_fields and category.field_units -%}
         {%- set parts = category.custom_fields.split(',') -%}
         {%- for p in parts -%}
             {%- set key = p.strip().lower() -%}
-            {{ category.field_units.get(key,'') }}
-            {%- if not loop.last %}\n{%- endif -%}
+            {{ category.field_units.get(key,'') }}{%- if not loop.last %}
+
+            {%- endif -%}
         {%- endfor -%}
-    {% endif %}</textarea><br>
+    {%- endif %}</textarea><br>
     <button class="btn" type="submit">Modifier</button>
 </form>
 {% endblock %}

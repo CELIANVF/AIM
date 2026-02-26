@@ -106,7 +106,7 @@
         </div>
         <div class="accordion-content">
             {% for p in products_by_category %}
-            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}"
+            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}"
                 {% if p.custom_values %}
                     {% for k, v in p.custom_values.items() %}
                         data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
@@ -133,16 +133,38 @@
                                 <span class="badge badge-danger">✗ Cassé</span>
                             {% endif %}
                         </div>
-                        {% if p.custom_values %}
+                        {# Show all standard fields plus custom fields in category order #}
                         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
-                            {% for k, v in p.custom_values.items() %}
-                                <span class="small" style="margin-right:12px"><strong>{{ k }}:</strong> {{ v }}</span>
-                            {% endfor %}
+                            <span class="small" style="margin-right:12px"><strong>État:</strong> {{ p.state or '' }}</span>
+                            <span class="small" style="margin-right:12px"><strong>Lieu:</strong> {{ p.location or '' }}</span>
+                            {% if p.size %}
+                                <span class="small" style="margin-right:12px"><strong>Taille:</strong> {{ p.size }}{% if p.category and p.category.field_units and p.category.field_units.get('size') %} {{ p.category.field_units.get('size') }}{% endif %}</span>
+                            {% endif %}
+                            {% if p.power %}
+                                <span class="small" style="margin-right:12px"><strong>Puissance:</strong> {{ p.power }}{% if p.category and p.category.field_units and p.category.field_units.get('power') %} {{ p.category.field_units.get('power') }}{% endif %}</span>
+                            {% endif %}
+                            {% if p.model %}
+                                <span class="small" style="margin-right:12px"><strong>Modèle:</strong> {{ p.model }}</span>
+                            {% endif %}
+                            {# Custom fields in category-defined order #}
+                            {% set cat_cf = p.category.custom_fields if p.category and p.category.custom_fields else None %}
+                            {% if cat_cf %}
+                                {%- set parts = cat_cf.split(',') -%}
+                                {%- for part in parts -%}
+                                    {%- set label = part.split(':')[0].strip() -%}
+                                    {%- set key = label.lower() -%}
+                                    {%- set val = (p.custom_values[key] if p.custom_values and key in p.custom_values else '') -%}
+                                    <span class="small" style="margin-right:12px"><strong>{{ label }}:</strong> {{ val }}</span>
+                                {%- endfor -%}
+                            {% elif p.custom_values %}
+                                {% for k, v in p.custom_values.items() %}
+                                    <span class="small" style="margin-right:12px"><strong>{{ k }}:</strong> {{ v }}</span>
+                                {% endfor %}
+                            {% endif %}
+                            {% if p.comments %}
+                                <div style="margin-top:6px"><span class="small muted">💬 {{ p.comments }}</span></div>
+                            {% endif %}
                         </div>
-                        {% endif %}
-                        {% if p.comments %}
-                        <p class="small muted" style="margin-top:8px">💬 {{ p.comments }}</p>
-                        {% endif %}
                     </div>
                     <div class="action-group">
                         {% if current_user.can_edit() %}
