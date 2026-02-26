@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+
+{% block title %}Recherche: {{ q }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumb"><a href="/">Accueil</a> › <span>Recherche</span></nav>
+{% endblock %}
+
+{% block content %}
+  <div class="header-with-actions">
+    <div>
+      <h1>🔎 Résultats pour « {{ q }} »</h1>
+      <p class="muted">Produits: {{ products|length }}, Archers: {{ archers|length }}, Catégories: {{ categories|length }}, Arcs: {{ composites|length }}, Utilisateurs: {{ users|length }}</p>
+    </div>
+  </div>
+
+  {% if products %}
+    <div class="card">
+      <h3>Produits</h3>
+      <ul>
+        {% for p in products %}
+          <li>
+            <a href="/edit_product/{{ p.id }}">{{ p.brand }}{% if p.model %} — {{ p.model }}{% endif %}</a>
+            <span class="muted">({{ p.category.name if p.category else '—' }})</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if archers %}
+    <div class="card" style="margin-top:12px">
+      <h3>Archers</h3>
+      <ul>
+        {% for a in archers %}
+          <li>
+            <a href="/edit_archer/{{ a.id }}">{{ a.name }}</a>
+            <span class="muted">— {{ a.license_number }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if categories %}
+    <div class="card" style="margin-top:12px">
+      <h3>Catégories</h3>
+      <ul>
+        {% for c in categories %}
+          <li><a href="/edit_category/{{ c.id }}">{{ c.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if composites %}
+    <div class="card" style="margin-top:12px">
+      <h3>Arcs / Composites</h3>
+      <ul>
+        {% for comp in composites %}
+          <li><a href="/edit_composite/{{ comp.id }}">{{ comp.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if users %}
+    <div class="card" style="margin-top:12px">
+      <h3>Utilisateurs</h3>
+      <ul>
+        {% for u in users %}
+          <li><a href="/users">{{ u.username }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if not (products or archers or categories or composites or users) %}
+    <div class="card" style="text-align:center;padding:48px 24px">
+      <p class="muted">Aucun résultat trouvé pour « {{ q }} »</p>
+      <a href="/" class="btn btn-outline">Retour à l'accueil</a>
+    </div>
+  {% endif %}
+
+{% endblock %}

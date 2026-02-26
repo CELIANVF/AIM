@@ -162,6 +162,24 @@ body{
   background:var(--primary-hover);
 }
 
+/* product filters widget inside sidebar */
+#product-filters {
+  margin-top:8px;
+}
+#product-filters input[type=search] {
+  width:100%;
+}
+#product-filters .category-btn {
+  justify-content:space-between;
+}
+#product-filters .category-count {
+  color:var(--muted);
+  font-size:0.85em;
+}
+#product-filters button[disabled] {
+  cursor:not-allowed;
+}
+
 .content{flex:1;min-width:0}
 h1{
   color:var(--text);
@@ -460,6 +478,44 @@ textarea{
   }
   .container{padding:0 24px}
   .top-bar .container{padding:16px 24px}
+}
+
+/* Mobile menu toggle */
+.menu-toggle{
+  display:none;
+  background:transparent;
+  border:none;
+  font-size:20px;
+  padding:6px 8px;
+  cursor:pointer;
+}
+
+/* Flash messages */
+.flash{padding:12px 16px;border-radius:8px;margin-bottom:16px;border:1px solid transparent}
+.flash.info{background:var(--bg-alt);color:var(--text-secondary);border-color:var(--border)}
+.flash.success{background:var(--success-light);color:var(--success)}
+.flash.error,.flash.danger{background:var(--danger-light);color:var(--danger)}
+.flash.warning{background:var(--warning-light);color:var(--warning)}
+
+/* Breadcrumbs */
+.breadcrumb{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:12px}
+.breadcrumb a{color:var(--primary);text-decoration:none}
+.breadcrumb a:hover{text-decoration:underline}
+
+/* Focus styles for keyboard users */
+a:focus, button:focus, input:focus-visible, .btn:focus-visible{outline:3px solid var(--primary-light);outline-offset:2px}
+
+/* Form error states */
+.input-error{border-color:var(--danger) !important;box-shadow:0 0 0 3px rgba(239,68,68,0.08)}
+.form-error{color:var(--danger);font-size:13px;margin-top:6px}
+
+/* Sidebar behaviour on small screens */
+@media (max-width: 1024px){
+  .menu-toggle{display:inline-flex}
+  .sidebar{position:fixed;left:0;top:64px;bottom:0;width:260px;background:var(--card);z-index:200;transform:translateX(-110%);transition:var(--transition);box-shadow:var(--shadow-lg);padding:18px}
+  .sidebar.open{transform:translateX(0)}
+  .main-layout{padding-left:0}
+  .content{padding:20px 12px}
 }
 
 @media (max-width: 768px){

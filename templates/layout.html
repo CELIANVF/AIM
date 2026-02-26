@@ -9,12 +9,13 @@
 <body>
     <div class="top-bar">
         <div class="container">
+            <button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
             <div class="logo">
                 <h2>🏹 ANC93</h2>
             </div>
             <div class="search">
                 <form action="/search" method="get">
-                    <input type="text" name="q" placeholder="Rechercher un produit, archer, catégorie...">
+                    <input type="text" name="q" placeholder="Rechercher un produit, archer, catégorie..." aria-label="Recherche">
                 </form>
             </div>
             <div class="user-menu">
@@ -38,10 +39,21 @@
                         {% if request.path.startswith('/products') and categories %}
                         <li>
                             <div id="product-filters" style="padding:8px 0 0 6px;display:flex;flex-direction:column;gap:6px;">
-                                <button class="btn btn-outline" data-filter="all" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;">Tous</button>
-                                {% for c in categories %}
-                                <button class="btn btn-outline" data-filter="{{ c.name|e }}" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;">{{ c.name }}</button>
-                                {% endfor %}
+                                <input id="category-search" type="search" placeholder="Filtrer les catégories..." aria-label="Filtrer les catégories" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-size:13px">
+                                <div style="display:flex;gap:6px;align-items:center">
+                                    <button class="btn btn-outline" data-filter="all" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;flex:1">Tous</button>
+                                    <button id="category-collapse-toggle" class="btn btn-outline" title="Déplier / Replier" style="padding:6px 8px;border-radius:8px;margin-left:6px">⇕</button>
+                                </div>
+                                <ul id="category-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto">
+                                    {% for c in categories %}
+                                    <li>
+                                        <button class="btn btn-outline category-btn" data-filter="{{ c.name|e }}" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;display:flex;justify-content:space-between;gap:8px;width:100%">
+                                            <span class="category-name">{{ c.name }}</span>
+                                            <span class="category-count muted" aria-hidden="true">–</span>
+                                        </button>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
                             </div>
                         </li>
                         {% endif %}
@@ -58,6 +70,7 @@
             </nav>
         </aside>
         <main class="content">
+            {% block breadcrumbs %}{% endblock %}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -70,5 +83,87 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+        <script>
+            (function(){
+                const btn = document.querySelector('.menu-toggle');
+                const sidebar = document.querySelector('.sidebar');
+                if(!btn || !sidebar) return;
+                btn.addEventListener('click', function(){
+                    const open = sidebar.classList.toggle('open');
+                    btn.setAttribute('aria-expanded', String(open));
+                });
+                document.addEventListener('click', function(e){
+                    if(window.innerWidth > 1024) return;
+                    if(!sidebar.classList.contains('open')) return;
+                    if(!sidebar.contains(e.target) && !btn.contains(e.target)){
+                        sidebar.classList.remove('open');
+                        btn.setAttribute('aria-expanded','false');
+                    }
+                });
+            })();
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function(){
+                const widget = document.getElementById('product-filters');
+                if (!widget) return;
+                const search = widget.querySelector('#category-search');
+                const collapseToggle = widget.querySelector('#category-collapse-toggle');
+                const list = widget.querySelector('#category-list');
+                const allBtn = widget.querySelector('button[data-filter="all"]');
+
+                function updateCounts(){
+                    const buttons = Array.from(widget.querySelectorAll('.category-btn'));
+                    buttons.forEach(btn => {
+                        const name = btn.getAttribute('data-filter');
+                        const acc = document.querySelector('.accordion[data-category="' + CSS.escape(name) + '"]');
+                        const count = acc ? acc.querySelectorAll('.item').length : 0;
+                        const countEl = btn.querySelector('.category-count');
+                        if (countEl) countEl.textContent = count;
+                        if (count === 0) {
+                            btn.disabled = true;
+                            btn.setAttribute('aria-disabled','true');
+                            btn.style.opacity = '0.6';
+                        } else {
+                            btn.disabled = false;
+                            btn.removeAttribute('aria-disabled');
+                            btn.style.opacity = '1';
+                        }
+                    });
+                }
+
+                // wire search to filter category list
+                if (search) {
+                    search.addEventListener('input', function(){
+                        const q = this.value.trim().toLowerCase();
+                        const items = Array.from(list.querySelectorAll('li'));
+                        items.forEach(li => {
+                            const name = li.querySelector('.category-name').textContent.toLowerCase();
+                            if (!q || name.indexOf(q) !== -1) li.style.display = '';
+                            else li.style.display = 'none';
+                        });
+                    });
+                }
+
+                // collapse toggle
+                if (collapseToggle && list) {
+                    let collapsed = false;
+                    collapseToggle.addEventListener('click', function(){
+                        collapsed = !collapsed;
+                        if (collapsed) {
+                            list.style.maxHeight = '0';
+                        } else {
+                            list.style.maxHeight = '240px';
+                        }
+                    });
+                }
+
+                // clicking a category button should trigger existing data-filter handlers
+                // keep behaviour: clicking the 'Tous' button triggers the all filter
+                // nothing to do here because products page attaches to buttons inside #product-filters
+
+                // update counts once on load
+                updateCounts();
+            });
+        </script>
 </body>
 </html>

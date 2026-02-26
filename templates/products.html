@@ -106,7 +106,7 @@
         </div>
         <div class="accordion-content">
             {% for p in products_by_category %}
-            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}"
+            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-power="{{ p.power|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}"
                 {% if p.custom_values %}
                     {% for k, v in p.custom_values.items() %}
                         data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function(){
         // populate sort-select and filter-field only with fields present for this category
         const filterSelect = acc.querySelector('.filter-field');
         const sortSelect = acc.querySelector('.sort-select');
-        const baseLabels = {brand: 'Marque', state: 'État', size: 'Taille', model: 'Modèle'};
+        const baseLabels = {brand: 'Marque', state: 'État', size: 'Taille', model: 'Modèle', location: 'Lieu', power: 'Puissance'};
 
         // build array of available base fields (check data- keys)
         const available = [];
@@ -266,6 +266,8 @@ document.addEventListener('DOMContentLoaded', function(){
         if (valueMap['data-state']) available.push('state');
         if (valueMap['data-size']) available.push('size');
         if (valueMap['data-model']) available.push('model');
+        if (valueMap['data-location']) available.push('location');
+        if (valueMap['data-power']) available.push('power');
 
         // custom fields as full data- keys
         const customKeys = Object.keys(valueMap).filter(k => k.startsWith('data-custom-'));

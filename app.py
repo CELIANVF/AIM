@@ -633,6 +633,33 @@ def edit_archer(archer_id):
         return redirect(url_for('archers'))
     return render_template('edit_archer.html', archer=arch)
 
+
+@app.route('/search')
+@login_required
+def search():
+    q = request.args.get('q', '').strip()
+    if not q:
+        flash('Veuillez saisir un terme de recherche.', 'info')
+        return redirect(url_for('index'))
+
+    term = f"%{q}%"
+
+    products = Product.query.filter(
+        db.or_(Product.brand.ilike(term), Product.model.ilike(term), Product.comments.ilike(term))
+    ).order_by(Product.brand).limit(200).all()
+
+    archers = Archer.query.filter(
+        db.or_(Archer.first_name.ilike(term), Archer.last_name.ilike(term), Archer.license_number.ilike(term), Archer.notes.ilike(term))
+    ).order_by(Archer.last_name).limit(200).all()
+
+    categories = Category.query.filter(Category.name.ilike(term)).all()
+
+    composites = CompositeProduct.query.filter(CompositeProduct.name.ilike(term)).all()
+
+    users = User.query.filter(User.username.ilike(term)).all()
+
+    return render_template('search_results.html', q=q, products=products, archers=archers, categories=categories, composites=composites, users=users)
+
 @app.route('/assignments')
 @login_required
 @require_permission('view_assignments')
