@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Liste des arcs composites</title>
+</head>
+<body>
+  <h1>Liste des arcs composites</h1>
+  <table>
+    <thead>
+      <tr><th>Nom</th><th>Type</th><th>Statut</th><th>Composants</th></tr>
+    </thead>
+    <tbody>
+      {% for c in comps %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td>{{ c.type }}</td>
+        <td>{{ c.status }}</td>
+        <td>
+          {% for com in c.components %}
+            {{ com.brand }} ({{ com.category.name if com.category else '' }}){% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

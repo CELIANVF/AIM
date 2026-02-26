@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Assignations</title>
+</head>
+<body>
+  <h1>Assignations actuelles</h1>
+  <table>
+    <thead>
+      <tr><th>Archer</th><th>Produit</th><th>Date assignée</th></tr>
+    </thead>
+    <tbody>
+      {% for a in assigns %}
+      <tr>
+        <td>{{ a.archer.name }}</td>
+        <td>{{ a.composite.name if a.composite else '' }}</td>
+        <td>{{ a.date_assigned.strftime('%d/%m/%Y') if a.date_assigned else '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

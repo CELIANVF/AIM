@@ -925,98 +925,170 @@ def mark_attendance(course_id):
 @app.route('/export_products')
 @login_required
 def export_products():
-    from reportlab.pdfgen import canvas
-    from io import BytesIO
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-    prods = Product.query.all()
-    p.drawString(100, 800, "Liste des produits")
-    y = 780
-    for prod in prods:
-        p.drawString(100, y, f"{prod.id}: {prod.brand} - {prod.category.name} - Etat: {prod.state}")
-        y -= 20
-        if y < 50:
-            p.showPage()
-            y = 800
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name='products.pdf', mimetype='application/pdf')
+    try:
+        from io import BytesIO
+        from weasyprint import HTML, CSS
+        from flask import render_template
+
+        prods = Product.query.all()
+        html = render_template('products_pdf.html', prods=prods)
+        css = CSS(string='''
+            body { font-family: Arial, sans-serif; font-size:12px; }
+            h1 { font-size:18px; }
+            table { width:100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 6px; }
+        ''')
+        buffer = BytesIO()
+        HTML(string=html).write_pdf(target=buffer, stylesheets=[css])
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='products.pdf', mimetype='application/pdf')
+    except Exception:
+        from reportlab.pdfgen import canvas
+        from io import BytesIO
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer)
+        prods = Product.query.all()
+        p.drawString(100, 800, "Liste des produits")
+        y = 780
+        for prod in prods:
+            p.drawString(100, y, f"{prod.id}: {prod.brand} - {prod.category.name} - Etat: {prod.state}")
+            y -= 20
+            if y < 50:
+                p.showPage()
+                y = 800
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='products.pdf', mimetype='application/pdf')
 
 @app.route('/export_assignments')
 @login_required
 def export_assignments():
-    from reportlab.pdfgen import canvas
-    from io import BytesIO
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-    assigns = Assignment.query.filter_by(date_returned=None).all()
-    p.drawString(100, 800, "Assignations actuelles")
-    y = 780
-    for ass in assigns:
-        p.drawString(100, y, f"{ass.archer.name} - {ass.composite.name} - {ass.date_assigned.strftime('%d/%m/%Y')}")
-        y -= 20
-        if y < 50:
-            p.showPage()
-            y = 800
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name='assignments.pdf', mimetype='application/pdf')
+    try:
+        from io import BytesIO
+        from weasyprint import HTML, CSS
+        from flask import render_template
+
+        assigns = Assignment.query.filter_by(date_returned=None).all()
+        html = render_template('assignments_pdf.html', assigns=assigns)
+        css = CSS(string='''
+            body { font-family: Arial, sans-serif; font-size:12px; }
+            h1 { font-size:18px; }
+            table { width:100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 6px; }
+        ''')
+        buffer = BytesIO()
+        HTML(string=html).write_pdf(target=buffer, stylesheets=[css])
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='assignments.pdf', mimetype='application/pdf')
+    except Exception:
+        from reportlab.pdfgen import canvas
+        from io import BytesIO
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer)
+        assigns = Assignment.query.filter_by(date_returned=None).all()
+        p.drawString(100, 800, "Assignations actuelles")
+        y = 780
+        for ass in assigns:
+            p.drawString(100, y, f"{ass.archer.name} - {ass.composite.name} - {ass.date_assigned.strftime('%d/%m/%Y')}")
+            y -= 20
+            if y < 50:
+                p.showPage()
+                y = 800
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='assignments.pdf', mimetype='application/pdf')
 
 @app.route('/export_composites')
 @login_required
 def export_composites():
-    from reportlab.pdfgen import canvas
-    from io import BytesIO
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-    comps = CompositeProduct.query.all()
-    p.drawString(100, 800, "Liste des arcs")
-    y = 780
-    for c in comps:
-        p.drawString(100, y, f"{c.name} - Type: {c.type} - Statut: {c.status}")
-        y -= 20
-        for comp in c.components:
-            p.drawString(120, y, f"- {comp.brand} ({comp.category.name})")
-            y -= 15
-        y -= 5
-        if y < 50:
-            p.showPage()
-            y = 800
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name='composites.pdf', mimetype='application/pdf')
+    try:
+        from io import BytesIO
+        from weasyprint import HTML, CSS
+        from flask import render_template
+
+        comps = CompositeProduct.query.all()
+        html = render_template('composites_pdf.html', comps=comps)
+        css = CSS(string='''
+            body { font-family: Arial, sans-serif; font-size:12px; }
+            h1 { font-size:18px; }
+            table { width:100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 6px; }
+        ''')
+        buffer = BytesIO()
+        HTML(string=html).write_pdf(target=buffer, stylesheets=[css])
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='composites.pdf', mimetype='application/pdf')
+    except Exception:
+        from reportlab.pdfgen import canvas
+        from io import BytesIO
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer)
+        comps = CompositeProduct.query.all()
+        p.drawString(100, 800, "Liste des arcs")
+        y = 780
+        for c in comps:
+            p.drawString(100, y, f"{c.name} - Type: {c.type} - Statut: {c.status}")
+            y -= 20
+            for comp in c.components:
+                p.drawString(120, y, f"- {comp.brand} ({comp.category.name})")
+                y -= 15
+            y -= 5
+            if y < 50:
+                p.showPage()
+                y = 800
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='composites.pdf', mimetype='application/pdf')
 
 @app.route('/export_archers')
 @login_required
 def export_archers():
-    from reportlab.pdfgen import canvas
-    from io import BytesIO
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-    archers = Archer.query.all()
-    p.drawString(100, 800, "Liste des archérs")
-    y = 780
-    for archer in archers:
-        archer_info = f"{archer.name} - License: {archer.license_number}"
-        if archer.age:
-            archer_info += f" - Age: {archer.age}"
-        if archer.categorie:
-            archer_info += f" - Catégorie: {archer.categorie}"
-        p.drawString(100, y, archer_info)
-        y -= 20
-        if archer.bow_type:
-            p.drawString(120, y, f"Type d'arc: {archer.bow_type}")
-            y -= 15
-        if y < 50:
-            p.showPage()
-            y = 800
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name='archers.pdf', mimetype='application/pdf')
+    try:
+        from io import BytesIO
+        from weasyprint import HTML, CSS
+        from flask import render_template
+
+        archers = Archer.query.all()
+        html = render_template('archers_pdf.html', archers=archers)
+        css = CSS(string='''
+            body { font-family: Arial, sans-serif; font-size:12px; }
+            h1 { font-size:18px; }
+            table { width:100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 6px; }
+        ''')
+        buffer = BytesIO()
+        HTML(string=html).write_pdf(target=buffer, stylesheets=[css])
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='archers.pdf', mimetype='application/pdf')
+    except Exception:
+        from reportlab.pdfgen import canvas
+        from io import BytesIO
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer)
+        archers = Archer.query.all()
+        p.drawString(100, 800, "Liste des archérs")
+        y = 780
+        for archer in archers:
+            archer_info = f"{archer.name} - License: {archer.license_number}"
+            if archer.age:
+                archer_info += f" - Age: {archer.age}"
+            if archer.categorie:
+                archer_info += f" - Catégorie: {archer.categorie}"
+            p.drawString(100, y, archer_info)
+            y -= 20
+            if archer.bow_type:
+                p.drawString(120, y, f"Type d'arc: {archer.bow_type}")
+                y -= 15
+            if y < 50:
+                p.showPage()
+                y = 800
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='archers.pdf', mimetype='application/pdf')
 
 @app.route('/import_archers', methods=['GET', 'POST'])
 @login_required
@@ -1488,4 +1560,7 @@ def delete_user(user_id):
     return redirect(url_for('users'))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=80, host='0.0.0.0')
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', '1') in ('1', 'true', 'True')
+    app.run(debug=debug, port=port, host='0.0.0.0')

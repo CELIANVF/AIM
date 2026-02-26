@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Liste des archers</title>
+</head>
+<body>
+  <h1>Liste des archers</h1>
+  <table>
+    <thead>
+      <tr><th>Nom</th><th>Licence</th><th>Âge</th><th>Catégorie</th><th>Type d'arc</th></tr>
+    </thead>
+    <tbody>
+      {% for a in archers %}
+      <tr>
+        <td>{{ a.name }}</td>
+        <td>{{ a.license_number }}</td>
+        <td>{{ a.age or '' }}</td>
+        <td>{{ a.categorie or '' }}</td>
+        <td>{{ a.bow_type or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

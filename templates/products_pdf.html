@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Liste des produits</title>
+</head>
+<body>
+  <h1>Liste des produits</h1>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Marque</th><th>Catégorie</th><th>État</th></tr>
+    </thead>
+    <tbody>
+      {% for p in prods %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>{{ p.brand }}</td>
+        <td>{{ p.category.name if p.category else '' }}</td>
+        <td>{{ p.state }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
