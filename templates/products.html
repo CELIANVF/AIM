@@ -106,7 +106,21 @@
         </div>
         <div class="accordion-content">
             {% for p in products_by_category %}
-            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-power="{{ p.power|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}"
+            {%- set comps = p.composites|list -%}
+            {%- set assigned_comps = comps|selectattr('status','equalto','loan')|list -%}
+            {%- if assigned_comps -%}
+                {%- set _status_label = 'Assigné' -%}
+            {%- elif comps -%}
+                {%- set _status_label = 'Monté' -%}
+            {%- elif p.state == 'stock' -%}
+                {%- set _status_label = 'Disponible' -%}
+            {%- elif p.state == 'broken' -%}
+                {%- set _status_label = 'Cassé' -%}
+            {%- else -%}
+                {%- set _status_label = p.state or '' -%}
+            {%- endif -%}
+
+            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-power="{{ p.power|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}" data-status="{{ _status_label }}"
                 {% if p.custom_values %}
                     {% for k, v in p.custom_values.items() %}
                         data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
@@ -121,8 +135,6 @@
                             {% endif %}
                         </div>
                         <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                            {% set comps = p.composites|list %}
-                            {% set assigned_comps = comps|selectattr('status','equalto','loan')|list %}
                             {% if assigned_comps %}
                                 <span class="badge badge-warning">→ Assigné</span>
                             {% elif comps %}
