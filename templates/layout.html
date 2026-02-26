@@ -36,6 +36,9 @@
                     <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">🏠 Accueil</a></li>
                     <li><a href="/categories" class="{% if request.path.startswith('/categories') %}active{% endif %}">📁 Catégories</a></li>
                     <li><a href="/products" class="{% if request.path.startswith('/products') %}active{% endif %}">📦 Produits</a></li>
+                    <li>
+                        <button id="show-unassigned-products" class="btn btn-outline" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;display:block;width:100%;">Produits non attribués</button>
+                    </li>
                         {% if request.path.startswith('/products') and categories %}
                         <li>
                             <div id="product-filters" style="padding:8px 0 0 6px;display:flex;flex-direction:column;gap:6px;">
@@ -163,6 +166,43 @@
 
                 // update counts once on load
                 updateCounts();
+            });
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function(){
+                const btn = document.getElementById('show-unassigned-products');
+                if (!btn) return;
+                let active = false;
+                btn.addEventListener('click', function(){
+                    active = !active;
+                    const accordions = Array.from(document.querySelectorAll('.accordion'));
+                    if (active) {
+                        btn.classList.add('active-filter');
+                        btn.textContent = 'Produits non attribués — Actif';
+                        accordions.forEach(acc => {
+                            const items = Array.from(acc.querySelectorAll('.item'));
+                            let hasMatch = false;
+                            items.forEach(it => {
+                                const status = (it.getAttribute('data-status') || '').toLowerCase();
+                                if (status === 'monté' || status === 'disponible') {
+                                    it.style.display = '';
+                                    hasMatch = true;
+                                } else {
+                                    it.style.display = 'none';
+                                }
+                            });
+                            acc.style.display = hasMatch ? '' : 'none';
+                        });
+                    } else {
+                        btn.classList.remove('active-filter');
+                        btn.textContent = 'Produits non attribués';
+                        accordions.forEach(acc => {
+                            acc.style.display = '';
+                            const items = Array.from(acc.querySelectorAll('.item'));
+                            items.forEach(it => it.style.display = '');
+                        });
+                    }
+                });
             });
         </script>
 </body>
