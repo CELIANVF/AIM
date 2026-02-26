@@ -1588,6 +1588,31 @@ def delete_user(user_id):
 
 if __name__ == '__main__':
     import os
-    port = int(os.environ.get('PORT', 5000))
+    # Default port handling: respect $PORT if set, otherwise
+    # run on port 80 when executed as root/admin, else 5000.
+    port_env = os.environ.get('PORT')
+    is_root = False
+    # Unix-like: check geteuid
+    if hasattr(os, 'geteuid'):
+        try:
+            is_root = (os.geteuid() == 0)
+        except Exception:
+            is_root = False
+    else:
+        # Windows: try to detect admin privileges
+        try:
+            import ctypes
+            is_root = ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except Exception:
+            is_root = False
+
+    if port_env:
+        try:
+            port = int(port_env)
+        except Exception:
+            port = 5000
+    else:
+        port = 80 if is_root else 5000
+
     debug = os.environ.get('FLASK_DEBUG', '1') in ('1', 'true', 'True')
     app.run(debug=debug, port=port, host='0.0.0.0')
