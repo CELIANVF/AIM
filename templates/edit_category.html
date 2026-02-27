@@ -15,18 +15,103 @@
     <input type="text" name="unit_size" placeholder="unité (ex: pouces)" style="margin-left:8px" value="{{ category.field_units.size if category.field_units and category.field_units.get('size') }}"><br>
     <input type="checkbox" name="has_power" value="1" {% if category.has_power %}checked{% endif %}> Puissance
     <input type="text" name="unit_power" placeholder="unité (ex: livres)" style="margin-left:8px" value="{{ category.field_units.power if category.field_units and category.field_units.get('power') }}"><br>
-    <label>Champs personnalisés (un par ligne):</label><br>
-<textarea name="custom_fields" rows="3" placeholder="Ex: Poids&#10;Couleur: rouge/bleu/jaune&#10;Diamètre">{% if category.custom_fields %}{{ category.custom_fields|replace(',', '\n') }}{% endif %}</textarea><br>
-    <label>Unités pour champs personnalisés (un par ligne, correspond à l'ordre ci-dessus):</label><br>
-    <textarea name="custom_field_units" rows="3" placeholder="Ex: kg&#10;--&#10;mm">{% if category.custom_fields and category.field_units -%}
-        {%- set parts = category.custom_fields.split(',') -%}
-        {%- for p in parts -%}
-            {%- set key = p.strip().lower() -%}
-            {{ category.field_units.get(key,'') }}{%- if not loop.last %}
+    <label>Champs personnalisés:</label>
+    <div id="custom-fields-list" style="margin:8px 0 12px;display:flex;flex-direction:column;gap:8px;">
+        {% if category.custom_fields %}
+            {%- set parts = category.custom_fields.split(',') -%}
+            {%- for p in parts -%}
+                {%- set key = p.strip() -%}
+                <div class="custom-field-row" style="display:flex;gap:8px;align-items:center">
+                    <input type="text" class="custom-name" value="{{ key }}" placeholder="Nom du champ" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--border)">
+                    <input type="text" class="custom-unit" value="{{ category.field_units.get(key.lower(), '') if category.field_units else '' }}" placeholder="Unité (optionnel)" style="width:160px;padding:6px;border-radius:6px;border:1px solid var(--border)">
+                    <button type="button" class="remove-field btn" title="Supprimer" style="padding:6px 8px;border-radius:6px">✕</button>
+                </div>
+            {%- endfor -%}
+        {% endif %}
+    </div>
+    <div style="margin-bottom:12px">
+        <button type="button" id="add-custom-field" class="btn">+ Ajouter un champ</button>
+    </div>
 
-            {%- endif -%}
-        {%- endfor -%}
-    {%- endif %}</textarea><br>
+    <!-- Hidden inputs used to submit data in the same shape as before -->
+    <textarea name="custom_fields" id="custom_fields_hidden" style="display:none"></textarea>
+    <textarea name="custom_field_units" id="custom_field_units_hidden" style="display:none"></textarea>
     <button class="btn" type="submit">Modifier</button>
 </form>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const list = document.getElementById('custom-fields-list');
+    const addBtn = document.getElementById('add-custom-field');
+    const hiddenNames = document.getElementById('custom_fields_hidden');
+    const hiddenUnits = document.getElementById('custom_field_units_hidden');
+    const form = list ? list.closest('form') : null;
+
+    function makeRow(name='', unit=''){
+        const row = document.createElement('div');
+        row.className = 'custom-field-row';
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.alignItems = 'center';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'custom-name';
+        nameInput.placeholder = 'Nom du champ';
+        nameInput.value = name;
+        nameInput.style.flex = '1';
+        nameInput.style.padding = '6px';
+        nameInput.style.borderRadius = '6px';
+        nameInput.style.border = '1px solid var(--border)';
+
+        const unitInput = document.createElement('input');
+        unitInput.type = 'text';
+        unitInput.className = 'custom-unit';
+        unitInput.placeholder = 'Unité (optionnel)';
+        unitInput.value = unit;
+        unitInput.style.width = '160px';
+        unitInput.style.padding = '6px';
+        unitInput.style.borderRadius = '6px';
+        unitInput.style.border = '1px solid var(--border)';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-field btn';
+        removeBtn.textContent = '✕';
+        removeBtn.title = 'Supprimer';
+        removeBtn.style.padding = '6px 8px';
+        removeBtn.style.borderRadius = '6px';
+
+        removeBtn.addEventListener('click', function(){ row.remove(); });
+
+        row.appendChild(nameInput);
+        row.appendChild(unitInput);
+        row.appendChild(removeBtn);
+        return row;
+    }
+
+    if(addBtn) addBtn.addEventListener('click', function(){
+        list.appendChild(makeRow());
+        const last = list.lastElementChild; if(last) last.querySelector('.custom-name').focus();
+    });
+
+    // attach remove handlers for server-rendered rows
+    if(list) Array.from(list.querySelectorAll('.remove-field')).forEach(btn=> btn.addEventListener('click', e=> e.target.closest('.custom-field-row').remove()));
+
+    // on submit, serialize rows into hidden textareas (comma-separated)
+    if(form){
+        form.addEventListener('submit', function(e){
+            const rows = list ? Array.from(list.querySelectorAll('.custom-field-row')) : [];
+            const names = [];
+            const units = [];
+            rows.forEach(r => {
+                const n = (r.querySelector('.custom-name')||{value:''}).value.trim();
+                const u = (r.querySelector('.custom-unit')||{value:''}).value.trim();
+                if(n){ names.push(n); units.push(u); }
+            });
+            if(hiddenNames) hiddenNames.value = names.join(',');
+            if(hiddenUnits) hiddenUnits.value = units.join(',');
+        });
+    }
+});
+</script>
 {% endblock %}

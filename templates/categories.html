@@ -18,7 +18,7 @@
 
 <div class="grid">
     {% for cat in categories %}
-    <div class="item">
+    <div class="item" draggable="true" data-id="{{ cat.id }}">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
             <div style="flex:1">
                 <h3 style="margin:0 0 8px 0">{{ cat.name }}</h3>
@@ -45,9 +45,12 @@
                     {% endif %}
                 </div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
                 {% if current_user.can_edit() %}
-                <a class="btn btn-outline" href="/edit_category/{{ cat.id }}">✏️ Modifier</a>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <span class="drag-handle" style="cursor:grab;padding:6px 8px;font-size:16px" title="Réordonner">≡</span>
+                    <a class="btn btn-outline" href="/edit_category/{{ cat.id }}">✏️ Modifier</a>
+                </div>
                 {% endif %}
                 {% if current_user.can_delete() %}
                 <form method="POST" action="/delete_category/{{ cat.id }}" onsubmit="return confirm('⚠️ Supprimer cette catégorie et tous ses produits ? Cette action est irréversible.');">
@@ -64,4 +67,19 @@
     </div>
     {% endfor %}
 </div>
+
+<style>
+/* drag & drop visuals */
+.grid .item.dragging { opacity: 0.5; }
+.grid .item.drag-over-top { border-top: 2px solid #007bff; }
+.grid .item.drag-over-bottom { border-bottom: 2px solid #007bff; }
+/* feedback when order saved */
+.grid.order-saved { animation: pulse 0.5s; }
+@keyframes pulse {
+    0% { background-color: rgba(0,123,255,0.1); }
+    100% { background-color: transparent; }
+}
+</style>
+
+<script src="{{ url_for('static', filename='categories.js') }}"></script>
 {% endblock %}

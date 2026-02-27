@@ -65,6 +65,7 @@ class User(UserMixin, db.Model):
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    position = db.Column(db.Integer, nullable=False, default=0)
     name = db.Column(db.String(50), unique=True, nullable=False)
     has_size = db.Column(db.Boolean, default=False)
     has_power = db.Column(db.Boolean, default=False)

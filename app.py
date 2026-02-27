@@ -5,6 +5,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from config import Config
 from models import db, User, Category, Product, CompositeProduct, Archer, Assignment, HistoryEvent, Course, Attendance
 from datetime import datetime, date, timedelta
+from sqlalchemy import func
 from dateutil import parser as date_parser
 import csv
 from io import StringIO
@@ -133,7 +134,7 @@ def index():
 @app.route('/categories')
 @login_required
 def categories():
-    cats = Category.query.all()
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
     return render_template('categories.html', categories=cats)
 
 @app.route('/add_category', methods=['GET', 'POST'])
@@ -169,7 +170,9 @@ def add_category():
             if i < len(custom_units_lines) and custom_units_lines[i]:
                 field_units[norm] = custom_units_lines[i]
 
-        cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields, field_units=field_units if field_units else None)
+        # assign next position
+        max_pos = db.session.query(func.max(Category.position)).scalar() or 0
+        cat = Category(name=name, has_size=has_size, has_power=has_power, has_model=has_model, has_brand=has_brand, custom_fields=custom_fields, field_units=field_units if field_units else None, position=max_pos+1)
         db.session.add(cat)
         db.session.commit()
         return redirect(url_for('categories'))
@@ -230,7 +233,61 @@ def delete_category(cat_id):
         db.session.delete(prod)
     db.session.delete(cat)
     db.session.commit()
+    # renumber positions to keep them contiguous
+    cats = Category.query.order_by(Category.position.asc(), Category.id.asc()).all()
+    for i, c in enumerate(cats, start=1):
+        c.position = i
+    db.session.commit()
     return redirect(url_for('categories'))
+
+
+@app.route('/move_category/<int:cat_id>/<string:direction>', methods=['POST'])
+@login_required
+@require_permission('edit')
+def move_category(cat_id, direction):
+    cat = Category.query.get_or_404(cat_id)
+    if direction not in ('up', 'down'):
+        return redirect(url_for('categories'))
+    if direction == 'up':
+        neighbor = Category.query.filter(Category.position < cat.position).order_by(Category.position.desc()).first()
+    else:
+        neighbor = Category.query.filter(Category.position > cat.position).order_by(Category.position.asc()).first()
+    if neighbor:
+        cat.position, neighbor.position = neighbor.position, cat.position
+        db.session.commit()
+    return redirect(url_for('categories'))
+
+
+@app.route('/reorder_categories', methods=['POST'])
+@login_required
+@require_permission('edit')
+def reorder_categories():
+    data = request.get_json(silent=True)
+    if not data or 'order' not in data:
+        return ('', 400)
+    try:
+        ids = [int(i) for i in data['order']]
+    except Exception:
+        return ('', 400)
+
+    # update positions according to the provided order
+    cats = Category.query.filter(Category.id.in_(ids)).all()
+    cat_map = {c.id: c for c in cats}
+    pos = 1
+    for cid in ids:
+        c = cat_map.get(cid)
+        if c:
+            c.position = pos
+            pos += 1
+
+    # append any categories not included in the list
+    remaining = Category.query.filter(~Category.id.in_(ids)).order_by(Category.position.asc(), Category.id.asc()).all()
+    for c in remaining:
+        c.position = pos
+        pos += 1
+
+    db.session.commit()
+    return ('', 204)
 
 @app.route('/products')
 @login_required
