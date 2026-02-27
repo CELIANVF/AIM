@@ -497,7 +497,13 @@ def edit_composite(comp_id):
     # composites.
     prods = Product.query.all()
     prods_filtered = [p for p in prods if (not p.composites) or (p in comp.components)]
-    return render_template('edit_composite.html', composite=comp, products=prods_filtered)
+    # pass categories so template can group products by category (only include filtered products)
+    cats = Category.query.order_by(Category.name).all()
+    cats_with_available = []
+    for c in cats:
+        available = [p for p in prods_filtered if p.category and p.category.id == c.id]
+        cats_with_available.append({'id': c.id, 'name': c.name, 'products': available})
+    return render_template('edit_composite.html', composite=comp, categories=cats_with_available)
 
 @app.route('/archers')
 @login_required

@@ -4,6 +4,18 @@
 
 {% block content %}
 <h1>Ajouter un arc</h1>
+<style>
+/* Components grid: 3 items per row on desktop, responsive down to 1 on small screens */
+.components-grid, #components-list-global { grid-template-columns: repeat(3, 1fr) !important; }
+@media (max-width: 1100px){ .components-grid, #components-list-global { grid-template-columns: repeat(2, 1fr) !important; } }
+@media (max-width: 600px){ .components-grid, #components-list-global { grid-template-columns: repeat(1, 1fr) !important; } }
+/* Tabs layout: tabs on top, panels underneath */
+.tabs-container { display:flex; flex-direction:column; gap:12px; width:100%; }
+.category-tabs { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; padding:6px 4px; align-items:center; justify-content: center; border-bottom: 1px solid var(--border); }
+.category-tabs .cat-tab { white-space:nowrap; padding: 8px 16px; border-radius: 4px 4px 0 0; background: var(--background); border: 1px solid var(--border); border-bottom: none; cursor: pointer; }
+.category-tabs .cat-tab.active, .category-tabs .cat-tab[aria-selected="true"]{ background:var(--card); border:1px solid var(--border); border-bottom: 2px solid var(--background); font-weight: bold; }
+.category-panel { width:100%; padding: 12px; border: 1px solid var(--border); border-radius: 0 0 4px 4px; background: var(--background); }
+</style>
 <form method="post">
     <label>Nom/Référence: <input type="text" name="name" required></label><br>
     <label>Type:
@@ -19,7 +31,14 @@
         </select>
     </label><br>
     <h2>Composants</h2>
+    <div class="category-tabs" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
     {% for c in categories %}
+        <button type="button" class="cat-tab btn btn-outline" data-cat-id="{{ c.id }}" {% if loop.first %}aria-selected="true"{% else %}aria-selected="false"{% endif %}>{{ c.name }}</button>
+    {% endfor %}
+    </div>
+
+    {% for c in categories %}
+        <div class="category-panel" data-cat-id="{{ c.id }}" style="{% if not loop.first %}display:none;{% endif %}">
         <h3>{{ c.name }}</h3>
         {% if c.products %}
             <div class="component-controls" data-category-id="{{ c.id }}" style="margin-bottom:8px">
@@ -30,15 +49,12 @@
                 <button type="button" class="btn btn-outline comp-filter-apply">Appliquer</button>
                 <button type="button" class="btn btn-outline comp-filter-clear">Réinitialiser</button>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                <button type="button" class="btn btn-outline comp-select-visible">Sélectionner visibles</button>
-                <button type="button" class="btn btn-outline comp-deselect-visible">Désélectionner visibles</button>
-            </div>
-            <div class="components-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;max-height:340px;overflow:auto;padding-right:6px">
+
+                <div class="components-grid" style="display:grid;gap:12px;max-height:340px;overflow:auto;padding-right:6px" data-category-id="{{ c.id }}">
             {% for p in c.products %}
                 <div class="component-card" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px">
                     <label style="display:flex;align-items:center;gap:8px">
-                        <input type="checkbox" name="components" value="{{ p.id }}"
+                        <input type="radio" name="components_cat_{{ p.category.id }}" value="{{ p.id }}" data-category-id="{{ p.category.id }}"
                             data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-power="{{ p.power|e }}" data-model="{{ p.model|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}"
                             {% if p.custom_values %}
                                 {% for k, v in p.custom_values.items() %}
@@ -66,9 +82,32 @@
         {% else %}
             <em>Aucun produit</em><br>
         {% endif %}
+        </div>
     {% endfor %}
     <button class="btn" type="submit">Ajouter</button>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const form = document.querySelector('form[method="post"]');
+    if (!form) return;
+    form.addEventListener('submit', function(){
+        // remove any previous hidden components inputs
+        form.querySelectorAll('input[name="components"]').forEach(i=>i.remove());
+        const seen = {};
+        document.querySelectorAll('input[type="radio"][name^="components_cat_"]').forEach(function(r){
+            const cat = r.dataset.categoryId;
+            if (!cat) return;
+            if (r.checked && !seen[cat]){
+                const h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'components'; h.value = r.value;
+                form.appendChild(h);
+                seen[cat] = true;
+            }
+        });
+    });
+});
+</script>
 <script>
 // Per-category component filtering in add_composite
 document.addEventListener('DOMContentLoaded', function(){
@@ -80,8 +119,8 @@ document.addEventListener('DOMContentLoaded', function(){
         const applyBtn = ctrl.querySelector('.comp-filter-apply');
         const clearBtn = ctrl.querySelector('.comp-filter-clear');
 
-        // build value map from checkboxes in container
-        const items = Array.from(container.querySelectorAll('.component-item input'));
+        // build value map from inputs in cards inside the container
+        const items = Array.from(container.querySelectorAll('.component-card input'));
         const valueMap = {};
         items.forEach(i => {
             Array.from(i.attributes).forEach(a => {
@@ -128,12 +167,39 @@ document.addEventListener('DOMContentLoaded', function(){
 
         applyBtn.addEventListener('click', applyFilter);
         clearBtn.addEventListener('click', function(){ fieldSel.value='any'; textInput.value=''; valueSel.innerHTML=''; valueSel.style.display='none'; textInput.style.display='inline-block'; items.forEach(i=> i.closest('.component-item').style.display=''); });
-        // select/deselect visible
+        // select/deselect visible (for radios: select first visible per category)
         const selectVisibleBtn = ctrl.parentElement.querySelector('.comp-select-visible');
         const deselectVisibleBtn = ctrl.parentElement.querySelector('.comp-deselect-visible');
-        if (selectVisibleBtn) selectVisibleBtn.addEventListener('click', function(){ items.forEach(i=>{ const lab=i.closest('.component-item') || i.closest('.component-card'); if (lab && lab.style.display !== 'none') i.checked = true; }); });
-        if (deselectVisibleBtn) deselectVisibleBtn.addEventListener('click', function(){ items.forEach(i=>{ const lab=i.closest('.component-item') || i.closest('.component-card'); if (lab && lab.style.display !== 'none') i.checked = false; }); });
+        if (selectVisibleBtn) selectVisibleBtn.addEventListener('click', function(){
+            const visibleCards = Array.from(container.querySelectorAll('.component-card')).filter(c=>c.style.display !== 'none');
+            const byCat = {};
+            visibleCards.forEach(card=>{
+                const r = card.querySelector('input[type="radio"][name^="components_cat_"]');
+                if (!r) return;
+                const cat = r.dataset.categoryId;
+                if (!byCat[cat]) byCat[cat]=r;
+            });
+            Object.values(byCat).forEach(r=>{ r.checked = true; });
+        });
+        if (deselectVisibleBtn) deselectVisibleBtn.addEventListener('click', function(){
+            items.forEach(i=>{ const lab=i.closest('.component-item') || i.closest('.component-card'); if (lab && lab.style.display !== 'none'){ const r = lab.querySelector('input[type="radio"][name^="components_cat_"]'); if (r) r.checked = false; } });
+        });
     });
+});
+</script>
+<script>
+// Tabs for categories
+document.addEventListener('DOMContentLoaded', function(){
+    const tabs = document.querySelectorAll('.cat-tab');
+    if (!tabs.length) return;
+    tabs.forEach(t=> t.addEventListener('click', function(){
+        const id = this.dataset.catId;
+        // toggle aria and active style
+        tabs.forEach(tb=>{ tb.classList.remove('active'); tb.setAttribute('aria-selected','false'); });
+        this.classList.add('active'); this.setAttribute('aria-selected','true');
+        // show panel
+        document.querySelectorAll('.category-panel').forEach(p=> p.style.display = (p.dataset.catId === id) ? '' : 'none');
+    }));
 });
 </script>
 {% endblock %}
