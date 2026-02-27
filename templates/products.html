@@ -231,6 +231,7 @@
             {% endfor %}
         </div>
     </div>
+        {% endif %}
     {% endfor %}
 {% else %}
     <div class="card" style="text-align:center;padding:48px 24px">
@@ -371,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 sortSelect.appendChild(opt);
             });
             customKeys.forEach(k => {
-                const display = k.replace('data-custom-','').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+                const display = k.replace('data-custom-','').replace(/_/g,' ').replace(/\\w/g, c => c.toUpperCase());
                 const opt = document.createElement('option');
                 opt.value = k; // full data- name
                 opt.textContent = display;
@@ -387,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 const o = document.createElement('option'); o.value = key; o.textContent = baseLabels[key] || key; filterSelect.appendChild(o);
             });
             customKeys.forEach(k => {
-                const display = k.replace('data-custom-','').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+                const display = k.replace('data-custom-','').replace(/_/g,' ').replace(/\\w/g, c => c.toUpperCase());
                 const o = document.createElement('option'); o.value = k; o.textContent = display; filterSelect.appendChild(o);
             });
         }
