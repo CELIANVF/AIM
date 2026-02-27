@@ -36,30 +36,7 @@
                     <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">🏠 Accueil</a></li>
                     <li><a href="/categories" class="{% if request.path.startswith('/categories') %}active{% endif %}">📁 Catégories</a></li>
                     <li><a href="/products" class="{% if request.path.startswith('/products') %}active{% endif %}">📦 Produits</a></li>
-                    <li>
-                        <button id="show-unassigned-products" class="btn btn-outline" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;display:block;width:100%;">Produits non attribués</button>
-                    </li>
-                        {% if request.path.startswith('/products') and categories %}
-                        <li>
-                            <div id="product-filters" style="padding:8px 0 0 6px;display:flex;flex-direction:column;gap:6px;">
-                                <input id="category-search" type="search" placeholder="Filtrer les catégories..." aria-label="Filtrer les catégories" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-size:13px">
-                                <div style="display:flex;gap:6px;align-items:center">
-                                    <button class="btn btn-outline" data-filter="all" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;flex:1">Tous</button>
-                                    <button id="category-collapse-toggle" class="btn btn-outline" title="Déplier / Replier" style="padding:6px 8px;border-radius:8px;margin-left:6px">⇕</button>
-                                </div>
-                                <ul id="category-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto">
-                                    {% for c in categories %}
-                                    <li>
-                                        <button class="btn btn-outline category-btn" data-filter="{{ c.name|e }}" style="padding:6px 8px;font-size:13px;border-radius:8px;text-align:left;display:flex;justify-content:space-between;gap:8px;width:100%">
-                                            <span class="category-name">{{ c.name }}</span>
-                                            <span class="category-count muted" aria-hidden="true">–</span>
-                                        </button>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        </li>
-                        {% endif %}
+
                     <li><a href="/composites" class="{% if request.path.startswith('/composites') %}active{% endif %}">🎯 Arcs</a></li>
                     <li><a href="/archers" class="{% if request.path.startswith('/archers') %}active{% endif %}">👥 Archers</a></li>
                     <li><a href="/assignments" class="{% if request.path.startswith('/assignments') %}active{% endif %}">🔄 Assignations</a></li>
@@ -105,105 +82,7 @@
                 });
             })();
         </script>
-        <script>
-            document.addEventListener('DOMContentLoaded', function(){
-                const widget = document.getElementById('product-filters');
-                if (!widget) return;
-                const search = widget.querySelector('#category-search');
-                const collapseToggle = widget.querySelector('#category-collapse-toggle');
-                const list = widget.querySelector('#category-list');
-                const allBtn = widget.querySelector('button[data-filter="all"]');
 
-                function updateCounts(){
-                    const buttons = Array.from(widget.querySelectorAll('.category-btn'));
-                    buttons.forEach(btn => {
-                        const name = btn.getAttribute('data-filter');
-                        const acc = document.querySelector('.accordion[data-category="' + CSS.escape(name) + '"]');
-                        const count = acc ? acc.querySelectorAll('.item').length : 0;
-                        const countEl = btn.querySelector('.category-count');
-                        if (countEl) countEl.textContent = count;
-                        if (count === 0) {
-                            btn.disabled = true;
-                            btn.setAttribute('aria-disabled','true');
-                            btn.style.opacity = '0.6';
-                        } else {
-                            btn.disabled = false;
-                            btn.removeAttribute('aria-disabled');
-                            btn.style.opacity = '1';
-                        }
-                    });
-                }
 
-                // wire search to filter category list
-                if (search) {
-                    search.addEventListener('input', function(){
-                        const q = this.value.trim().toLowerCase();
-                        const items = Array.from(list.querySelectorAll('li'));
-                        items.forEach(li => {
-                            const name = li.querySelector('.category-name').textContent.toLowerCase();
-                            if (!q || name.indexOf(q) !== -1) li.style.display = '';
-                            else li.style.display = 'none';
-                        });
-                    });
-                }
-
-                // collapse toggle
-                if (collapseToggle && list) {
-                    let collapsed = false;
-                    collapseToggle.addEventListener('click', function(){
-                        collapsed = !collapsed;
-                        if (collapsed) {
-                            list.style.maxHeight = '0';
-                        } else {
-                            list.style.maxHeight = '240px';
-                        }
-                    });
-                }
-
-                // clicking a category button should trigger existing data-filter handlers
-                // keep behaviour: clicking the 'Tous' button triggers the all filter
-                // nothing to do here because products page attaches to buttons inside #product-filters
-
-                // update counts once on load
-                updateCounts();
-            });
-        </script>
-        <script>
-            document.addEventListener('DOMContentLoaded', function(){
-                const btn = document.getElementById('show-unassigned-products');
-                if (!btn) return;
-                let active = false;
-                btn.addEventListener('click', function(){
-                    active = !active;
-                    const accordions = Array.from(document.querySelectorAll('.accordion'));
-                    if (active) {
-                        btn.classList.add('active-filter');
-                        btn.textContent = 'Produits non attribués — Actif';
-                        accordions.forEach(acc => {
-                            const items = Array.from(acc.querySelectorAll('.item'));
-                            let hasMatch = false;
-                            items.forEach(it => {
-                                const status = (it.getAttribute('data-status') || '').toLowerCase();
-                                if (status === 'monté' || status === 'disponible') {
-                                    it.style.display = '';
-                                    hasMatch = true;
-                                } else {
-                                    it.style.display = 'none';
-                                }
-                            });
-                            acc.style.display = hasMatch ? '' : 'none';
-                        });
-                    } else {
-                        btn.classList.remove('active-filter');
-                        btn.textContent = 'Produits non attribués';
-                        accordions.forEach(acc => {
-                            acc.style.display = '';
-                            const items = Array.from(acc.querySelectorAll('.item'));
-                            items.forEach(it => it.style.display = '');
-                        });
-                    }
-                });
-            });
-        </script>
 </body>
 </html>

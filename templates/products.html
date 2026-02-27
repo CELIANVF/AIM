@@ -23,6 +23,27 @@
         border-bottom: 1px solid var(--border-light);
     }
 
+    /* tabs for categories */
+    .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+    .tabs .tab {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--background-secondary);
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .tabs .tab.active {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+
     .accordion-header:hover {
         background-color: var(--background-tertiary, #efefef);
     }
@@ -72,6 +93,19 @@
         {% endif %}
         <a class="btn btn-outline" href="/export_products">📄 Exporter PDF</a>
         <a class="btn btn-outline" href="/export_products_csv">📊 Exporter CSV</a>
+    </div>
+</div>
+
+<div id="product-tabs-container">
+    <label style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
+        <input type="checkbox" id="unassigned-checkbox">
+        <span>Afficher uniquement les produits non attribués</span>
+    </label>
+    <div id="product-tabs" class="tabs">
+        <button class="tab active" data-filter="all">Tous</button>
+        {% for cat in categories %}
+            <button class="tab" data-filter="{{ cat.name|e }}">{{ cat.name }}</button>
+        {% endfor %}
     </div>
 </div>
 
@@ -212,36 +246,75 @@ function toggleAccordion(header) {
 }
 </script>
 <script>
-// Filter products by category using sidebar buttons
+// Filter products by category using tabs at the top
+// includes a special "unassigned" filter to mimic previous behaviour
+
 document.addEventListener('DOMContentLoaded', function(){
-    const filterContainer = document.getElementById('product-filters');
-    if (!filterContainer) return;
-    const buttons = Array.from(filterContainer.querySelectorAll('button[data-filter]'));
+    const tabContainer = document.getElementById('product-tabs');
+    const checkbox = document.getElementById('unassigned-checkbox');
+    if (!tabContainer) return;
+    const buttons = Array.from(tabContainer.querySelectorAll('button[data-filter]'));
     const accordions = Array.from(document.querySelectorAll('.accordion[data-category]'));
 
-    function setActiveButton(activeBtn){
-        buttons.forEach(b => b.classList.remove('active-filter'));
-        if (activeBtn) activeBtn.classList.add('active-filter');
+    function setActive(btn){
+        buttons.forEach(b=>b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
     }
 
+    function applyFilters(){
+        const activeBtn = buttons.find(b=>b.classList.contains('active'));
+        const filter = activeBtn ? activeBtn.getAttribute('data-filter') : 'all';
+        const justUnassigned = checkbox && checkbox.checked;
+
+        accordions.forEach(acc => {
+            const cat = acc.getAttribute('data-category');
+            let showAcc = (filter === 'all' || cat === filter);
+            let hasMatch = false;
+            if (showAcc) {
+                const items = Array.from(acc.querySelectorAll('.item'));
+                items.forEach(it => {
+                    let showItem = true;
+                    if (justUnassigned) {
+                        const status = (it.getAttribute('data-status') || '').toLowerCase();
+                        showItem = (status === 'monté' || status === 'disponible');
+                    }
+                    it.style.display = showItem ? '' : 'none';
+                    if (showItem) hasMatch = true;
+                });
+                showAcc = hasMatch;
+            }
+            acc.style.display = showAcc ? '' : 'none';
+        });
+    }
+
+    // persist selection in localStorage
     buttons.forEach(btn => {
         btn.addEventListener('click', function(){
-            const filter = this.getAttribute('data-filter');
-            setActiveButton(this);
-            accordions.forEach(acc => {
-                const cat = acc.getAttribute('data-category');
-                if (filter === 'all' || cat === filter) {
-                    acc.style.display = '';
-                } else {
-                    acc.style.display = 'none';
-                }
-            });
+            setActive(this);
+            localStorage.setItem('products.filter', this.getAttribute('data-filter'));
+            applyFilters();
         });
     });
 
-    // default: activate 'Tous' if present
-    const defaultBtn = buttons.find(b => b.getAttribute('data-filter') === 'all');
-    if (defaultBtn) defaultBtn.click();
+    if (checkbox) {
+        checkbox.addEventListener('change', function(){
+            localStorage.setItem('products.unassigned', this.checked);
+            applyFilters();
+        });
+    }
+
+    // restore saved state or default
+    const savedFilter = localStorage.getItem('products.filter');
+    const savedUnassigned = localStorage.getItem('products.unassigned');
+    if (checkbox && savedUnassigned !== null) {
+        checkbox.checked = savedUnassigned === 'true';
+    }
+    if (savedFilter) {
+        const btn = buttons.find(b=>b.getAttribute('data-filter')===savedFilter);
+        if (btn) setActive(btn);
+    }
+
+    applyFilters();
 });
 </script>
 <script>
@@ -425,8 +498,4 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 
-<style>
-/* Active filter button look */
-.active-filter{border-color:var(--primary)!important;color:var(--primary)!important;background:var(--primary-light)!important}
-</style>
 {% endblock %}
