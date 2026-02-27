@@ -110,10 +110,13 @@
 </div>
 
 {% if products %}
-    {% for category_name, products_by_category in grouped_products.items() %}
-    <div class="accordion" data-category="{{ category_name|e }}">
+    {# iterate through the ordered list of categories so the display matches the drag&amp;drop order #}
+    {% for cat in categories %}
+        {% set products_by_category = grouped_products.get(cat.name, []) %}
+        {% if products_by_category %}
+        <div class="accordion" data-category="{{ cat.name|e }}">
         <div class="accordion-header" onclick="toggleAccordion(this)">
-            <span>{{ category_name }} ({{ products_by_category|length }})</span>
+            <span>{{ cat.name }} ({{ products_by_category|length }})</span>
             <span class="accordion-icon">▼</span>
         </div>
         <div class="accordion-controls" style="padding:8px 12px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap;align-items:center">

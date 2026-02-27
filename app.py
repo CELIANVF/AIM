@@ -293,15 +293,18 @@ def reorder_categories():
 @login_required
 @require_permission('view_equipment')
 def products():
-    prods = Product.query.join(Category).order_by(Category.name, Product.brand).all()
+    # fetch products sorted according to the category position first, then name/brand
+    prods = Product.query.join(Category).order_by(Category.position.asc(), Category.name.asc(), Product.brand.asc()).all()
     
-    # Group products by category
+    # Group products by category name in the order they appear in the query above
     from collections import defaultdict
     grouped = defaultdict(list)
     for product in prods:
+        # category may be None in edge cases, but position should handle that too
         grouped[product.category.name].append(product)
     
-    cats = Category.query.order_by(Category.name).all()
+    # also supply ordered list of categories for tabs/panels
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
     return render_template('products.html', products=prods, grouped_products=grouped, categories=cats)
 
 @app.route('/add_product', methods=['GET', 'POST'])
@@ -510,9 +513,9 @@ def add_composite():
         )
         db.session.commit()
         return redirect(url_for('composites'))
-    # pass categories so template can group products by category
+    # pass categories (ordered by user-defined position) so template can group products by category
     # Exclude products that are already assigned to an existing composite
-    cats = Category.query.order_by(Category.name).all()
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
     cats_with_available = []
     for c in cats:
         available = [p for p in c.products if not p.composites]
@@ -555,7 +558,7 @@ def edit_composite(comp_id):
     prods = Product.query.all()
     prods_filtered = [p for p in prods if (not p.composites) or (p in comp.components)]
     # pass categories so template can group products by category (only include filtered products)
-    cats = Category.query.order_by(Category.name).all()
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
     cats_with_available = []
     for c in cats:
         available = [p for p in prods_filtered if p.category and p.category.id == c.id]
