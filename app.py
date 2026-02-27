@@ -496,13 +496,34 @@ def add_composite():
         status = request.form['status']
         comp = CompositeProduct(name=name, type=type, status=status)
         db.session.add(comp)
-        db.session.commit()
-        # add components
+        db.session.commit()  # need comp.id to exist for relationship handling
+
+        # gather components selected by user
         comp_ids = request.form.getlist('components')
         for cid in comp_ids:
             prod = Product.query.get(int(cid))
-            if prod:
-                comp.components.append(prod)
+            if not prod:
+                continue
+
+            # if the product belongs to another composite that is not on loan,
+            # remove it and log that swap so the other bow loses this piece.
+            for other in list(prod.composites):
+                if other.id != comp.id and other.status != 'loan':
+                    old_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                    other.components.remove(prod)
+                    new_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                    if old_other != new_other:
+                        log_history(
+                            event_type='composite_change',
+                            entity_type='composite',
+                            entity_id=other.id,
+                            summary=f"Pièce déplacée vers {comp.name}",
+                            details={'before': old_other, 'after': new_other}
+                        )
+                    break
+
+            comp.components.append(prod)
+
         components = [f"{p.brand} ({p.category.name})" for p in comp.components]
         log_history(
             event_type='composite_created',
@@ -514,11 +535,19 @@ def add_composite():
         db.session.commit()
         return redirect(url_for('composites'))
     # pass categories (ordered by user-defined position) so template can group products by category
-    # Exclude products that are already assigned to an existing composite
+    # Show products that are free or mounted on another bow that is not on loan.
     cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
     cats_with_available = []
     for c in cats:
-        available = [p for p in c.products if not p.composites]
+        available = []
+        for p in c.products:
+            if not p.composites:
+                available.append(p)
+            else:
+                # include if at least one composite containing this product is
+                # not the one we're about to create (obviously) and not on loan
+                if any(other.status != 'loan' for other in p.composites):
+                    available.append(p)
         cats_with_available.append({'id': c.id, 'name': c.name, 'products': available})
     return render_template('add_composite.html', categories=cats_with_available)
 
@@ -528,18 +557,62 @@ def add_composite():
 def edit_composite(comp_id):
     comp = CompositeProduct.query.get_or_404(comp_id)
     if request.method == 'POST':
+        # snapshot the old components with category information so we can
+        # log and possibly swap them back into another bow later.
         old_components = [f"{p.brand} ({p.category.name})" for p in comp.components]
+        old_by_cat = {p.category.id: p for p in comp.components if p.category}
+
         comp.name = request.form['name']
         comp.type = request.form['type']
         comp.status = request.form['status']
-        # clear existing components
-        comp.components.clear()
-        # add new components
+
+        # collect selection but do not immediately clear the relationship, we
+        # need to know which new products belonged to other composites so we
+        # can perform a swap.
         comp_ids = request.form.getlist('components')
+
+        # prepare a list of product objects from the submitted ids
+        new_products = []
         for cid in comp_ids:
             prod = Product.query.get(int(cid))
             if prod:
-                comp.components.append(prod)
+                new_products.append(prod)
+
+        # handle swapping: for each new product that is currently part of an
+        # other composite which is not on loan, remove it from the other and
+        # put the old item (if any) back on that composite in the same
+        # category.
+        for newp in new_products:
+            for other in list(newp.composites):
+                if other.id != comp.id and other.status != 'loan':
+                    # record before/after for logging
+                    old_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+
+                    # remove the piece from the other bow
+                    other.components.remove(newp)
+                    # if we had something in the same category previously,
+                    # give it back to the other bow
+                    cat_id = newp.category.id if newp.category else None
+                    oldp = old_by_cat.get(cat_id)
+                    if oldp and oldp != newp:
+                        other.components.append(oldp)
+
+                    new_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                    if old_other != new_other:
+                        log_history(
+                            event_type='composite_change',
+                            entity_type='composite',
+                            entity_id=other.id,
+                            summary=f"Swap de composant via {comp.name}",
+                            details={'before': old_other, 'after': new_other}
+                        )
+                    break
+
+        # now we can safely clear and re-add
+        comp.components.clear()
+        for prod in new_products:
+            comp.components.append(prod)
+
         new_components = [f"{p.brand} ({p.category.name})" for p in comp.components]
         if old_components != new_components:
             log_history(
@@ -551,12 +624,28 @@ def edit_composite(comp_id):
             )
         db.session.commit()
         return redirect(url_for('composites'))
-    # When editing a composite, show products that are either unassigned
-    # (not part of any composite) or already part of this composite so the
-    # user can keep/remove them. Do not show products that belong to other
-    # composites.
+    # When editing a composite we want to offer the user components that are:
+    #  1. not part of any composite (completely free),
+    #  2. already part of *this* composite (so they can be kept or removed), or
+    #  3. part of another composite **that is not currently loaned out**.
+    #
+    # The third case lets the user take a piece off of a built bow that isn't
+    # assigned to an archer yet.  When such an item is selected we will also
+    # swap the old component back onto the other bow on save (see POST logic
+    # below).
     prods = Product.query.all()
-    prods_filtered = [p for p in prods if (not p.composites) or (p in comp.components)]
+    prods_filtered = []
+    for p in prods:
+        if (not p.composites) or (p in comp.components):
+            prods_filtered.append(p)
+        else:
+            # look for a composite containing this product that is not the one
+            # we're editing and not currently on loan; show it so the user can
+            # swap parts between bows
+            for other in p.composites:
+                if other.id != comp.id and other.status != 'loan':
+                    prods_filtered.append(p)
+                    break
     # pass categories so template can group products by category (only include filtered products)
     cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
     cats_with_available = []

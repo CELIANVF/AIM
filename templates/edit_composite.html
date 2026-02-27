@@ -31,6 +31,7 @@
         </select>
     </label><br>
     <h2>Composants</h2>
+    <p class="muted" style="margin-top:-8px;font-size:0.9em">Les pièces déjà montées sur un autre arc non prêté sont affichées ; en cas de sélection elles seront échangées automatiquement.</p>
     <div class="category-tabs" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
     {% for c in categories %}
         <button type="button" class="cat-tab btn btn-outline" data-cat-id="{{ c.id }}" {% if loop.first %}aria-selected="true"{% else %}aria-selected="false"{% endif %}>{{ c.name }}</button>
@@ -66,6 +67,14 @@
                         <div style="flex:1">
                             <div style="font-weight:600"><a href="/edit_product/{{ p.id }}" target="_blank" rel="noopener" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">{{ p.brand }}{% if p.model %} {{ p.model }}{% endif %}</a></div>
                             <div class="small muted">{{ p.category.name }}{% if p.size %} • {{ p.size }}{% endif %}{% if p.power %} • {{ p.power }}{% endif %}</div>
+                            {# show a badge when this item is mounted on another non‑loaned composite #}
+                            {% if p.composites %}
+                                {% for other in p.composites %}
+                                    {% if other.id != composite.id and other.status != 'loan' %}
+                                        <div class="small" style="margin-top:4px"><span class="badge badge-secondary">Monté sur {{ other.name }}</span></div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
                             <div class="small muted" style="margin-top:6px">État: {% if p.state == 'stock' %}Disponible{% elif p.state == 'loan' %}En prêt{% elif p.state == 'broken' %}Cassé{% else %}{{ p.state }}{% endif %} • Localisation: {% if p.location == 'club' %}Au club{% elif p.location == 'loan' %}En prêt{% else %}{{ p.location }}{% endif %}</div>
                             {% if p.comments %}<div class="small" style="margin-top:6px">💬 {{ p.comments }}</div>{% endif %}
                             {% if p.custom_values %}
