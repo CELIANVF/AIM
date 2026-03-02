@@ -431,6 +431,11 @@ def duplicate_product(prod_id):
     db.session.commit()
     return redirect(url_for('products'))
 
+def natural_sort_key(s):
+    """Extract numbers from string for natural sorting (Arc_2 before Arc_10)"""
+    import re
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s or '')]
+
 @app.route('/composites')
 @login_required
 def composites():
@@ -445,7 +450,7 @@ def composites():
     elif sort_by == 'status':
         comps = sorted(comps, key=lambda x: x.status or '')
     elif sort_by == 'name':
-        comps = sorted(comps, key=lambda x: x.name or '')
+        comps = sorted(comps, key=lambda x: natural_sort_key(x.name))
     
     # build summaries for each composite: handle (poignée), branch (branche) and assignment status
     summaries = {}
