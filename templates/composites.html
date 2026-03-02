@@ -17,6 +17,15 @@
     </div>
 </div>
 
+<div style="margin-bottom: 20px; padding: 12px; background-color: var(--bg-light); border-radius: 8px;">
+    <p style="margin: 0 0 10px 0; font-weight: 600; font-size: 0.9rem;">Trier par:</p>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="/composites?sort=name" class="btn {% if current_sort == 'name' %}btn-primary{% else %}btn-outline{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">📝 Nom</a>
+        <a href="/composites?sort=type" class="btn {% if current_sort == 'type' %}btn-primary{% else %}btn-outline{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">🏷️ Type</a>
+        <a href="/composites?sort=status" class="btn {% if current_sort == 'status' %}btn-primary{% else %}btn-outline{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">📍 Statut</a>
+    </div>
+</div>
+
 <div class="grid">
     {% for c in composites %}
     <div class="item">

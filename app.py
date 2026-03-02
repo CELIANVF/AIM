@@ -434,7 +434,19 @@ def duplicate_product(prod_id):
 @app.route('/composites')
 @login_required
 def composites():
+    # Get sort parameter from query string
+    sort_by = request.args.get('sort', 'name')  # default sort by name
+    
     comps = CompositeProduct.query.all()
+    
+    # Sort the composites
+    if sort_by == 'type':
+        comps = sorted(comps, key=lambda x: x.type or '')
+    elif sort_by == 'status':
+        comps = sorted(comps, key=lambda x: x.status or '')
+    elif sort_by == 'name':
+        comps = sorted(comps, key=lambda x: x.name or '')
+    
     # build summaries for each composite: handle (poignée), branch (branche) and assignment status
     summaries = {}
     for comp in comps:
@@ -484,7 +496,7 @@ def composites():
             'branch': branch,
             'assigned_to': assigned
         }
-    return render_template('composites.html', composites=comps, composite_summaries=summaries)
+    return render_template('composites.html', composites=comps, composite_summaries=summaries, current_sort=sort_by)
 
 @app.route('/add_composite', methods=['GET', 'POST'])
 @login_required
