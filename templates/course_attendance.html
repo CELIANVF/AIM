@@ -18,7 +18,7 @@
             <form method="POST" action="{{ url_for('mark_attendance', course_id=course.id) }}">
                 <div class="form-group" style="margin-bottom:20px">
                     <label for="date">Choisir une date</label>
-                    <input type="date" id="date" name="date" required value="{{ today }}">
+                    <input type="text" id="date" name="date" required value="{{ today }}">
                 </div>
 
                 <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -91,4 +91,35 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- flatpickr CSS & JS from CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+;(function(){
+    const modelDow = {{ course.day_of_week }}; // 0=Monday .. 6=Sunday
+    // flatpickr getDay: 0=Sun..6=Sat -> convert modelDow (0=Mon) to flatpickr weekday
+    const targetJsDow = (modelDow + 1) % 7;
+
+    const dateInput = document.getElementById('date');
+    if(!dateInput) return;
+
+    flatpickr(dateInput, {
+        defaultDate: (function(){
+            try { return '{{ today.isoformat() }}'; } catch(e){ return null; }
+        })(),
+        dateFormat: 'Y-m-d',
+        enable: [
+            function(date){
+                return date.getDay() === targetJsDow;
+            }
+        ],
+        locale: {
+            firstDayOfWeek: 1
+        }
+    });
+})();
+</script>
 {% endblock %}

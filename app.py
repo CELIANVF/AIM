@@ -1080,13 +1080,9 @@ def remove_archer_from_course(course_id, archer_id):
 def course_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     today = date.today()
-    # Get the next 30 days
-    end_date = today + timedelta(days=30)
-    # Get attendance records for the next 30 days
+    # Get all attendance records for this course (historical + future)
     attendance_records = Attendance.query.filter(
-        Attendance.course_id == course_id,
-        Attendance.date >= today,
-        Attendance.date <= end_date
+        Attendance.course_id == course_id
     ).order_by(Attendance.date.desc()).all()
     return render_template('course_attendance.html', course=course, attendance_records=attendance_records, today=today)
 
@@ -1097,6 +1093,11 @@ def mark_attendance(course_id):
     course = Course.query.get_or_404(course_id)
     attendance_date = request.form.get('date')
     date_obj = datetime.strptime(attendance_date, '%Y-%m-%d').date()
+    # Ensure the selected date falls on the course's configured weekday
+    weekday_names = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche']
+    if date_obj.weekday() != course.day_of_week:
+        flash(f"Veuillez sélectionner un {weekday_names[course.day_of_week]} pour ce cours.", 'error')
+        return redirect(url_for('course_attendance', course_id=course_id))
     
     # Mark all archers in the course
     for archer in course.archers:
