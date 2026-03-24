@@ -53,8 +53,7 @@ ssh $SERVER_USER@$SERVER_HOST << 'EOF'
     source venv/bin/activate
     
     pip install -r requirements.txt
-    pip install gunicorn  # Production WSGI server
-    
+
     echo "Dependencies installed"
 EOF
 
@@ -63,22 +62,13 @@ echo "[5/6] Initializing database..."
 ssh $SERVER_USER@$SERVER_HOST << 'EOF'
     cd /home/celian/aim
     source venv/bin/activate
-    
+    export FLASK_APP=app.py
+
     # Run migrations if they exist
     if [ -d "migrations" ]; then
         flask db upgrade
     fi
-    
-    # Initialize database with seed data
-    python3 << 'PYTHON'
-from app import app, db, seed_categories
 
-with app.app_context():
-    db.create_all()
-    seed_categories()
-    print("Database initialized with seed data")
-PYTHON
-    
     echo "Database setup complete"
 EOF
 
@@ -93,7 +83,7 @@ After=network.target
 [Service]
 User=celian
 WorkingDirectory=/home/celian/aim
-ExecStart=/home/celian/aim/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 --timeout 60 app:app
+ExecStart=/home/celian/aim/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5001 --timeout 120 app:app
 Restart=always
 RestartSec=10
 
@@ -114,10 +104,11 @@ echo "=========================================="
 echo "Deployment Complete!"
 echo "=========================================="
 echo ""
-echo "Next steps:"
-echo "1. Configure Nginx as reverse proxy (see nginx.conf template)"
-echo "2. Setup SSL certificate (Let's Encrypt recommended)"
-echo "3. Access your app at: http://$SERVER_HOST"
+echo "Next steps (on the server, SSH):"
+echo "1. cd $APP_DIR && ./install-on-server.sh $SERVER_HOST"
+echo "   (configure Nginx + vérifie le service; voir aussi nginx.conf dans le dépôt)"
+echo "2. SSL: sudo certbot --nginx -d $SERVER_HOST"
+echo "3. Accès: http://$SERVER_HOST"
 echo ""
 echo "Useful commands on server:"
 echo "  - Check app status: sudo systemctl status aim"
