@@ -3,7 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}AIM{% endblock %} - ANC93</title>
+     {# Meta tags for Discord/OG/Twitter embeds. Templates can override
+         `meta_title`, `meta_description`, `meta_image`, `meta_url` when rendering. #}
+     {% if meta_title is not defined %}{% set meta_title = ("AIM - ANC93") %}{% endif %}
+     {% if meta_description is not defined %}{% set meta_description = ("AIM est une application de gestion des produits, archers, cours et assignations pour l'ANC93.") %}{% endif %}
+     {% if meta_image is not defined %}{% set meta_image = url_for('static', filename='logo.png', _external=True) %}{% endif %}
+     {% if meta_url is not defined %}{% set meta_url = request.url %}{% endif %}
+
+     <title>{% block title %}{{ meta_title }}{% endblock %}</title>
+
+     <meta property="og:title" content="{{ meta_title }}">
+     <meta property="og:description" content="{{ meta_description }}">
+     <meta property="og:type" content="website">
+     <meta property="og:url" content="{{ meta_url }}">
+     <meta property="og:image" content="{{ meta_image }}">
+
+     <meta name="twitter:card" content="summary_large_image">
+     <meta name="twitter:title" content="{{ meta_title }}">
+     <meta name="twitter:description" content="{{ meta_description }}">
+     <meta name="twitter:image" content="{{ meta_image }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
