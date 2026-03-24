@@ -1,0 +1,31 @@
+name: deploiment automatique
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+  runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          script: |
+            cd AIM
+            git pull origin main
+            # activate venv
+            source venv/bin/activate
+            # install dependencies
+            pip install -r requirements.txt
+            # run flask migrations
+            flask db upgrade
