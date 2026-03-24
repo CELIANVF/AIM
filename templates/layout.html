@@ -12,6 +12,7 @@
             <button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
             <div class="logo">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo AIM" style="height:32px;vertical-align:middle">
+                <span style="font-size:1.2rem;font-weight:700;vertical-align:middle;margin-left:8px;letter-spacing:0.05em;">AIM</span>
             </div>
             <div class="search">
                 <form action="/search" method="get">
@@ -88,7 +89,6 @@
                 });
             })();
         </script>
-</script>
     {% block scripts %}{% endblock %}
 
 </body>
