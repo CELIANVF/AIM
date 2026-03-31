@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Index
 from sqlalchemy.ext.hybrid import hybrid_property
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -62,6 +63,26 @@ class User(UserMixin, db.Model):
     
     def can_view_history(self):
         return self.role in ('admin', 'responsable', 'lecteur', 'entraineur')
+
+
+class UserLoginEvent(db.Model):
+    """Journal des tentatives de connexion (succès et échecs), par utilisateur et IP."""
+    __tablename__ = 'user_login_event'
+    __table_args__ = (
+        Index('ix_user_login_event_user_id_created_at', 'user_id', 'created_at'),
+        Index('ix_user_login_event_ip_address_created_at', 'ip_address', 'created_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    attempted_username = db.Column(db.String(80), nullable=True)
+    success = db.Column(db.Boolean, nullable=False, default=True)
+    ip_address = db.Column(db.String(45), nullable=False)
+    user_agent = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
+
+    user = db.relationship('User', backref=db.backref('login_events', lazy='dynamic'))
+
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)

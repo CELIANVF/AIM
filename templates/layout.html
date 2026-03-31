@@ -71,6 +71,7 @@
                     {% if current_user.is_authenticated and current_user.is_admin() %}
                     <li><hr></li>
                     <li><a href="/users" class="{% if request.path.startswith('/users') %}active{% endif %}">👤 Utilisateurs</a></li>
+                    <li><a href="{{ url_for('login_history') }}" class="{% if request.path.startswith('/login_history') %}active{% endif %}">🔑 Connexions</a></li>
                     {% endif %}
                 </ul>
             </nav>

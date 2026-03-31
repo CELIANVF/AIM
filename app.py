@@ -6,6 +6,7 @@ from config import Config
 from models import (
     db,
     User,
+    UserLoginEvent,
     Category,
     Product,
     CompositeProduct,
@@ -47,6 +48,57 @@ REGISTRATION_WEAPON_ALIASES = {
 
 REGISTRATION_WEAPON_LABELS = dict(REGISTRATION_WEAPON_CHOICES)
 
+# Fiche archer : type d'arc (mêmes codes que l'inscription, sans « comme sur la fiche »)
+ARCHER_BOW_TYPE_CHOICES = [
+    ('CL', 'Classique (CL)'),
+    ('BB', 'Barebow (BB)'),
+    ('Compound', 'Compound (poulies)'),
+    ('Longbow', 'Longbow'),
+    ('Autre', 'Autre'),
+]
+ARCHER_BOW_TYPE_VALID_CODES = frozenset(c[0] for c in ARCHER_BOW_TYPE_CHOICES)
+
+
+def _canonical_archer_bow_type_code(stored):
+    """Associe une valeur en base au code du select ; None si chaîne libre non reconnue."""
+    s = (stored or '').strip()
+    if not s:
+        return None
+    s0 = REGISTRATION_WEAPON_ALIASES.get(s, s)
+    if s0 in ARCHER_BOW_TYPE_VALID_CODES:
+        return s0
+    if s0 == 'CO' or str(s0).upper() == 'CO':
+        return 'Compound'
+    sl = s.lower()
+    if s0 in ('LD', 'Longbow') or 'longbow' in sl or 'arc droit' in sl:
+        return 'Longbow'
+    if 'compound' in sl or 'poulie' in sl or sl == 'co':
+        return 'Compound'
+    if s0 == 'BB' or 'bare' in sl:
+        return 'BB'
+    if s0 == 'CL' or sl == 'cl' or ('classique' in sl and 'compound' not in sl):
+        return 'CL'
+    if s0 == 'Autre' or s == 'Autre':
+        return 'Autre'
+    return None
+
+
+def _archer_bow_type_form_value(stored):
+    """Valeur à pré-sélectionner : code canonique ou texte brut si non mappé."""
+    s = (stored or '').strip()
+    if not s:
+        return ''
+    c = _canonical_archer_bow_type_code(s)
+    return c if c is not None else s
+
+
+def _normalize_archer_bow_type_from_form(raw):
+    """Valeur POST → stockage (normalise synonymes, conserve texte libre hérité)."""
+    v = (raw or '').strip()
+    if not v:
+        return None
+    c = _canonical_archer_bow_type_code(v)
+    return c if c is not None else v
 
 def _registration_weapon_canonical(weapon_choice):
     w = (weapon_choice or '').strip()
@@ -793,18 +845,56 @@ def require_permission(permission_type):
         return decorated_function
     return decorator
 
+
+def get_client_ip():
+    """IP client : premier hop X-Forwarded-For (proxy de confiance), sinon remote_addr."""
+    xff = (request.headers.get('X-Forwarded-For') or '').strip()
+    if xff:
+        part = xff.split(',')[0].strip()
+        if part:
+            return part[:45]
+    addr = request.remote_addr or ''
+    return (addr or 'unknown')[:45]
+
+
+def _record_login_event(*, user_id, attempted_username, success):
+    try:
+        ua = request.headers.get('User-Agent') or None
+        if ua and len(ua) > 4000:
+            ua = ua[:4000]
+        db.session.add(
+            UserLoginEvent(
+                user_id=user_id,
+                attempted_username=attempted_username,
+                success=success,
+                ip_address=get_client_ip(),
+                user_agent=ua,
+            )
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Impossible d'enregistrer l'événement de connexion")
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
+        username = (request.form.get('username') or '').strip()
         password = request.form.get('password')
-        
-        user = User.query.filter_by(username=username).first()
+        uname_audit = (username[:80] if username else None)
+
+        user = User.query.filter_by(username=username).first() if username else None
         if user and user.check_password(password):
             login_user(user)
+            _record_login_event(user_id=user.id, attempted_username=None, success=True)
             return redirect(url_for('index'))
-        else:
-            return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
+        _record_login_event(
+            user_id=(user.id if user else None),
+            attempted_username=(None if user else uname_audit),
+            success=False,
+        )
+        return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -1793,13 +1883,18 @@ def add_archer():
         age = request.form.get('age') or None
         bow_length = request.form.get('bow_length')
         draw_length = request.form.get('draw_length')
-        bow_type = request.form.get('bow_type')
+        bow_type = _normalize_archer_bow_type_from_form(request.form.get('bow_type'))
         notes = request.form.get('notes')
         arch = Archer(first_name=first_name, last_name=last_name, age=int(age) if age else None, license_number=license, bow_length=bow_length, draw_length=draw_length, bow_type=bow_type, notes=notes)
         db.session.add(arch)
         db.session.commit()
         return redirect(url_for('archers'))
-    return render_template('add_archer.html')
+    return render_template(
+        'add_archer.html',
+        bow_type_choices=ARCHER_BOW_TYPE_CHOICES,
+        bow_type_valid_codes=ARCHER_BOW_TYPE_VALID_CODES,
+        bow_type_value='',
+    )
 
 
 @app.route('/edit_archer/<int:archer_id>', methods=['GET', 'POST'])
@@ -1815,11 +1910,17 @@ def edit_archer(archer_id):
         arch.age = int(age) if age else None
         arch.bow_length = request.form.get('bow_length')
         arch.draw_length = request.form.get('draw_length')
-        arch.bow_type = request.form.get('bow_type')
+        arch.bow_type = _normalize_archer_bow_type_from_form(request.form.get('bow_type'))
         arch.notes = request.form.get('notes')
         db.session.commit()
         return redirect(url_for('archers'))
-    return render_template('edit_archer.html', archer=arch)
+    return render_template(
+        'edit_archer.html',
+        archer=arch,
+        bow_type_choices=ARCHER_BOW_TYPE_CHOICES,
+        bow_type_valid_codes=ARCHER_BOW_TYPE_VALID_CODES,
+        bow_type_value=_archer_bow_type_form_value(arch.bow_type),
+    )
 
 
 def _registration_weapon_label(archer, weapon_choice):
@@ -3583,6 +3684,38 @@ def users():
     all_users = User.query.all()
     roles = ['admin', 'responsable', 'lecteur', 'entraineur']
     return render_template('users.html', users=all_users, roles=roles)
+
+
+def _safe_login_ip_filter(value):
+    s = (value or '').strip()[:45]
+    if not s or not re.match(r'^[\w.:%]+$', s):
+        return None
+    return s
+
+
+@app.route('/login_history')
+@login_required
+@require_permission('admin')
+def login_history():
+    q = UserLoginEvent.query.order_by(UserLoginEvent.created_at.desc())
+    user_id_arg = request.args.get('user_id', type=int)
+    if user_id_arg:
+        q = q.filter(UserLoginEvent.user_id == user_id_arg)
+    ip_in_form = request.args.get('ip', '')
+    ip_safe = _safe_login_ip_filter(ip_in_form)
+    if ip_safe:
+        q = q.filter(UserLoginEvent.ip_address.contains(ip_safe))
+    page = request.args.get('page', default=1, type=int) or 1
+    pagination = q.paginate(page=page, per_page=50, error_out=False)
+    users_for_filter = User.query.order_by(User.username.asc()).all()
+    return render_template(
+        'login_history.html',
+        pagination=pagination,
+        users_for_filter=users_for_filter,
+        filter_user_id=user_id_arg,
+        filter_ip=ip_in_form.strip()[:45],
+    )
+
 
 @app.route('/add_user', methods=['GET', 'POST'])
 @login_required

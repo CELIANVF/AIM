@@ -28,8 +28,16 @@
     <h3 style="margin-top:12px">Informations d'archer</h3>
     <div class="form-row">
         <div class="form-group">
-            <label>Type d'arc</label>
-            <input type="text" name="bow_type">
+            <label for="bow_type">Type d'arc</label>
+            <select id="bow_type" name="bow_type">
+                <option value="" {% if not bow_type_value %}selected{% endif %}>—</option>
+                {% if bow_type_value and bow_type_value not in bow_type_valid_codes %}
+                <option value="{{ bow_type_value }}" selected>{{ bow_type_value }}</option>
+                {% endif %}
+                {% for val, label in bow_type_choices %}
+                <option value="{{ val }}" {% if bow_type_value == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label>Longueur d'arc</label>
