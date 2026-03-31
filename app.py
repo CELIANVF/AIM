@@ -100,6 +100,14 @@ def _normalize_archer_bow_type_from_form(raw):
     c = _canonical_archer_bow_type_code(v)
     return c if c is not None else v
 
+
+def _normalize_archer_email(raw):
+    if raw is None:
+        return None
+    s = raw.strip() if isinstance(raw, str) else str(raw).strip()
+    return s[:255] if s else None
+
+
 def _registration_weapon_canonical(weapon_choice):
     w = (weapon_choice or '').strip()
     if not w:
@@ -1885,7 +1893,18 @@ def add_archer():
         draw_length = request.form.get('draw_length')
         bow_type = _normalize_archer_bow_type_from_form(request.form.get('bow_type'))
         notes = request.form.get('notes')
-        arch = Archer(first_name=first_name, last_name=last_name, age=int(age) if age else None, license_number=license, bow_length=bow_length, draw_length=draw_length, bow_type=bow_type, notes=notes)
+        email = _normalize_archer_email(request.form.get('email'))
+        arch = Archer(
+            first_name=first_name,
+            last_name=last_name,
+            age=int(age) if age else None,
+            license_number=license,
+            email=email,
+            bow_length=bow_length,
+            draw_length=draw_length,
+            bow_type=bow_type,
+            notes=notes,
+        )
         db.session.add(arch)
         db.session.commit()
         return redirect(url_for('archers'))
@@ -1912,6 +1931,7 @@ def edit_archer(archer_id):
         arch.draw_length = request.form.get('draw_length')
         arch.bow_type = _normalize_archer_bow_type_from_form(request.form.get('bow_type'))
         arch.notes = request.form.get('notes')
+        arch.email = _normalize_archer_email(request.form.get('email'))
         db.session.commit()
         return redirect(url_for('archers'))
     return render_template(
@@ -2471,7 +2491,13 @@ def search():
     ).order_by(Product.brand).limit(200).all()
 
     archers = Archer.query.filter(
-        db.or_(Archer.first_name.ilike(term), Archer.last_name.ilike(term), Archer.license_number.ilike(term), Archer.notes.ilike(term))
+        db.or_(
+            Archer.first_name.ilike(term),
+            Archer.last_name.ilike(term),
+            Archer.license_number.ilike(term),
+            Archer.email.ilike(term),
+            Archer.notes.ilike(term),
+        )
     ).order_by(Archer.last_name).limit(200).all()
 
     categories = Category.query.filter(Category.name.ilike(term)).all()
@@ -3141,6 +3167,16 @@ def import_archers():
                             'Categorie',
                             'Cat. sportive',
                         ).strip()
+                        email_raw = find_column(
+                            row,
+                            'Adresse email',
+                            'Adresse e-mail',
+                            'Email',
+                            'E-mail',
+                            'Mail',
+                            'Courriel',
+                        ).strip()
+                        email_val = _normalize_archer_email(email_raw)
                         if not categorie or not _age_cat_re.search(categorie):
                             for k in row:
                                 nk = normalize_header_for_match(k).replace(' ', '')
@@ -3186,6 +3222,8 @@ def import_archers():
                                 existing.age = age
                             if categorie:
                                 existing.categorie = categorie
+                            if email_val is not None:
+                                existing.email = email_val
                             imported += 1
                         else:
                             # Créer un nouvel archer
@@ -3193,6 +3231,7 @@ def import_archers():
                                 first_name=first_name,
                                 last_name=last_name,
                                 license_number=license_number,
+                                email=email_val,
                                 age=age,
                                 categorie=categorie if categorie else None
                             )
@@ -3481,7 +3520,7 @@ def export_archers_csv():
     writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     
     # Headers
-    writer.writerow(['ID', 'Prénom', 'Nom', 'Numéro Licence', 'Âge', 'Catégorie', 'Type d\'arc', 'Personnel', 'Archer'])
+    writer.writerow(['ID', 'Prénom', 'Nom', 'Email', 'Numéro Licence', 'Âge', 'Catégorie', 'Type d\'arc', 'Personnel', 'Archer'])
     
     # Data
     archers = Archer.query.all()
@@ -3490,12 +3529,13 @@ def export_archers_csv():
             archer.id,
             archer.first_name or '',
             archer.last_name or '',
+            archer.email or '',
             archer.license_number or '',
             archer.age or '',
             archer.categorie or '',
             archer.bow_type or '',
-            'Oui' if archer.personal_equipment else 'Non',
-            'Oui' if archer.is_archer else 'Non'
+            'Oui' if getattr(archer, 'personal_equipment', None) else 'Non',
+            'Oui' if getattr(archer, 'is_archer', None) else 'Non'
         ])
     
     buffer = BytesIO(output.getvalue().encode('utf-8-sig'))

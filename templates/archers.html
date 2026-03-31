@@ -74,6 +74,7 @@
                 <th>Nom</th>
                 <th data-sort="number">Âge</th>
                 <th>Licence</th>
+                <th>E-mail</th>
                 <th>Catégorie</th>
                 <th>Cours</th>
                 <th>Arc assigné</th>
@@ -94,6 +95,7 @@
                 {% endif %}
                 <td>{% if a.age is not none %}{{ a.age }}{% else %}—{% endif %}</td>
                 <td>{{ a.license_number or '—' }}</td>
+                <td class="small">{% if a.email %}<a href="mailto:{{ a.email }}">{{ a.email }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
                 <td>{{ a.categorie or '—' }}</td>
                 <td class="small">
                     {% if active_courses %}
