@@ -910,6 +910,167 @@ def _header_is_nom_prenom_combine(norm_key: str) -> bool:
     return 'nom' in parts and 'prenom' in parts
 
 
+def _split_composite_csv_component_cell(cell):
+    """
+    Découpe une cellule d'export du type « Marque (Catégorie) | Marque2 (Cat2) ».
+    Retourne une liste de (marque, nom_catégorie).
+    """
+    if cell is None or not str(cell).strip():
+        return []
+    s = str(cell).strip()
+    parts = [p.strip() for p in s.split(' | ') if p.strip()]
+    out = []
+    for p in parts:
+        idx = p.rfind(' (')
+        if idx < 0:
+            continue
+        brand = p[:idx].strip()
+        rest = p[idx + 2 :].strip()
+        if not rest.endswith(')'):
+            continue
+        cat = rest[:-1].strip()
+        if brand and cat:
+            out.append((brand, cat))
+    return out
+
+
+def _normalize_composite_type_import(raw):
+    s = (raw or '').strip().upper()
+    if not s:
+        return None
+    if s in ('BB', 'BAREBOW', 'BARE BOW'):
+        return 'BB'
+    if s in ('CL', 'CLASSIQUE'):
+        return 'CL'
+    return s if len(s) <= 10 else s[:10]
+
+
+def _normalize_composite_status_import(raw):
+    s = (raw or '').strip().lower()
+    if s in ('', 'club', 'au club'):
+        return 'club'
+    if s in ('loan', 'en prêt', 'en pret', 'prêt', 'pret', 'prêté', 'prete'):
+        return 'loan'
+    return 'club'
+
+
+def _truncate_db_str(s, max_len):
+    t = (s or '').strip()
+    if len(t) <= max_len:
+        return t, False
+    return t[:max_len], True
+
+
+def _find_or_create_category_for_composite_import(cat_name):
+    """
+    Catégorie existante (ilike) ou création avec défauts alignés sur add_category.
+    Retourne (Category | None, created: bool).
+    """
+    cn = (cat_name or '').strip()
+    if not cn:
+        return None, False
+    name_db, _trunc = _truncate_db_str(cn, 50)
+    existing = Category.query.filter(Category.name.ilike(name_db)).first()
+    if existing:
+        return existing, False
+    max_pos = db.session.query(func.max(Category.position)).scalar() or 0
+    cat = Category(
+        name=name_db,
+        position=max_pos + 1,
+        has_size=False,
+        has_power=False,
+        has_model=True,
+        has_brand=True,
+        custom_fields='',
+        field_units=None,
+    )
+    db.session.add(cat)
+    db.session.flush()
+    return cat, True
+
+
+def _get_or_create_product_for_composite_import(brand, cat_name):
+    """
+    Produit existant ou création (stock / club). Catégorie créée si besoin.
+    Retourne (Product | None, created_product, created_category, ambiguous_multiples).
+    """
+    brand_db, _btrunc = _truncate_db_str(brand, 50)
+    if not brand_db:
+        return None, False, False, False
+    cat, created_cat = _find_or_create_category_for_composite_import(cat_name)
+    if not cat:
+        return None, False, False, False
+    prods = (
+        Product.query.filter(
+            Product.category_id == cat.id,
+            Product.brand.ilike(brand_db),
+        )
+        .order_by(Product.id)
+        .all()
+    )
+    if len(prods) > 1:
+        return prods[0], False, created_cat, True
+    if len(prods) == 1:
+        return prods[0], False, created_cat, False
+    prod = Product(
+        category_id=cat.id,
+        brand=brand_db,
+        state='stock',
+        location='club',
+    )
+    db.session.add(prod)
+    db.session.flush()
+    return prod, True, created_cat, False
+
+
+def _sync_composite_components_from_products(comp, new_products, *, is_new):
+    """
+    Attache les produits à l'arc en répliquant la logique add_composite / edit_composite
+    (retrait sur l'autre arc non prêté, swap de catégorie si édition).
+    """
+    if is_new:
+        for prod in new_products:
+            for other in list(prod.composites):
+                if other.id != comp.id and other.status != 'loan':
+                    old_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                    other.components.remove(prod)
+                    new_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                    if old_other != new_other:
+                        log_history(
+                            event_type='composite_change',
+                            entity_type='composite',
+                            entity_id=other.id,
+                            summary=f"Pièce déplacée vers {comp.name}",
+                            details={'before': old_other, 'after': new_other},
+                        )
+                    break
+            comp.components.append(prod)
+        return
+    old_by_cat = {p.category.id: p for p in comp.components if p.category}
+    for newp in new_products:
+        for other in list(newp.composites):
+            if other.id != comp.id and other.status != 'loan':
+                old_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                other.components.remove(newp)
+                cat_id = newp.category.id if newp.category else None
+                oldp = old_by_cat.get(cat_id)
+                if oldp and oldp != newp:
+                    other.components.append(oldp)
+                new_other = [f"{p.brand} ({p.category.name})" for p in other.components]
+                if old_other != new_other:
+                    log_history(
+                        event_type='composite_change',
+                        entity_type='composite',
+                        entity_id=other.id,
+                        summary=f"Swap de composant via {comp.name}",
+                        details={'before': old_other, 'after': new_other},
+                    )
+                break
+    comp.components.clear()
+    for prod in new_products:
+        comp.components.append(prod)
+
+
 def log_history(event_type, entity_type, entity_id, summary, details=None):
     event = HistoryEvent(
         event_type=event_type,
@@ -1238,6 +1399,42 @@ def natural_sort_key(s):
     import re
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s or '')]
 
+def _first_int_from_text(val):
+    """Premier entier dans une chaîne (ex. taille poignée/branche)."""
+    if val is None:
+        return None
+    m = re.search(r'-?\d+', str(val).strip())
+    return int(m.group(0)) if m else None
+
+def _product_size_display(product):
+    """Chaîne taille + unité catégorie pour un produit."""
+    if not product:
+        return None
+    raw = product.size
+    if not raw and product.custom_values:
+        raw = product.custom_values.get('size')
+    if not raw:
+        return None
+    cat = product.category
+    u = ''
+    if cat and cat.field_units and cat.field_units.get('size'):
+        u = ' ' + str(cat.field_units.get('size'))
+    return f"{raw}{u}"
+
+def _product_power_display(product):
+    if not product:
+        return None
+    raw = product.power
+    if not raw and product.custom_values:
+        raw = product.custom_values.get('power')
+    if not raw:
+        return None
+    cat = product.category
+    u = ''
+    if cat and cat.field_units and cat.field_units.get('power'):
+        u = ' ' + str(cat.field_units.get('power'))
+    return f"{raw}{u}"
+
 @app.route('/composites')
 @login_required
 def composites():
@@ -1254,28 +1451,28 @@ def composites():
     elif sort_by == 'name':
         comps = sorted(comps, key=lambda x: natural_sort_key(x.name))
     
-    # build summaries for each composite: handle (poignée), branch (branche) and assignment status
+    # Résumé par arc : poignée, branche, puissance (branche), taille AMO = branche + poignée - 25
     summaries = {}
     for comp in comps:
         handle = None
         branch = None
-        # find components by category keywords
+        handle_prod = None
+        branch_prod = None
         for p in comp.components:
             cname = (p.category.name or '').lower()
             if 'poign' in cname or 'handle' in cname:
-                # prefer first matching handle
                 if not handle:
-                    # build descriptive string
                     parts = []
                     if p.size:
                         parts.append(str(p.size))
-                    # lateralite could be in custom_values under various keys
                     if p.custom_values:
-                        for k in ('latéralité','lateralite','side','hand','lat'):
+                        for k in ('latéralité', 'lateralite', 'side', 'hand', 'lat'):
                             if k in p.custom_values:
                                 parts.append(str(p.custom_values[k]))
                                 break
                     handle = ' '.join(parts) if parts else p.brand or ''
+                if handle_prod is None:
+                    handle_prod = p
             if 'branche' in cname or 'branch' in cname or 'limb' in cname:
                 if not branch:
                     parts = []
@@ -1285,14 +1482,27 @@ def composites():
                         parts.append(str(p.size))
                     if p.power:
                         parts.append(str(p.power))
-                    # also check custom values for power/size
                     if p.custom_values and not parts:
                         if 'size' in p.custom_values:
                             parts.append(str(p.custom_values['size']))
                         if 'power' in p.custom_values:
                             parts.append(str(p.custom_values['power']))
                     branch = ' '.join(parts) if parts else p.brand or ''
-        # assignment: check for active assignment
+                if branch_prod is None:
+                    branch_prod = p
+        handle_num = None
+        branch_num = None
+        if handle_prod:
+            handle_num = _first_int_from_text(handle_prod.size)
+            if handle_num is None and handle_prod.custom_values:
+                handle_num = _first_int_from_text(handle_prod.custom_values.get('size'))
+        if branch_prod:
+            branch_num = _first_int_from_text(branch_prod.size)
+            if branch_num is None and branch_prod.custom_values:
+                branch_num = _first_int_from_text(branch_prod.custom_values.get('size'))
+        taille = None
+        if handle_num is not None and branch_num is not None:
+            taille = branch_num + handle_num - 25
         assigned = None
         for a in comp.assignments:
             if not a.date_returned:
@@ -1301,7 +1511,11 @@ def composites():
         summaries[comp.id] = {
             'handle': handle,
             'branch': branch,
-            'assigned_to': assigned
+            'handle_size_display': _product_size_display(handle_prod),
+            'branch_size_display': _product_size_display(branch_prod),
+            'power_display': _product_power_display(branch_prod),
+            'taille': taille,
+            'assigned_to': assigned,
         }
     return render_template('composites.html', composites=comps, composite_summaries=summaries, current_sort=sort_by)
 
@@ -2896,6 +3110,231 @@ def import_archers():
                                      error=f"Erreur lors de la lecture du fichier: {str(e)}")
     
     return render_template('import_archers.html')
+
+
+@app.route('/import_composites', methods=['GET', 'POST'])
+@login_required
+@require_permission('edit')
+def import_composites():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            return redirect(request.url)
+        if file and file.filename.endswith('.csv'):
+            try:
+                raw = file.stream.read()
+                content = _decode_csv_bytes(raw)
+                delim = _detect_csv_delimiter(content)
+                lines = content.splitlines()
+                if not lines:
+                    return render_template(
+                        'import_composites.html',
+                        error='Le fichier CSV est vide ou mal formaté',
+                    )
+                header_reader = csv.reader(StringIO(lines[0]), delimiter=delim, quotechar='"')
+                try:
+                    header_cells = next(header_reader)
+                except StopIteration:
+                    return render_template(
+                        'import_composites.html',
+                        error='Le fichier CSV est vide ou mal formaté',
+                    )
+                fieldnames = _make_unique_csv_fieldnames(header_cells)
+                body = '\n'.join(lines[1:])
+                stream = StringIO(body, newline=None)
+                csv_reader = csv.DictReader(
+                    stream, fieldnames=fieldnames, delimiter=delim, quotechar='"'
+                )
+
+                def normalize_header_for_match(s):
+                    if s is None:
+                        return ''
+                    t = str(s).strip().strip('"')
+                    if t.startswith('\ufeff'):
+                        t = t[1:].lstrip()
+                    t = unicodedata.normalize('NFD', t)
+                    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+                    t = ' '.join(t.lower().split())
+                    return t.strip(' :')
+
+                norm_to_field = {}
+                for f in fieldnames:
+                    if f:
+                        n = normalize_header_for_match(f)
+                        norm_to_field.setdefault(n, f)
+
+                def cell_value(row_dict, field_name):
+                    v = row_dict.get(field_name, '')
+                    if v is None:
+                        return ''
+                    return v.strip() if isinstance(v, str) else str(v).strip()
+
+                def find_column(row_dict, *possible_names):
+                    for name in possible_names:
+                        n = normalize_header_for_match(name)
+                        if n in norm_to_field:
+                            return cell_value(row_dict, norm_to_field[n])
+                        for key in row_dict:
+                            if normalize_header_for_match(key) == n:
+                                return cell_value(row_dict, key)
+                    return ''
+
+                imported = 0
+                errors = []
+                notices = []
+                missing_export_arc_ids = 0
+
+                for row_num, row in enumerate(csv_reader, start=2):
+                    try:
+                        if not any(cell_value(row, k).strip() for k in row if k is not None):
+                            continue
+
+                        id_raw = find_column(row, 'ID', 'Id').strip()
+                        name = find_column(row, 'Nom', 'Name', 'Référence', 'Reference').strip()
+                        type_raw = find_column(row, 'Type')
+                        status_raw = find_column(row, 'Statut', 'Status')
+                        comp_cell = find_column(row, 'Composants', 'Components', 'Pieces', 'Pièces')
+
+                        if not name:
+                            errors.append(
+                                f"Ligne {row_num}: le nom de l'arc est obligatoire "
+                                f"(reçu: « {name} »)"
+                            )
+                            continue
+
+                        ctype = _normalize_composite_type_import(type_raw)
+                        status = _normalize_composite_status_import(status_raw)
+
+                        pairs = _split_composite_csv_component_cell(comp_cell)
+
+                        cid = None
+                        if id_raw:
+                            try:
+                                cid = int(id_raw)
+                            except ValueError:
+                                errors.append(f"Ligne {row_num}: ID arc invalide « {id_raw} »")
+                                continue
+                            if not CompositeProduct.query.get(cid):
+                                missing_export_arc_ids += 1
+                                cid = None
+
+                        try:
+                            with db.session.begin_nested():
+                                new_products = []
+                                seen_pid = set()
+                                for brand, cat_name in pairs:
+                                    (
+                                        prod,
+                                        created_p,
+                                        created_c,
+                                        ambiguous,
+                                    ) = _get_or_create_product_for_composite_import(
+                                        brand, cat_name
+                                    )
+                                    if not prod:
+                                        raise ValueError(
+                                            f"marque vide pour la catégorie « {cat_name} »"
+                                        )
+                                    if ambiguous:
+                                        errors.append(
+                                            f"Ligne {row_num}: plusieurs pièces pour "
+                                            f"« {brand} ({cat_name}) », utilisation du produit "
+                                            f"ID {prod.id}"
+                                        )
+                                    if created_c:
+                                        notices.append(
+                                            f"Ligne {row_num}: catégorie créée « {prod.category.name} »"
+                                        )
+                                    if created_p:
+                                        notices.append(
+                                            f"Ligne {row_num}: produit créé « {prod.brand} "
+                                            f"({prod.category.name}) »"
+                                        )
+                                    pid = prod.id
+                                    if pid not in seen_pid:
+                                        seen_pid.add(pid)
+                                        new_products.append(prod)
+
+                                if cid is not None:
+                                    comp = CompositeProduct.query.get(cid)
+                                    old_components = [
+                                        f"{p.brand} ({p.category.name})" for p in comp.components
+                                    ]
+                                    comp.name = name
+                                    comp.type = ctype
+                                    comp.status = status
+                                    _sync_composite_components_from_products(
+                                        comp, new_products, is_new=False
+                                    )
+                                    new_components = [
+                                        f"{p.brand} ({p.category.name})" for p in comp.components
+                                    ]
+                                    if old_components != new_components:
+                                        log_history(
+                                            event_type='composite_change',
+                                            entity_type='composite',
+                                            entity_id=comp.id,
+                                            summary=f"Composition modifiée (import CSV): {comp.name}",
+                                            details={
+                                                'before': old_components,
+                                                'after': new_components,
+                                            },
+                                        )
+                                else:
+                                    comp = CompositeProduct(
+                                        name=name, type=ctype, status=status
+                                    )
+                                    db.session.add(comp)
+                                    db.session.flush()
+                                    _sync_composite_components_from_products(
+                                        comp, new_products, is_new=True
+                                    )
+                                    components = [
+                                        f"{p.brand} ({p.category.name})"
+                                        for p in comp.components
+                                    ]
+                                    log_history(
+                                        event_type='composite_created',
+                                        entity_type='composite',
+                                        entity_id=comp.id,
+                                        summary=f"Arc créé (import CSV): {comp.name}",
+                                        details={
+                                            'components': components,
+                                            'type': comp.type,
+                                            'status': comp.status,
+                                        },
+                                    )
+                                imported += 1
+                        except Exception as e:
+                            errors.append(f"Ligne {row_num}: {str(e)}")
+                    except Exception as e:
+                        errors.append(f"Ligne {row_num}: {str(e)}")
+
+                db.session.commit()
+                if missing_export_arc_ids:
+                    notices.insert(
+                        0,
+                        f"{missing_export_arc_ids} ligne(s) avaient un ID d’arc absent en base "
+                        f"(export d’une autre base ou ancien) : de nouveaux arcs ont été créés, "
+                        f"les IDs du fichier ont été ignorés.",
+                    )
+                return render_template(
+                    'import_composites.html',
+                    success=True,
+                    imported=imported,
+                    errors=errors,
+                    notices=notices,
+                )
+            except Exception as e:
+                return render_template(
+                    'import_composites.html',
+                    error=f"Erreur lors de la lecture du fichier: {str(e)}",
+                )
+
+    return render_template('import_composites.html')
+
 
 # Routes d'export CSV
 @app.route('/export_products_csv')

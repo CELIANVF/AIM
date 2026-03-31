@@ -11,6 +11,7 @@
     <div class="action-group">
         {% if current_user.can_edit() %}
         <a class="btn btn-primary" href="/add_composite">➕ Nouvel arc</a>
+        <a class="btn btn-outline" href="{{ url_for('import_composites') }}">📥 Importer CSV</a>
         {% endif %}
         <a class="btn btn-outline" href="/export_composites">📄 Exporter PDF</a>
         <a class="btn btn-outline" href="/export_composites_csv">📊 Exporter CSV</a>
@@ -43,48 +44,15 @@
                 <div style="margin-bottom:8px">
                     {% set s = composite_summaries.get(c.id) if composite_summaries else None %}
                     {% if s %}
-                    <p class="small muted" style="margin:0"><strong>Résumé:</strong>
-                        {% if s.handle %} Poignée: {{ s.handle }};{% endif %}
-                        {% if s.branch %} Branche: {{ s.branch }};{% endif %}
-                        {% if s.assigned_to %} Assigné à: {{ s.assigned_to }}{% endif %}
-                    </p>
+                    <ul class="small" style="margin:8px 0 0 0;padding-left:1.1rem;line-height:1.65">
+                        {% if s.power_display %}<li><strong>Puissance:</strong> {{ s.power_display }}</li>{% endif %}
+                        {% if s.handle_size_display %}<li><strong>Taille poignée:</strong> {{ s.handle_size_display }}</li>{% endif %}
+                        {% if s.branch_size_display %}<li><strong>Taille branche:</strong> {{ s.branch_size_display }}</li>{% endif %}
+                        {% if s.taille is not none %}<li><strong>Taille:</strong> {{ s.taille }}</li>{% endif %}
+                        {% if s.assigned_to %}<li class="muted"><strong>Assigné à:</strong> {{ s.assigned_to }}</li>{% endif %}
+                    </ul>
                     {% endif %}
                 </div>
-                {% if c.components %}
-                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
-                    <p class="small muted" style="margin:0 0 6px 0"><strong>Composants:</strong></p>
-                    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
-                    {% for comp in c.components %}
-                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-                            <div style="flex:1">
-                                <div style="font-weight:600"><a href="/edit_product/{{ comp.id }}" target="_blank" rel="noopener">{{ comp.brand }}{% if comp.model %} {{ comp.model }}{% endif %}</a></div>
-                                <div class="small muted">{{ comp.category.name }}</div>
-                                <div class="small" style="margin-top:6px">
-                                    {% if comp.size %}
-                                        Taille: {{ comp.size }}{% if comp.category and comp.category.field_units and comp.category.field_units.get('size') %} {{ comp.category.field_units.get('size') }}{% endif %}
-                                    {% endif %}
-                                    {% if comp.power %}
-                                        &nbsp; Puissance: {{ comp.power }}{% if comp.category and comp.category.field_units and comp.category.field_units.get('power') %} {{ comp.category.field_units.get('power') }}{% endif %}
-                                    {% endif %}
-                                </div>
-                                <div class="small muted" style="margin-top:6px">État: {% if comp.state == 'stock' %}Disponible{% elif comp.state == 'loan' %}En prêt{% elif comp.state == 'broken' %}Cassé{% else %}{{ comp.state }}{% endif %} • Localisation: {% if comp.location == 'club' %}Au club{% elif comp.location == 'loan' %}En prêt{% else %}{{ comp.location }}{% endif %}</div>
-                                {% if comp.comments %}
-                                <div class="small" style="margin-top:6px">💬 {{ comp.comments }}</div>
-                                {% endif %}
-                                {% if comp.custom_values %}
-                                <div class="small muted" style="margin-top:6px">
-                                    {% for k, v in comp.custom_values.items() %}
-                                        <div>{{ k }}: {{ v }}</div>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                            </div>
-                        
-                        </div>
-                    {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
             </div>
             <div style="padding-top:8px;border-top:1px solid var(--border-light)">
                 {% if current_user.can_edit() %}
