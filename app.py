@@ -972,9 +972,13 @@ _IMPORT_LICENSE_RE = re.compile(r'^[0-9]{5,}[A-Za-z0-9-]*$')
 
 def _split_nom_prenom_combined_cell(cell: str):
     """
-    Colonne unique type « Nom, Prénom » (civilité M / Me / Mme en tête).
-    3+ mots : tout sauf le dernier = nom de famille, dernier = prénom.
-    2 mots seuls : ambigu (NOM Prénom vs Prénom NOM) → tout est mis dans le nom (à corriger à la fiche si besoin).
+    Découpe une cellule « nom + prénom » (export FFTA / club).
+
+    - Civilités M / Me / Mme / Mr en tête retirées.
+    - Forme « NOM, Prénom » (virgule) : coupure sur la première virgule.
+    - 3+ mots séparés par espaces : tout sauf le dernier = nom, dernier = prénom
+      (ex. VAN DER BERG Jean).
+    - 2 mots : ordre FFTA habituel **NOM puis Prénom** (ex. BENZ LOUIS, ANTOINE THOMAS).
     """
     s = (cell or '').strip()
     if not s:
@@ -983,7 +987,13 @@ def _split_nom_prenom_combined_cell(cell: str):
     for prefix in ('mme ', 'mlle ', 'me ', 'mr ', 'm '):
         if lower.startswith(prefix):
             s = s[len(prefix):].strip()
+            lower = s.lower()
             break
+    if ',' in s:
+        left, _, right = s.partition(',')
+        left, right = left.strip(), right.strip()
+        if left and right:
+            return left, right
     parts = s.split()
     if not parts:
         return '', ''
@@ -991,12 +1001,6 @@ def _split_nom_prenom_combined_cell(cell: str):
         return parts[0], ''
     if len(parts) == 2:
         a, b = parts[0], parts[1]
-        if '-' in a:
-            return a, b
-        # Deux mots de longueur proche : souvent « Prénom NOM » (ex. ANTOINE THOMAS) → tout dans le nom
-        if abs(len(a) - len(b)) <= 2 and min(len(a), len(b)) >= 5:
-            return f'{a} {b}', ''
-        # Sinon : NOM puis prénom (ex. BENZ LOUIS)
         return a, b
     return ' '.join(parts[:-1]), parts[-1]
 
@@ -3152,6 +3156,13 @@ def import_archers():
                                     last_name = ln
                                 if fn:
                                     first_name = fn
+
+                        # Colonne « Nom » seule contenant « NOM Prénom » (sans colonne prénom)
+                        if not (first_name or '').strip() and (last_name or '').strip():
+                            ln_fix, fn_fix = _split_nom_prenom_combined_cell(last_name)
+                            if fn_fix:
+                                last_name = ln_fix
+                                first_name = fn_fix
 
                         dob_str = find_column(
                             row,
