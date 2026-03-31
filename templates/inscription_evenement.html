@@ -1,0 +1,421 @@
+{% extends "layout.html" %}
+
+{% block title %}Inscription événement{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>📧 Inscription événement</h1>
+        <p class="muted">Créez un événement, enregistrez les archers concernés, puis générez le texte du mail ou le PDF (format courrier type organisateur).</p>
+    </div>
+</div>
+
+{% if not events %}
+<section class="form-card" style="margin-bottom:20px">
+    <h3 style="margin-top:0">Premier pas</h3>
+    <p class="muted small">Aucun événement pour l’instant. Créez-en un pour pouvoir y associer des archers.</p>
+    <form method="post" class="form-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px;margin-top:12px">
+        <div class="form-group" style="flex:1;min-width:200px">
+            <label for="new_event_title">Titre de l’événement</label>
+            <input type="text" id="new_event_title" name="new_event_title" placeholder="ex. Départ dimanche, Concours de…">
+        </div>
+        <button type="submit" name="action" value="create_event" class="btn btn-primary">Créer l’événement</button>
+    </form>
+</section>
+{% else %}
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:20px">
+    <form method="get" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label for="sel_event" class="muted" style="font-size:14px">Événement</label>
+        <select id="sel_event" name="event_id" onchange="this.form.submit()" style="min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">
+            {% for ev in events %}
+            <option value="{{ ev.id }}" {% if current_event and ev.id == current_event.id %}selected{% endif %}>{{ ev.title }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    {% if current_event %}
+    <form method="post" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap" onsubmit="return confirm('Supprimer cet événement et toutes les inscriptions associées ?');">
+        <input type="hidden" name="event_id" value="{{ current_event.id }}">
+        <button type="submit" name="action" value="delete_event" class="btn btn-outline">Supprimer</button>
+    </form>
+    {% endif %}
+    <form method="post" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+        <input type="text" name="new_event_title" placeholder="Nouvel événement…" style="min-width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">
+        <button type="submit" name="action" value="create_event" class="btn btn-outline">+ Créer</button>
+    </form>
+</div>
+{% endif %}
+
+{% if current_event %}
+<form method="post" class="form-card" id="form-inscription">
+    <input type="hidden" name="event_id" value="{{ current_event.id }}">
+
+    <h3 style="margin-top:0">Détails du mail / PDF</h3>
+    <div class="form-group">
+        <label for="title">Titre (interne)</label>
+        <input type="text" id="title" name="title" value="{{ form_values.title }}" placeholder="Référence dans la liste">
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label for="recipient_name">Destinataire (prénom ou prénom nom)</label>
+            <input type="text" id="recipient_name" name="recipient_name" placeholder="ex. Jean-Marie" value="{{ form_values.recipient_name }}">
+        </div>
+        <div class="form-group">
+            <label for="depart_phrase">Départ (phrase après « pour le départ de »)</label>
+            <input type="text" id="depart_phrase" name="depart_phrase" placeholder="ex. dimanche 4 13h45" value="{{ form_values.depart_phrase }}">
+        </div>
+        <div class="form-group">
+            <label for="lieu">Lieu (optionnel)</label>
+            <input type="text" id="lieu" name="lieu" placeholder="ex. Salle Jean Moulin" value="{{ form_values.lieu }}">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="blasons_line">Blasons et distances</label>
+        <textarea id="blasons_line" name="blasons_line" rows="3" style="width:100%;font-family:inherit;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">{{ form_values.blasons_line }}</textarea>
+    </div>
+
+    <div style="margin-top:8px;margin-bottom:20px">
+        <button type="submit" name="action" value="save_event" class="btn btn-primary">Enregistrer l’événement et les archers</button>
+    </div>
+
+    <h3>Archers inscrits à cet envoi</h3>
+    <p class="small muted" style="margin-bottom:12px">Pour chaque archer : discipline, catégorie d’âge (fiche par défaut), arme, puis une colonne qui combine <strong>blason ou piquet</strong> selon la discipline et <strong>la distance</strong> seulement quand elle existe (pas pour parcours 3D, tir nature ou campagne). Défauts : salle, extérieur DI/DN, Beursault, Campagne (piquets — hors arc chasse / poulies sans viseur). Cas particuliers : DI — CO U11–U15 hors tableau ; DN — BB U13 hors tableau ; Campagne — arc nu interdit en U13.</p>
+
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card)">
+        <table class="data-table inscription-table" style="width:100%;border-collapse:collapse;font-size:13px;min-width:880px">
+            <thead>
+                <tr style="background:var(--bg-alt);text-align:left">
+                    <th style="padding:8px 10px;width:36px"></th>
+                    <th style="padding:8px 10px">Nom</th>
+                    <th style="padding:8px 10px">Lic.</th>
+                    <th style="padding:8px 10px;min-width:150px">Discipline</th>
+                    <th style="padding:8px 10px;min-width:120px">Cat. âge</th>
+                    <th style="padding:8px 10px;min-width:130px">Arme</th>
+                    <th style="padding:8px 10px;min-width:200px" class="insc-th-blason-pike">Blason / piquet / distance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in archers %}
+                {% set ex = registration_extras.get(a.id, {}) %}
+                {% set dm = inscription_discipline_modes.get(ex.get('discipline', 'salle'), 'distance') %}
+                <tr class="inscription-archer-row" data-archer-id="{{ a.id }}" data-fiche-cat-key="{{ inscription_archer_cat_keys.get(a.id, '') }}" data-fiche-cat-key-di="{{ inscription_archer_cat_keys_di.get(a.id, '') }}" data-bow-type="{{ a.bow_type or '' }}" style="border-top:1px solid var(--border-light)">
+                    <td style="padding:6px 10px;vertical-align:middle">
+                        <input type="checkbox" name="archer_id" value="{{ a.id }}" id="arch_{{ a.id }}" {% if a.id in selected_ids %}checked{% endif %}>
+                    </td>
+                    <td style="padding:6px 10px;vertical-align:middle">
+                        <label for="arch_{{ a.id }}" style="cursor:pointer;font-weight:500">{{ a.name }}</label>
+                        {% if a.categorie %}<div class="muted small" style="font-size:11px">Fiche : {{ a.categorie }}</div>{% endif %}
+                    </td>
+                    <td style="padding:6px 10px;vertical-align:middle" class="muted">{{ a.license_number or '—' }}</td>
+                    <td style="padding:6px 10px;vertical-align:top">
+                        <select name="discipline_{{ a.id }}" class="insc-discipline" data-archer="{{ a.id }}" style="width:100%;max-width:200px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px">
+                            {% for code, label, _m in inscription_disciplines %}
+                            <option value="{{ code }}" {% if ex.get('discipline', 'salle') == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td style="padding:6px 10px;vertical-align:top">
+                        <select name="age_category_{{ a.id }}" class="insc-age-cat" data-archer="{{ a.id }}" style="width:100%;max-width:140px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px">
+                            {% for val, label in inscription_age_choices %}
+                            <option value="{{ val }}" {% if ex.get('age_category', '__fiche__') == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="age_custom_{{ a.id }}" class="insc-age-custom" placeholder="Préciser…" value="{{ ex.get('age_custom', '') }}" style="width:100%;max-width:140px;margin-top:4px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px;display:{% if ex.get('age_category') == '__custom__' %}block{% else %}none{% endif %}">
+                    </td>
+                    <td style="padding:6px 10px;vertical-align:top">
+                        <select name="weapon_{{ a.id }}" class="insc-weapon" style="width:100%;max-width:150px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px">
+                            {% set wsel = weapon_saved.get(a.id, '__fiche__') %}
+                            {% for val, label in weapon_choices %}
+                            <option value="{{ val }}" {% if wsel == val %}selected{% endif %}>{{ label }}{% if val == '__fiche__' and a.bow_type %} ({{ a.bow_type }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td style="padding:6px 10px;vertical-align:top" class="insc-td-blason-pike">
+                        <div class="insc-blason-pike-label muted" style="font-size:11px;margin-bottom:6px;font-weight:600">{% if dm == 'pike' %}Piquet{% elif dm == 'both' %}Blason et piquet{% else %}Blason{% endif %}</div>
+                        <div class="insc-wrap-blason" style="display:{% if dm == 'distance' or dm == 'both' %}block{% else %}none{% endif %}">
+                            <select name="blason_{{ a.id }}" class="insc-blason-sel" data-archer="{{ a.id }}" style="width:100%;max-width:130px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px">
+                                {% for val, label in inscription_blason_choices %}
+                                <option value="{{ val }}" {% if ex.get('blason', '') == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="blason_custom_{{ a.id }}" class="insc-blason-custom" placeholder="Préciser blason…" value="{{ ex.get('blason_custom', '') }}" style="width:100%;max-width:130px;margin-top:4px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px;display:{% if ex.get('blason') == '__custom__' %}block{% else %}none{% endif %}">
+                        </div>
+                        <div class="insc-wrap-pike" style="display:{% if dm == 'pike' or dm == 'both' %}block{% else %}none{% endif %}">
+                            <select name="pike_{{ a.id }}" class="insc-pike-sel" style="width:100%;max-width:130px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px">
+                                {% for val, label in inscription_pike_choices %}
+                                <option value="{{ val }}" {% if ex.get('pike', '') == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="pike_custom_{{ a.id }}" class="insc-pike-custom" placeholder="ex. Piquet / pique…" value="{{ ex.get('pike_custom', '') }}" style="width:100%;max-width:130px;margin-top:4px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px;display:{% if ex.get('pike') == '__custom__' %}block{% else %}none{% endif %}">
+                        </div>
+                        <div class="insc-wrap-distance" style="display:{% if dm == 'distance' or dm == 'both' %}block{% else %}none{% endif %}">
+                            <div class="insc-distance-label muted" style="font-size:11px;margin-top:8px;margin-bottom:6px;font-weight:600">Distance</div>
+                            <select name="distance_{{ a.id }}" class="insc-distance-sel" style="width:100%;max-width:100px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px">
+                                {% for val, label in inscription_distance_choices %}
+                                <option value="{{ val }}" {% if ex.get('distance', '') == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="distance_custom_{{ a.id }}" class="insc-distance-custom" placeholder="ex. 33 m" value="{{ ex.get('distance_custom', '') }}" style="width:100%;max-width:100px;margin-top:4px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px;display:{% if ex.get('distance') == '__custom__' %}block{% else %}none{% endif %}">
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="padding:24px;text-align:center" class="muted">Aucun archer en base. Ajoutez-en depuis la liste des archers.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <button type="submit" name="action" value="texte" class="btn btn-primary">Générer le texte</button>
+        <button type="submit" name="action" value="pdf" class="btn btn-outline" formaction="{{ url_for('inscription_evenement_pdf') }}">Télécharger PDF</button>
+    </div>
+</form>
+{% elif events %}
+{# should not happen #}
+{% endif %}
+
+{% if generated_text is not none %}
+<section class="form-card" style="margin-top:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+        <h3 style="margin:0">Texte pour le mail</h3>
+        <button type="button" class="btn btn-primary" id="btn-copy-inscription">Copier</button>
+    </div>
+    <textarea id="inscription-output" readonly rows="16" style="width:100%;min-height:220px;font-family:ui-monospace,monospace;font-size:13px;line-height:1.5;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt)">{{ generated_text }}</textarea>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if current_event %}
+<script>
+(function(){
+  var modes = {{ inscription_discipline_modes | tojson }};
+  var targetsByDisc = {{ inscription_cat_weapon_targets | tojson }};
+  var campagnePiques = {{ inscription_campagne_piquets | tojson }};
+  var AGE_VALUE_TO_CAT_SALLE = {
+    'U11': 'U11', 'U13': 'U13', 'U15': 'U15', 'U18': 'U18', 'U21': 'U21_SPLUS',
+    'S1': 'U21_SPLUS', 'S2': 'U21_SPLUS', 'S3': 'U21_SPLUS',
+    'Senior': 'U21_SPLUS', 'Vétéran': 'U21_SPLUS'
+  };
+  var AGE_VALUE_TO_CAT_OUTDOOR = {
+    'U11': 'U11', 'U13': 'U13', 'U15': 'U15', 'U18': 'U18',
+    'U21': 'U21_S12', 'S1': 'U21_S12', 'S2': 'U21_S12', 'S3': 'S3',
+    'Senior': 'U21_S12', 'Vétéran': 'U21_S12'
+  };
+  function normCatFromTextSalle(s) {
+    if (!s) return '';
+    var t = String(s).toUpperCase().replace(/É/g, 'E').replace(/\s+/g, '');
+    if (/\bU21\b/.test(s) || t === 'U21') return 'U21_SPLUS';
+    if (/\bU18\b/.test(s) || t === 'U18') return 'U18';
+    if (/\bU15\b/.test(s) || t === 'U15') return 'U15';
+    if (/\bU13\b/.test(s) || t === 'U13') return 'U13';
+    if (/\bU11\b/.test(s) || t === 'U11') return 'U11';
+    if (/^S[123]$/.test(String(s).trim())) return 'U21_SPLUS';
+    if (/SENIOR|SNR/.test(t) && /[123]/.test(t)) return 'U21_SPLUS';
+    return '';
+  }
+  function normCatFromTextOutdoor(s) {
+    if (!s) return '';
+    var t = String(s).toUpperCase().replace(/É/g, 'E');
+    var tn = t.replace(/\s+/g, '');
+    if (/SENIOR\s*3|SNR\s*3/.test(t) || tn === 'S3' || /SENIOR3/.test(tn)) return 'S3';
+    if (/\bU18\b/.test(s) || tn === 'U18') return 'U18';
+    if (/\bU15\b/.test(s) || tn === 'U15') return 'U15';
+    if (/\bU13\b/.test(s) || tn === 'U13') return 'U13';
+    if (/\bU11\b/.test(s) || tn === 'U11') return 'U11';
+    if (/\bU21\b/.test(s) || tn === 'U21') return 'U21_S12';
+    if (/SENIOR\s*1|SNR\s*1/.test(t) || /^S1$/.test(String(s).trim())) return 'U21_S12';
+    if (/SENIOR\s*2|SNR\s*2/.test(t) || /^S2$/.test(String(s).trim())) return 'U21_S12';
+    return '';
+  }
+  function weaponGroup(selVal, bowType) {
+    if (selVal === '__fiche__') {
+      var bt = (bowType || '').toLowerCase();
+      if (bt.indexOf('compound') !== -1 || bt.indexOf('poulie') !== -1) return 'CO';
+      if (bt.indexOf('longbow') !== -1 || bt.indexOf('arc droit') !== -1 || bt.trim() === 'ld') return 'LD';
+      if (bt.indexOf('bare') !== -1 || bt.trim() === 'bb') return 'BB';
+      return 'CL';
+    }
+    if (selVal === 'Compound') return 'CO';
+    if (selVal === 'Longbow' || selVal === 'LD') return 'LD';
+    if (selVal === 'BB' || selVal === 'Barebow') return 'BB';
+    if (selVal === 'CL' || selVal === 'Classique') return 'CL';
+    return 'CL';
+  }
+  function resolveCatKey(row, disc) {
+    var age = row.querySelector('.insc-age-cat');
+    var custom = row.querySelector('.insc-age-custom');
+    if (!age) return '';
+    var v = age.value;
+    if (disc === 'exterieur_di' || disc === 'exterieur_dn') {
+      if (AGE_VALUE_TO_CAT_OUTDOOR[v]) return AGE_VALUE_TO_CAT_OUTDOOR[v];
+      if (v === '__fiche__') return row.getAttribute('data-fiche-cat-key-di') || '';
+      if (v === '__custom__' && custom && custom.value) return normCatFromTextOutdoor(custom.value);
+      return '';
+    }
+    if (AGE_VALUE_TO_CAT_SALLE[v]) return AGE_VALUE_TO_CAT_SALLE[v];
+    if (v === '__fiche__') return row.getAttribute('data-fiche-cat-key') || '';
+    if (v === '__custom__' && custom && custom.value) return normCatFromTextSalle(custom.value);
+    return '';
+  }
+  function applyCatWeaponDefaults(row) {
+    if (!row) return;
+    var dselDisc = row.querySelector('.insc-discipline');
+    var disc = dselDisc ? dselDisc.value : 'salle';
+    var cat = resolveCatKey(row, disc);
+    var wsel = row.querySelector('.insc-weapon');
+    var bow = row.getAttribute('data-bow-type') || '';
+    var g = weaponGroup(wsel ? wsel.value : '__fiche__', bow);
+    var dsel = row.querySelector('.insc-distance-sel');
+    var dcu = row.querySelector('.insc-distance-custom');
+    var bsel = row.querySelector('.insc-blason-sel');
+    var bcu = row.querySelector('.insc-blason-custom');
+    var psel = row.querySelector('.insc-pike-sel');
+    var pc = row.querySelector('.insc-pike-custom');
+
+    if (disc === 'campagne') {
+      if (!campagnePiques || cat === 'U11') return;
+      if (!cat || !campagnePiques[cat]) return;
+      var cArr = campagnePiques[cat][g];
+      if (!cArr && g === 'LD' && campagnePiques[cat].CL) cArr = campagnePiques[cat].CL;
+      if (cArr === null) {
+        if (psel) { psel.value = ''; if (pc) pc.value = ''; }
+        if (dsel) { dsel.value = ''; if (dcu) dcu.value = ''; }
+        if (bsel) { bsel.value = ''; if (bcu) bcu.value = ''; }
+      } else if (cArr && cArr.length) {
+        if (psel) { psel.value = cArr[0] || ''; if (pc) pc.value = ''; }
+        if (dsel) { dsel.value = ''; if (dcu) dcu.value = ''; }
+        if (bsel) { bsel.value = ''; if (bcu) bcu.value = ''; }
+      } else {
+        return;
+      }
+      if (psel && pc) toggleCustom(psel, pc);
+      if (dsel && dcu) toggleCustom(dsel, dcu);
+      if (bsel && bcu) toggleCustom(bsel, bcu);
+      return;
+    }
+
+    if (!targetsByDisc) return;
+    var targets = targetsByDisc[disc] || targetsByDisc.salle;
+    if (!targets) return;
+    if (!cat || !targets[cat]) return;
+    if (psel && ['salle', 'exterieur_di', 'exterieur_dn', 'beursault'].indexOf(disc) >= 0) {
+      psel.value = '';
+      if (pc) pc.value = '';
+      if (pc) toggleCustom(psel, pc);
+    }
+    var arr = targets[cat][g];
+    if (!arr && g === 'LD' && targets[cat].CL) arr = targets[cat].CL;
+    if (arr === null) {
+      if (dsel) { dsel.value = ''; if (dcu) dcu.value = ''; }
+      if (bsel) { bsel.value = ''; if (bcu) bcu.value = ''; }
+      if (dsel && dcu) toggleCustom(dsel, dcu);
+      if (bsel && bcu) toggleCustom(bsel, bcu);
+      return;
+    }
+    if (!arr || !arr.length) return;
+    if (dsel) {
+      dsel.value = arr[0] || '';
+      if (dcu) dcu.value = '';
+    }
+    if (bsel && bcu) {
+      if (arr.length >= 2) {
+        bsel.value = arr[1] || '';
+        bcu.value = (arr.length >= 3 && arr[1] === '__custom__') ? (arr[2] || '') : '';
+      }
+    }
+    if (dsel && dcu) toggleCustom(dsel, dcu);
+    if (bsel && bcu) toggleCustom(bsel, bcu);
+  }
+  function rowMode(row) {
+    var sel = row.querySelector('.insc-discipline');
+    return (sel && modes[sel.value]) || 'both';
+  }
+  function updateRow(row) {
+    var m = rowMode(row);
+    var wrapB = row.querySelector('.insc-wrap-blason');
+    var wrapP = row.querySelector('.insc-wrap-pike');
+    var wrapDist = row.querySelector('.insc-wrap-distance');
+    var lbl = row.querySelector('.insc-blason-pike-label');
+    function dim(el, on) {
+      if (!el) return;
+      el.style.opacity = on ? '1' : '0.42';
+    }
+    var showB = m === 'distance' || m === 'both';
+    var showP = m === 'pike' || m === 'both';
+    var showDist = m === 'distance' || m === 'both';
+    if (wrapB) {
+      wrapB.style.display = showB ? 'block' : 'none';
+      dim(wrapB, showB);
+    }
+    if (wrapP) {
+      wrapP.style.display = showP ? 'block' : 'none';
+      dim(wrapP, showP);
+    }
+    if (wrapDist) {
+      wrapDist.style.display = showDist ? 'block' : 'none';
+      dim(wrapDist, showDist);
+    }
+    if (lbl) {
+      if (m === 'pike') lbl.textContent = 'Piquet';
+      else if (m === 'distance') lbl.textContent = 'Blason';
+      else lbl.textContent = 'Blason et piquet';
+    }
+  }
+  function toggleCustom(select, customEl) {
+    if (!select || !customEl) return;
+    customEl.style.display = select.value === '__custom__' ? 'block' : 'none';
+  }
+  document.querySelectorAll('.inscription-archer-row').forEach(function(row){
+    var disc = row.querySelector('.insc-discipline');
+    if (disc) disc.addEventListener('change', function(){ updateRow(row); applyCatWeaponDefaults(row); });
+    var age = row.querySelector('.insc-age-cat');
+    var ageC = row.querySelector('.insc-age-custom');
+    if (age && ageC) {
+      age.addEventListener('change', function(){ toggleCustom(age, ageC); applyCatWeaponDefaults(row); });
+      ageC.addEventListener('input', function(){ applyCatWeaponDefaults(row); });
+    }
+    var wpn = row.querySelector('.insc-weapon');
+    if (wpn) wpn.addEventListener('change', function(){ applyCatWeaponDefaults(row); });
+    var bls = row.querySelector('.insc-blason-sel');
+    var blc = row.querySelector('.insc-blason-custom');
+    if (bls && blc) bls.addEventListener('change', function(){ toggleCustom(bls, blc); });
+    var dsel = row.querySelector('.insc-distance-sel');
+    var dc = row.querySelector('.insc-distance-custom');
+    if (dsel && dc) dsel.addEventListener('change', function(){ toggleCustom(dsel, dc); });
+    var psel = row.querySelector('.insc-pike-sel');
+    var pc = row.querySelector('.insc-pike-custom');
+    if (psel && pc) psel.addEventListener('change', function(){ toggleCustom(psel, pc); });
+    updateRow(row);
+    toggleCustom(age, ageC);
+    toggleCustom(bls, blc);
+    toggleCustom(dsel, dc);
+    toggleCustom(psel, pc);
+  });
+})();
+</script>
+{% endif %}
+{% if generated_text is not none %}
+<script>
+(function(){
+    var btn = document.getElementById('btn-copy-inscription');
+    var ta = document.getElementById('inscription-output');
+    if (!btn || !ta) return;
+    btn.addEventListener('click', function(){
+        ta.select();
+        ta.setSelectionRange(0, 99999);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(ta.value).then(function(){
+                btn.textContent = 'Copié !';
+                setTimeout(function(){ btn.textContent = 'Copier'; }, 2000);
+            });
+        } else {
+            document.execCommand('copy');
+            btn.textContent = 'Copié !';
+            setTimeout(function(){ btn.textContent = 'Copier'; }, 2000);
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

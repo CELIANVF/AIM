@@ -31,7 +31,8 @@
     
     <div class="card" style="padding: 24px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 24px;">
         <h2 style="margin-top: 0;">Format requis</h2>
-        <p>Le fichier CSV doit contenir les colonnes suivantes (séparées par des points-virgules):</p>
+        <p>Le fichier CSV peut être au format FFTA (Code adhérent, Nom, Prénom…) ou <strong>export club</strong> avec colonnes du type <strong>N°</strong>, <strong>Nom, Prénom</strong> (une seule colonne), <strong>Date de naissance</strong>, etc. Séparateur : point-virgule ou virgule (détection automatique). Si une même étiquette apparaît deux fois (ex. deux « Catégorie »), les deux colonnes sont conservées.</p>
+        <p>Colonnes usuelles (séparées par des points-virgules ou des virgules) :</p>
         <ul style="background-color: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto;">
             <li>Code adhérent <span style="color: red;">*</span></li>
             <li>Civilité</li>
@@ -69,7 +70,7 @@
                 required
                 style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box;"
             >
-            <small style="color: #666; display: block; margin-top: 8px;">Formats acceptés: CSV (séparé par des points-virgules)</small>
+            <small style="color: #666; display: block; margin-top: 8px;">CSV avec points-virgules. Encodage reconnu : UTF-8 (avec ou sans BOM), <strong>Windows-1252</strong> (Western European — Excel « Enregistrer sous CSV »), Latin-1, etc.</small>
         </div>
         <button type="submit" class="btn btn-primary" style="width: 100%;">📥 Importer</button>
     </form>

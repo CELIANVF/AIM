@@ -61,6 +61,7 @@
                     <li><a href="/composites" class="{% if request.path.startswith('/composites') %}active{% endif %}">🎯 Arcs</a></li>
                     {% if current_user.role != 'lecteur' %}
                     <li><a href="/archers" class="{% if request.path.startswith('/archers') %}active{% endif %}">👥 Archers</a></li>
+                    <li><a href="/inscription_evenement" class="{% if request.path.startswith('/inscription_evenement') %}active{% endif %}">📧 Inscription (mail)</a></li>
                     {% endif %}
                     <li><a href="/assignments" class="{% if request.path.startswith('/assignments') %}active{% endif %}">🔄 Assignations</a></li>
                     <li><a href="/courses" class="{% if request.path.startswith('/courses') %}active{% endif %}">📚 Cours</a></li>

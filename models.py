@@ -170,3 +170,44 @@ class Attendance(db.Model):
     notes = db.Column(db.Text)
     recorded_at = db.Column(db.DateTime, default=db.func.now())
     course = db.relationship('Course', backref='attendances')
+
+
+class InscriptionEvent(db.Model):
+    """Événement (concours, départ…) pour lequel on prépare un mail / PDF d'inscription."""
+    __tablename__ = 'inscription_event'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False, default='Événement')
+    recipient_name = db.Column(db.String(120), nullable=True)
+    depart_phrase = db.Column(db.String(500), nullable=True)
+    lieu = db.Column(db.String(200), nullable=True)
+    blasons_line = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
+
+    registrations = db.relationship(
+        'InscriptionEventRegistration',
+        back_populates='event',
+        cascade='all, delete-orphan',
+    )
+
+
+class InscriptionEventRegistration(db.Model):
+    """Archer inscrit à un événement d'inscription (discipline, catégorie, arme, blason, distance/pique)."""
+    __tablename__ = 'inscription_event_registration'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('inscription_event.id'), nullable=False)
+    archer_id = db.Column(db.Integer, db.ForeignKey('archer.id'), nullable=False)
+    weapon_choice = db.Column(db.String(80), nullable=True)
+    discipline = db.Column(db.String(40), nullable=True)
+    age_category = db.Column(db.String(80), nullable=True)
+    blason = db.Column(db.String(120), nullable=True)
+    distance_label = db.Column(db.String(60), nullable=True)
+    pike_label = db.Column(db.String(60), nullable=True)
+
+    event = db.relationship('InscriptionEvent', back_populates='registrations')
+    archer = db.relationship('Archer', backref='inscription_event_registrations')
+
+    __table_args__ = (
+        db.UniqueConstraint('event_id', 'archer_id', name='uq_inscription_event_archer'),
+    )

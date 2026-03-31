@@ -3,13 +3,699 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from config import Config
-from models import db, User, Category, Product, CompositeProduct, Archer, Assignment, HistoryEvent, Course, Attendance
+from models import (
+    db,
+    User,
+    Category,
+    Product,
+    CompositeProduct,
+    Archer,
+    Assignment,
+    HistoryEvent,
+    Course,
+    Attendance,
+    InscriptionEvent,
+    InscriptionEventRegistration,
+)
 from datetime import datetime, date, timedelta
 from sqlalchemy import func
 from dateutil import parser as date_parser
 import csv
+import re
+import unicodedata
 from io import StringIO
 from functools import wraps
+import click
+
+# Armes proposées pour les textes d'inscription (mail / PDF) — « fiche » = bow_type de l'archer
+REGISTRATION_WEAPON_CHOICES = [
+    ('__fiche__', 'Comme sur la fiche archer'),
+    ('CL', 'Classique (CL)'),
+    ('BB', 'Barebow (BB)'),
+    ('Compound', ' poulies'),
+    ('Longbow', 'Longbow'),
+    ('Autre', 'Autre'),
+]
+
+# Anciennes valeurs enregistrées (synonymes) → code canonique
+REGISTRATION_WEAPON_ALIASES = {
+    'Classique': 'CL',
+    'Barebow': 'BB',
+}
+
+REGISTRATION_WEAPON_LABELS = dict(REGISTRATION_WEAPON_CHOICES)
+
+
+def _registration_weapon_canonical(weapon_choice):
+    w = (weapon_choice or '').strip()
+    if not w:
+        w = '__fiche__'
+    if w == '__fiche__':
+        return '__fiche__'
+    return REGISTRATION_WEAPON_ALIASES.get(w, w)
+
+DEFAULT_INSCRIPTION_BLASONS_LINE = (
+    'U11 12m Ø 80cm - U13 15m Ø 80cm - U15 20m 80cm - U18 à S3 30m Ø122 cm'
+)
+
+# (code, libellé affiché, mode distance/pique pour le formulaire et le texte)
+INSCRIPTION_DISCIPLINES = [
+    ('salle', 'Tir en salle', 'distance'),
+    ('exterieur_di', 'Tir en extérieur DI', 'distance'),
+    ('exterieur_dn', 'Tir en extérieur DN', 'distance'),
+    ('nature', 'Tir nature', 'pike'),
+    ('parcours', '3D', 'pike'),
+    ('campagne', 'Campagne', 'pike'),
+    ('beursault', 'Beursault', 'distance'),
+    ('autre', 'Autre', 'both'),
+]
+DEFAULT_INSCRIPTION_DISCIPLINE = 'salle'
+
+# Anciens codes (inscriptions déjà enregistrées)
+INSCRIPTION_DISCIPLINE_ALIASES = {
+    'blason_salle': 'salle',
+    'blason_ext': 'exterieur_di',
+    'field': 'campagne',
+}
+
+
+def _inscription_discipline_canonical(code):
+    c = (code or '').strip()
+    if not c:
+        return DEFAULT_INSCRIPTION_DISCIPLINE
+    c = INSCRIPTION_DISCIPLINE_ALIASES.get(c, c)
+    valid = {x[0] for x in INSCRIPTION_DISCIPLINES}
+    return c if c in valid else DEFAULT_INSCRIPTION_DISCIPLINE
+
+INSCRIPTION_AGE_CATEGORY_CHOICES = [
+    ('__fiche__', 'Comme sur la fiche'),
+    ('U11', 'U11'),
+    ('U13', 'U13'),
+    ('U15', 'U15'),
+    ('U18', 'U18'),
+    ('U21', 'U21'),
+    ('S1', 'S1'),
+    ('S2', 'S2'),
+    ('S3', 'S3'),
+    ('__custom__', 'Autre…'),
+]
+
+# Beursault : même libellé pour toutes les catégories (aussi une entrée de liste blason).
+INSCRIPTION_BEURSAULT_BLASON_LINE = 'Blason Beursault (identique toutes catégories)'
+
+INSCRIPTION_BLASON_CHOICES = [
+    ('', '—'),
+    ('Ø 40 cm', 'Ø 40 cm (normal)'),
+    ('Trispot 40', 'Trispot 40'),
+    ('Trispot 60', 'Trispot 60'),
+    ('Ø 60 cm', 'Ø 60 cm'),
+    ('Ø 80 cm', 'Ø 80 cm'),
+    ('Ø 122 cm', 'Ø 122 cm'),
+    ('80 cm (1-X)', '80 cm (1-X)'),
+    ('80 cm (5-X)', '80 cm (5-X)'),
+    (INSCRIPTION_BEURSAULT_BLASON_LINE, INSCRIPTION_BEURSAULT_BLASON_LINE),
+]
+
+# Anciennes valeurs enregistrées → codes actuels (liste réduite)
+INSCRIPTION_BLASON_ALIASES = {
+    'Ø 40 cm ou Trispot': 'Ø 40 cm',
+    'Trispot Ø 40': 'Trispot 40',
+    'Trispot': 'Trispot 40',
+    'Trispot / 3 verticaux': 'Trispot 40',
+}
+
+
+def _inscription_blason_canonical(stored):
+    s = (stored or '').strip()
+    return INSCRIPTION_BLASON_ALIASES.get(s, s)
+
+# Distance + blason par catégorie d’âge et type d’arc (CL / CO poulies / BB)
+# Tuples : (distance, blason) avec blason ∈ INSCRIPTION_BLASON_CHOICES ; None = non régi (ex. CO U11–U15 en DI)
+# --- Tir en salle ---
+INSCRIPTION_CAT_WEAPON_TARGETS_SALLE = {
+    'U11': {
+        'CL': ('10 m', 'Ø 80 cm'),
+        'CO': ('10 m', 'Ø 80 cm'),
+        'BB': ('10 m', 'Ø 80 cm'),
+    },
+    'U13': {
+        'CL': ('18 m', 'Ø 80 cm'),
+        'CO': ('18 m', 'Ø 80 cm'),
+        'BB': ('18 m', 'Ø 80 cm'),
+    },
+    'U15': {
+        'CL': ('18 m', 'Ø 60 cm'),
+        'CO': ('18 m', 'Ø 60 cm'),
+        'BB': ('18 m', 'Ø 80 cm'),
+    },
+    'U18': {
+        'CL': ('18 m', 'Ø 40 cm'),
+        'CO': ('18 m', 'Trispot 40'),
+        'BB': ('18 m', 'Ø 40 cm'),
+    },
+    'U21_SPLUS': {
+        'CL': ('18 m', 'Ø 40 cm'),
+        'CO': ('18 m', 'Trispot 40'),
+        'BB': ('18 m', 'Ø 40 cm'),
+    },
+}
+
+# --- Tir en extérieur DI (distances internationales, tableau officiel) ---
+INSCRIPTION_CAT_WEAPON_TARGETS_EXTERIEUR_DI = {
+    'U11': {
+        'CL': ('20 m', '80 cm (1-X)'),
+        'CO': None,
+        'BB': ('20 m', '80 cm (1-X)'),
+    },
+    'U13': {
+        'CL': ('30 m', '80 cm (1-X)'),
+        'CO': None,
+        'BB': ('30 m', '80 cm (1-X)'),
+    },
+    'U15': {
+        'CL': ('40 m', '80 cm (1-X)'),
+        'CO': None,
+        'BB': ('40 m', '80 cm (1-X)'),
+    },
+    'U18': {
+        'CL': ('60 m', 'Ø 122 cm'),
+        'CO': ('50 m', '80 cm (5-X)'),
+        'BB': ('60 m', 'Ø 122 cm'),
+    },
+    'U21_S12': {
+        'CL': ('70 m', 'Ø 122 cm'),
+        'CO': ('50 m', '80 cm (5-X)'),
+        'BB': ('70 m', 'Ø 122 cm'),
+    },
+    'S3': {
+        'CL': ('60 m', 'Ø 122 cm'),
+        'CO': ('50 m', '80 cm (5-X)'),
+        'BB': ('60 m', 'Ø 122 cm'),
+    },
+}
+
+# --- Tir en extérieur DN (distances nationales, tableau n°2) ---
+INSCRIPTION_CAT_WEAPON_TARGETS_EXTERIEUR_DN = {
+    'U13': {
+        'CL': ('20 m', '80 cm (1-X)'),
+        'CO': ('30 m', '80 cm (1-X)'),
+        'BB': None,
+    },
+    'U15': {
+        'CL': ('30 m', '80 cm (1-X)'),
+        'CO': ('30 m', '80 cm (1-X)'),
+        'BB': ('30 m', '80 cm (1-X)'),
+    },
+    'U18': {
+        'CL': ('50 m', 'Ø 122 cm'),
+        'CO': ('50 m', 'Ø 122 cm'),
+        'BB': ('30 m', '80 cm (1-X)'),
+    },
+    'U21_S12': {
+        'CL': ('50 m', 'Ø 122 cm'),
+        'CO': ('50 m', 'Ø 122 cm'),
+        'BB': ('50 m', 'Ø 122 cm'),
+    },
+    'S3': {
+        'CL': ('50 m', 'Ø 122 cm'),
+        'CO': ('50 m', 'Ø 122 cm'),
+        'BB': ('50 m', 'Ø 122 cm'),
+    },
+}
+
+def _inscription_beursault_row(dist):
+    t = (dist, INSCRIPTION_BEURSAULT_BLASON_LINE)
+    return {'CL': t, 'CO': t, 'BB': t, 'LD': t}
+
+
+INSCRIPTION_CAT_WEAPON_TARGETS_BEURSAULT = {
+    'U13': _inscription_beursault_row('30 m'),
+    'U15': _inscription_beursault_row('30 m'),
+    'U18': _inscription_beursault_row('50 m'),
+    'U21_SPLUS': _inscription_beursault_row('50 m'),
+}
+
+INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE = {
+    'salle': INSCRIPTION_CAT_WEAPON_TARGETS_SALLE,
+    'exterieur_di': INSCRIPTION_CAT_WEAPON_TARGETS_EXTERIEUR_DI,
+    'exterieur_dn': INSCRIPTION_CAT_WEAPON_TARGETS_EXTERIEUR_DN,
+    'beursault': INSCRIPTION_CAT_WEAPON_TARGETS_BEURSAULT,
+}
+
+# Tir en Campagne — couleur de piquet (CL, CO, BB, arc droit ; hors arc chasse / poulies sans viseur)
+INSCRIPTION_CAMPAGNE_PIQUETS = {
+    'U13': {
+        'CL': 'Piquet blanc',
+        'CO': 'Piquet blanc',
+        'BB': None,
+        'LD': 'Piquet blanc',
+    },
+    'U15': {
+        'CL': 'Piquet blanc',
+        'CO': 'Piquet blanc',
+        'BB': 'Piquet blanc',
+        'LD': 'Piquet blanc',
+    },
+    'U18': {
+        'CL': 'Piquet bleu',
+        'CO': 'Piquet bleu',
+        'BB': 'Piquet blanc',
+        'LD': 'Piquet blanc',
+    },
+    'U21_SPLUS': {
+        'CL': 'Piquet rouge',
+        'CO': 'Piquet rouge',
+        'BB': 'Piquet bleu',
+        'LD': 'Piquet blanc',
+    },
+}
+
+# Alias rétrocompat / lectures internes
+INSCRIPTION_CAT_WEAPON_TARGETS = INSCRIPTION_CAT_WEAPON_TARGETS_SALLE
+
+INSCRIPTION_DISTANCE_CHOICES = [
+    ('', '—'),
+    ('6 m', '6 m'),
+    ('8 m', '8 m'),
+    ('10 m', '10 m'),
+    ('12 m', '12 m'),
+    ('15 m', '15 m'),
+    ('18 m', '18 m'),
+    ('20 m', '20 m'),
+    ('25 m', '25 m'),
+    ('30 m', '30 m'),
+    ('40 m', '40 m'),
+    ('50 m', '50 m'),
+    ('60 m', '60 m'),
+    ('70 m', '70 m'),
+    ('90 m', '90 m'),
+    ('__custom__', 'Autre…'),
+]
+
+INSCRIPTION_PIKE_CHOICES = [
+    ('', '—'),
+    ('Piquet blanc', 'Piquet blanc'),
+    ('Piquet bleu', 'Piquet bleu'),
+    ('Piquet rouge', 'Piquet rouge'),
+    ('__custom__', 'Autre…'),
+]
+
+
+def _inscription_weapon_group(weapon_choice, bow_type):
+    """CL / CO / BB / LD (arc droit / longbow) pour les tableaux distances-blasons."""
+    w = _registration_weapon_canonical(weapon_choice)
+    if w == '__fiche__':
+        bt = (bow_type or '').lower()
+        if 'compound' in bt or 'poulie' in bt:
+            return 'CO'
+        if 'longbow' in bt or 'arc droit' in bt or bt.strip() in ('ld', 'long bow'):
+            return 'LD'
+        if 'bare' in bt or bt.strip() == 'bb':
+            return 'BB'
+        return 'CL'
+    if w in ('Compound', 'CO'):
+        return 'CO'
+    if w in ('Longbow', 'LD'):
+        return 'LD'
+    if w == 'BB':
+        return 'BB'
+    return 'CL'
+
+
+def _normalize_inscription_category_key(raw):
+    """Associe le libellé catégorie (fiche ou saisie) à une clé du tableau U11…U21_SPLUS."""
+    if raw is None:
+        return None
+    s = str(raw).strip().upper().replace('É', 'E').replace('È', 'E')
+    if not s:
+        return None
+    s_nospace = re.sub(r'\s+', '', s)
+    if re.search(r'\bU21\b', s) or s_nospace == 'U21':
+        return 'U21_SPLUS'
+    if re.search(r'SENIOR\s*3|SNR\s*3', s) or s_nospace in ('S3', 'SENIOR3', 'SÉNIOR3'):
+        return 'U21_SPLUS'
+    if re.search(r'SENIOR\s*2|SNR\s*2', s) or s_nospace in ('S2', 'SENIOR2', 'SÉNIOR2'):
+        return 'U21_SPLUS'
+    if re.search(r'SENIOR\s*1|SNR\s*1', s) or s_nospace in ('S1', 'SENIOR1', 'SÉNIOR1'):
+        return 'U21_SPLUS'
+    if 'SENIOR' in s and re.search(r'[123]', s):
+        return 'U21_SPLUS'
+    if re.search(r'\bU18\b', s) or s_nospace == 'U18':
+        return 'U18'
+    if re.search(r'\bU15\b', s) or s_nospace == 'U15':
+        return 'U15'
+    if re.search(r'\bU13\b', s) or s_nospace == 'U13':
+        return 'U13'
+    if re.search(r'\bU11\b', s) or s_nospace == 'U11':
+        return 'U11'
+    if re.match(r'^S[123]$', s.strip()):
+        return 'U21_SPLUS'
+    return None
+
+
+def _normalize_inscription_category_key_exterieur_di(raw):
+    """
+    Clés pour tableaux extérieur DI et DN (U21 + S1/S2 ≠ S3 quand le règlement le prévoit).
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip().upper().replace('É', 'E').replace('È', 'E')
+    if not s:
+        return None
+    s_nospace = re.sub(r'\s+', '', s)
+    if re.search(r'SENIOR\s*3|SNR\s*3', s) or s_nospace in ('S3', 'SENIOR3', 'SÉNIOR3'):
+        return 'S3'
+    if re.search(r'\bU18\b', s) or s_nospace == 'U18':
+        return 'U18'
+    if re.search(r'\bU15\b', s) or s_nospace == 'U15':
+        return 'U15'
+    if re.search(r'\bU13\b', s) or s_nospace == 'U13':
+        return 'U13'
+    if re.search(r'\bU11\b', s) or s_nospace == 'U11':
+        return 'U11'
+    if re.search(r'\bU21\b', s) or s_nospace == 'U21':
+        return 'U21_S12'
+    if re.search(r'SENIOR\s*1|SNR\s*1', s) or s_nospace in ('S1', 'SENIOR1', 'SÉNIOR1'):
+        return 'U21_S12'
+    if re.search(r'SENIOR\s*2|SNR\s*2', s) or s_nospace in ('S2', 'SENIOR2', 'SÉNIOR2'):
+        return 'U21_S12'
+    if re.match(r'^S[12]$', s.strip()):
+        return 'U21_S12'
+    return None
+
+
+def _inscription_effective_category_label(archer, age_code, age_custom):
+    ac = (age_code or '').strip() or '__fiche__'
+    if ac == '__fiche__':
+        return (archer.categorie or '').strip()
+    if ac == '__custom__':
+        return (age_custom or '').strip() or (archer.categorie or '').strip()
+    return ac.strip()
+
+
+def _inscription_unpack_distance_blason_tuple(t):
+    """Tuple (dist, blason) ou (dist, '__custom__', texte) → champs formulaire."""
+    out = {
+        'distance': '',
+        'distance_custom': '',
+        'blason': '',
+        'blason_custom': '',
+    }
+    if not t:
+        return out
+    dist = t[0]
+    preset_dist = {c for c, _ in INSCRIPTION_DISTANCE_CHOICES if c not in ('', '__custom__')}
+    if dist in preset_dist:
+        out['distance'] = dist
+    else:
+        out['distance'] = '__custom__'
+        out['distance_custom'] = dist or ''
+    if len(t) == 2:
+        b = t[1]
+        bpreset = {c for c, _ in INSCRIPTION_BLASON_CHOICES if c not in ('', '__custom__')}
+        if b in bpreset:
+            out['blason'] = b
+        elif b:
+            out['blason'] = '__custom__'
+            out['blason_custom'] = b
+    elif len(t) >= 3:
+        out['blason'] = '__custom__'
+        out['blason_custom'] = (t[2] or '').strip()
+    return out
+
+
+def _inscription_targets_table_for_discipline(discipline_code):
+    disc = _inscription_discipline_canonical(discipline_code)
+    return INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE.get(disc) or INSCRIPTION_CAT_WEAPON_TARGETS_SALLE
+
+
+def _inscription_category_key_for_table(eff_label, discipline_code):
+    disc = _inscription_discipline_canonical(discipline_code)
+    if disc in ('exterieur_di', 'exterieur_dn'):
+        return _normalize_inscription_category_key_exterieur_di(eff_label)
+    if disc == 'beursault':
+        k = _normalize_inscription_category_key(eff_label)
+        if k in ('U11',):
+            return None
+        return k
+    if disc == 'campagne':
+        k = _normalize_inscription_category_key(eff_label)
+        if k in ('U11', None):
+            return None
+        return k
+    return _normalize_inscription_category_key(eff_label)
+
+
+def _inscription_campagne_auto_fields(archer, age_code, age_custom, weapon_choice):
+    """Piquet campagne ; distance/blason vidés (discipline pique)."""
+    eff = _inscription_effective_category_label(archer, age_code, age_custom)
+    cat_key = _inscription_category_key_for_table(eff, 'campagne')
+    if not cat_key:
+        return {}
+    grp = _inscription_weapon_group(weapon_choice, archer.bow_type)
+    row = INSCRIPTION_CAMPAGNE_PIQUETS.get(cat_key)
+    if not row:
+        return {}
+    pval = row.get(grp)
+    if grp == 'LD' and pval is None:
+        pval = row.get('CL')
+    base = {
+        'distance': '',
+        'distance_custom': '',
+        'blason': '',
+        'blason_custom': '',
+        'pike': '',
+        'pike_custom': '',
+    }
+    presets = {c for c, _ in INSCRIPTION_PIKE_CHOICES if c not in ('', '__custom__')}
+    if pval is None:
+        return base
+    if pval in presets:
+        base['pike'] = pval
+    else:
+        base['pike'] = '__custom__'
+        base['pike_custom'] = pval
+    return base
+
+
+def _inscription_campagne_targets_for_json():
+    out = {}
+    for cat, weapons in INSCRIPTION_CAMPAGNE_PIQUETS.items():
+        out[cat] = {g: (None if p is None else [p]) for g, p in weapons.items()}
+    return out
+
+
+def _inscription_default_distance_blason_fields(
+    archer, age_code, age_custom, weapon_choice, discipline_code=None
+):
+    """Remplissage auto distance + blason (ou piquet campagne) selon discipline, catégorie et arme."""
+    disc = _inscription_discipline_canonical(discipline_code)
+    if disc == 'campagne':
+        return _inscription_campagne_auto_fields(archer, age_code, age_custom, weapon_choice)
+    eff = _inscription_effective_category_label(archer, age_code, age_custom)
+    cat_key = _inscription_category_key_for_table(eff, disc)
+    if not cat_key:
+        return {}
+    grp = _inscription_weapon_group(weapon_choice, archer.bow_type)
+    table = _inscription_targets_table_for_discipline(disc)
+    row = table.get(cat_key)
+    if not row:
+        return {}
+    tup = row.get(grp)
+    if tup is None and grp == 'LD':
+        tup = row.get('CL')
+    if tup is None:
+        return {}
+    return _inscription_unpack_distance_blason_tuple(tup)
+
+
+def _inscription_cat_weapon_targets_for_json():
+    """Par discipline : clés catégorie → groupe d’arc → liste ou null (CO non régi)."""
+
+    def serialize_table(tbl):
+        out = {}
+        for cat, weapons in tbl.items():
+            out[cat] = {}
+            for g, t in weapons.items():
+                if t is None:
+                    out[cat][g] = None
+                elif len(t) == 2:
+                    out[cat][g] = [t[0], t[1]]
+                else:
+                    out[cat][g] = [t[0], '__custom__', t[2]]
+        return out
+
+    return {
+        'salle': serialize_table(INSCRIPTION_CAT_WEAPON_TARGETS_SALLE),
+        'exterieur_di': serialize_table(INSCRIPTION_CAT_WEAPON_TARGETS_EXTERIEUR_DI),
+        'exterieur_dn': serialize_table(INSCRIPTION_CAT_WEAPON_TARGETS_EXTERIEUR_DN),
+        'beursault': serialize_table(INSCRIPTION_CAT_WEAPON_TARGETS_BEURSAULT),
+    }
+
+
+def _inscription_discipline_mode(code):
+    code = _inscription_discipline_canonical(code)
+    for c, _lbl, mode in INSCRIPTION_DISCIPLINES:
+        if c == code:
+            return mode
+    return 'both'
+
+
+def _inscription_discipline_label(code):
+    code = _inscription_discipline_canonical(code)
+    for c, lbl, _m in INSCRIPTION_DISCIPLINES:
+        if c == code:
+            return lbl
+    return (code or '').strip() or '—'
+
+
+def _inscription_select_or_custom(raw, custom_key, aid):
+    """raw = valeur du select ; si __custom__, lit request.form[custom_key_aid]."""
+    v = (raw or '').strip()
+    if v == '__custom__':
+        return (request.form.get(f'{custom_key}_{aid}', '') or '').strip()
+    return v
+
+
+def _inscription_age_label(archer, age_code):
+    ac = (age_code or '').strip() or '__fiche__'
+    if ac == '__fiche__':
+        return (archer.categorie or '').strip() or '—'
+    if ac == '__custom__':
+        return (request.form.get(f'age_custom_{archer.id}', '') or '').strip() or '—'
+    return ac
+
+
+def _inscription_blason_label(aid, blason_sel):
+    sel = (blason_sel or '').strip()
+    if sel == '__custom__':
+        return (request.form.get(f'blason_custom_{aid}', '') or '').strip() or '—'
+    return sel or '—'
+
+
+def _inscription_distance_value(aid):
+    d = (request.form.get(f'distance_{aid}', '') or '').strip()
+    return _inscription_select_or_custom(d, 'distance_custom', aid)
+
+
+def _inscription_pike_value(aid):
+    p = (request.form.get(f'pike_{aid}', '') or '').strip()
+    return _inscription_select_or_custom(p, 'pike_custom', aid)
+
+
+def _inscription_dist_pike_summary(disc_code, distance_str, pike_str):
+    mode = _inscription_discipline_mode(disc_code)
+    d = (distance_str or '').strip()
+    p = (pike_str or '').strip()
+    if mode == 'distance':
+        return d or '—'
+    if mode == 'pike':
+        return p or '—'
+    bits = []
+    if d:
+        bits.append(d)
+    if p:
+        bits.append(p if p.lower().startswith('pique') else f'Pique {p}')
+    return ' — '.join(bits) if bits else '—'
+
+
+def _inscription_parse_row(archer):
+    """Lit le POST pour une ligne archer (tous champs d'inscription)."""
+    aid = archer.id
+    disc = _inscription_discipline_canonical(request.form.get(f'discipline_{aid}', ''))
+    age_code = (request.form.get(f'age_category_{aid}', '') or '').strip() or '__fiche__'
+    w = _registration_weapon_canonical(request.form.get(f'weapon_{aid}', '__fiche__'))
+    blason_sel = request.form.get(f'blason_{aid}', '')
+    dist = _inscription_distance_value(aid)
+    pike = _inscription_pike_value(aid)
+    weapon_label = _registration_weapon_label(archer, w)
+    age_label = _inscription_age_label(archer, age_code)
+    blason_label = _inscription_blason_label(aid, blason_sel)
+    dist_pike = _inscription_dist_pike_summary(disc, dist, pike)
+    return {
+        'discipline_code': disc,
+        'discipline_label': _inscription_discipline_label(disc),
+        'weapon_choice': w,
+        'weapon_label': weapon_label,
+        'age_code': age_code,
+        'age_label': age_label,
+        'blason_label': blason_label,
+        'distance_stored': dist,
+        'pike_stored': pike,
+        'dist_pike_label': dist_pike,
+    }
+
+
+def _inscription_age_for_db(archer, age_code):
+    ac = (age_code or '').strip() or '__fiche__'
+    if ac == '__fiche__':
+        return None
+    if ac == '__custom__':
+        return (request.form.get(f'age_custom_{archer.id}', '') or '').strip() or None
+    return ac
+
+
+def _inscription_blason_for_db(aid, blason_sel):
+    sel = (blason_sel or '').strip()
+    if not sel:
+        return None
+    if sel == '__custom__':
+        return (request.form.get(f'blason_custom_{aid}', '') or '').strip() or None
+    return sel
+
+
+def _preset_match(stored, choices):
+    stored = (stored or '').strip()
+    if not stored:
+        return '', ''
+    presets = {c for c, _ in choices if c not in ('', '__custom__')}
+    if stored in presets:
+        return stored, ''
+    return '__custom__', stored
+
+
+def _inscription_row_form_state(archer, reg=None):
+    """État formulaire pour un archer (depuis DB ou défauts)."""
+    aid = archer.id
+    if reg is None:
+        st = {
+            'discipline': DEFAULT_INSCRIPTION_DISCIPLINE,
+            'age_category': '__fiche__',
+            'age_custom': '',
+            'blason': '',
+            'blason_custom': '',
+            'distance': '',
+            'distance_custom': '',
+            'pike': '',
+            'pike_custom': '',
+        }
+        auto = _inscription_default_distance_blason_fields(
+            archer, '__fiche__', '', '__fiche__', st['discipline']
+        )
+        st.update(auto)
+        return st
+    disc = _inscription_discipline_canonical(reg.discipline)
+    if reg.age_category is None or (reg.age_category or '').strip() == '':
+        age_cat, age_cust = '__fiche__', ''
+    else:
+        age_cat, age_cust = _preset_match(reg.age_category, INSCRIPTION_AGE_CATEGORY_CHOICES)
+    blason, blason_cust = _preset_match(
+        _inscription_blason_canonical(reg.blason or ''), INSCRIPTION_BLASON_CHOICES
+    )
+    dist, dist_cust = _preset_match(reg.distance_label or '', INSCRIPTION_DISTANCE_CHOICES)
+    pike, pike_cust = _preset_match(reg.pike_label or '', INSCRIPTION_PIKE_CHOICES)
+    return {
+        'discipline': disc,
+        'age_category': age_cat or '__fiche__',
+        'age_custom': age_cust,
+        'blason': blason,
+        'blason_custom': blason_cust,
+        'distance': dist,
+        'distance_custom': dist_cust,
+        'pike': pike,
+        'pike_custom': pike_cust,
+    }
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -26,7 +712,7 @@ login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 # Décorateurs de permission
 def require_permission(permission_type):
@@ -107,6 +793,103 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+def _decode_csv_bytes(raw: bytes) -> str:
+    """
+    Décode un CSV (import archers, etc.).
+
+    Ordre : UTF-16 avec BOM, UTF-8 avec BOM (Excel « CSV UTF-8 »), puis **Windows-1252**
+    (cp1252, « Western European (Windows) » — encodage par défaut d’Excel pour un CSV
+    classique en France), puis UTF-8 sans BOM et autres pages Latin.
+    """
+    if raw.startswith((b'\xff\xfe', b'\xfe\xff')):
+        return raw.decode('utf-16-sig')
+    # utf-8-sig = UTF-8 avec BOM ; cp1252 = Windows-1252 avant utf-8 nu (exports Excel FR)
+    for encoding in (
+        'utf-8-sig',
+        'cp1252',
+        'utf-8',
+        'cp1250',
+        'iso-8859-15',
+        'iso-8859-1',
+    ):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode('utf-8', errors='replace')
+
+
+def _detect_csv_delimiter(content: str) -> str:
+    """Point-virgule (Excel FR), virgule ou tabulation selon le fichier."""
+    sample = (content[:8192] if content else '').strip()
+    if not sample:
+        return ';'
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=';,\t|')
+        return dialect.delimiter
+    except csv.Error:
+        pass
+    first = content.splitlines()[0] if content.splitlines() else ''
+    sc = first.count(';')
+    cc = first.count(',')
+    if cc > sc:
+        return ','
+    return ';'
+
+
+def _make_unique_csv_fieldnames(headers):
+    """Évite les clés dupliquées (ex. deux colonnes « Catégorie ») qui écrasent les valeurs dans DictReader."""
+    seen = {}
+    out = []
+    for h in headers:
+        key = (h or '').strip()
+        n = seen.get(key, 0) + 1
+        seen[key] = n
+        out.append(key if n == 1 else f'{key}_{n}')
+    return out
+
+
+_IMPORT_LICENSE_RE = re.compile(r'^[0-9]{5,}[A-Za-z0-9-]*$')
+
+
+def _split_nom_prenom_combined_cell(cell: str):
+    """
+    Colonne unique type « Nom, Prénom » (civilité M / Me / Mme en tête).
+    3+ mots : tout sauf le dernier = nom de famille, dernier = prénom.
+    2 mots seuls : ambigu (NOM Prénom vs Prénom NOM) → tout est mis dans le nom (à corriger à la fiche si besoin).
+    """
+    s = (cell or '').strip()
+    if not s:
+        return '', ''
+    lower = s.lower()
+    for prefix in ('mme ', 'mlle ', 'me ', 'mr ', 'm '):
+        if lower.startswith(prefix):
+            s = s[len(prefix):].strip()
+            break
+    parts = s.split()
+    if not parts:
+        return '', ''
+    if len(parts) == 1:
+        return parts[0], ''
+    if len(parts) == 2:
+        a, b = parts[0], parts[1]
+        if '-' in a:
+            return a, b
+        # Deux mots de longueur proche : souvent « Prénom NOM » (ex. ANTOINE THOMAS) → tout dans le nom
+        if abs(len(a) - len(b)) <= 2 and min(len(a), len(b)) >= 5:
+            return f'{a} {b}', ''
+        # Sinon : NOM puis prénom (ex. BENZ LOUIS)
+        return a, b
+    return ' '.join(parts[:-1]), parts[-1]
+
+
+def _header_is_nom_prenom_combine(norm_key: str) -> bool:
+    nk = norm_key.replace(',', ' ').replace(';', ' ')
+    nk = ' '.join(nk.split())
+    parts = nk.split()
+    return 'nom' in parts and 'prenom' in parts
+
+
 def log_history(event_type, entity_type, entity_id, summary, details=None):
     event = HistoryEvent(
         event_type=event_type,
@@ -165,7 +948,6 @@ def add_category():
         custom_units_raw = request.form.get('custom_field_units','').strip()
         custom_units_lines = [line.strip() for line in custom_units_raw.split('\n') if line.strip()]
         for i, label in enumerate(custom_fields_lines):
-            key = label.replace('\s+', ' ')
             norm = ' '.join(label.split()).lower()
             if i < len(custom_units_lines) and custom_units_lines[i]:
                 field_units[norm] = custom_units_lines[i]
@@ -806,6 +1588,357 @@ def edit_archer(archer_id):
     return render_template('edit_archer.html', archer=arch)
 
 
+def _registration_weapon_label(archer, weapon_choice):
+    """Libellé arme pour l'inscription : choix explicite ou type d'arc en base."""
+    choice = _registration_weapon_canonical(weapon_choice)
+    if choice == '__fiche__':
+        return (archer.bow_type or '').strip() or '—'
+    return REGISTRATION_WEAPON_LABELS.get(choice, choice)
+
+
+def _parse_inscription_evenement_form():
+    """
+    Retourne ((recipient, depart_phrase, lieu, blasons_line, rows), None) ou (None, erreur).
+    rows : liste de tuples (Archer, meta dict pour _format_inscription_archer_line).
+    """
+    recipient = request.form.get('recipient_name', '').strip()
+    depart_phrase = request.form.get('depart_phrase', '').strip()
+    lieu = request.form.get('lieu', '').strip()
+    blasons_line = request.form.get('blasons_line', '').strip()
+    ids = request.form.getlist('archer_id')
+    if not ids:
+        return None, 'Sélectionnez au moins un archer.'
+    rows = []
+    seen = set()
+    for sid in ids:
+        try:
+            aid = int(sid)
+        except (TypeError, ValueError):
+            continue
+        if aid in seen:
+            continue
+        seen.add(aid)
+        arch = Archer.query.get(aid)
+        if not arch:
+            continue
+        rows.append((arch, _inscription_parse_row(arch)))
+    if not rows:
+        return None, 'Aucun archer valide sélectionné.'
+    return (recipient, depart_phrase, lieu, blasons_line, rows), None
+
+
+def _format_inscription_archer_line(archer, meta):
+    lic = (archer.license_number or '').strip() or '—'
+    bits = [
+        f'- {archer.name}',
+        f'Licence : {lic}',
+        meta['discipline_label'],
+        f"Cat. : {meta['age_label']}",
+        f"Arme : {meta['weapon_label']}",
+    ]
+    b = (meta.get('blason_label') or '').strip()
+    if b and b != '—':
+        bits.append(f'Blason : {b}')
+    dp = (meta.get('dist_pike_label') or '').strip()
+    if dp and dp != '—':
+        bits.append(dp)
+    return ' — '.join(bits)
+
+
+def _build_inscription_evenement_body(recipient, depart_phrase, lieu, blasons_line, rows):
+    """Texte type courrier / mail pour l’organisateur."""
+    r = (recipient or '').strip()
+    salut = f'Bonjour {r},' if r else 'Bonjour,'
+    dep = (depart_phrase or '').strip() or '—'
+    lines = [
+        salut,
+        '',
+        f'Voici les archers que je souhaite inscrire pour le départ de {dep}.',
+    ]
+    if (lieu or '').strip():
+        lines.append(f'Lieu : {lieu.strip()}.')
+    lines.append('')
+    for arch, meta in rows:
+        lines.append(_format_inscription_archer_line(arch, meta))
+    lines.append('')
+    bl = (blasons_line or '').strip()
+    if bl:
+        lines.append(f'Blasons et distances: {bl}')
+    return '\n'.join(lines)
+
+
+def _inscription_form_snapshot(archers_list):
+    """Reconstitue l’état formulaire après un POST (texte / PDF)."""
+    form_values = {
+        'title': request.form.get('title', ''),
+        'recipient_name': request.form.get('recipient_name', ''),
+        'depart_phrase': request.form.get('depart_phrase', ''),
+        'lieu': request.form.get('lieu', ''),
+        'blasons_line': request.form.get('blasons_line', ''),
+    }
+    selected_ids = set()
+    for sid in request.form.getlist('archer_id'):
+        try:
+            selected_ids.add(int(sid))
+        except (TypeError, ValueError):
+            pass
+    weapon_saved = {}
+    registration_extras = {}
+    for a in archers_list:
+        aid = a.id
+        weapon_saved[a.id] = _registration_weapon_canonical(
+            request.form.get(f'weapon_{aid}', '__fiche__')
+        )
+        registration_extras[a.id] = {
+            'discipline': _inscription_discipline_canonical(
+                request.form.get(f'discipline_{aid}', '')
+            ),
+            'age_category': (request.form.get(f'age_category_{aid}', '') or '').strip() or '__fiche__',
+            'age_custom': request.form.get(f'age_custom_{aid}', '') or '',
+            'blason': request.form.get(f'blason_{aid}', '') or '',
+            'blason_custom': request.form.get(f'blason_custom_{aid}', '') or '',
+            'distance': request.form.get(f'distance_{aid}', '') or '',
+            'distance_custom': request.form.get(f'distance_custom_{aid}', '') or '',
+            'pike': request.form.get(f'pike_{aid}', '') or '',
+            'pike_custom': request.form.get(f'pike_custom_{aid}', '') or '',
+        }
+    return form_values, selected_ids, weapon_saved, registration_extras
+
+
+@app.route('/inscription_evenement', methods=['GET', 'POST'])
+@login_required
+def inscription_evenement():
+    archers_list = Archer.query.order_by(Archer.last_name.asc(), Archer.first_name.asc()).all()
+    events = InscriptionEvent.query.order_by(InscriptionEvent.created_at.desc()).all()
+    generated_text = None
+    current_event = None
+    form_values = {
+        'title': '',
+        'recipient_name': '',
+        'depart_phrase': '',
+        'lieu': '',
+        'blasons_line': DEFAULT_INSCRIPTION_BLASONS_LINE,
+    }
+    selected_ids = set()
+    weapon_saved = {}
+    registration_extras = {}
+
+    if request.method == 'POST':
+        action = request.form.get('action') or ''
+
+        if action == 'create_event':
+            title = (request.form.get('new_event_title') or '').strip() or 'Événement'
+            ev = InscriptionEvent(
+                title=title,
+                blasons_line=DEFAULT_INSCRIPTION_BLASONS_LINE,
+            )
+            db.session.add(ev)
+            db.session.commit()
+            flash('Événement créé. Cochez les archers puis enregistrez.', 'success')
+            return redirect(url_for('inscription_evenement', event_id=ev.id))
+
+        if action == 'save_event':
+            eid = request.form.get('event_id', type=int)
+            ev = InscriptionEvent.query.get(eid) if eid else None
+            if not ev:
+                flash('Événement introuvable.', 'error')
+                return redirect(url_for('inscription_evenement'))
+            ev.title = (request.form.get('title') or '').strip() or ev.title
+            ev.recipient_name = (request.form.get('recipient_name') or '').strip() or None
+            ev.depart_phrase = (request.form.get('depart_phrase') or '').strip() or None
+            ev.lieu = (request.form.get('lieu') or '').strip() or None
+            ev.blasons_line = (request.form.get('blasons_line') or '').strip() or None
+            InscriptionEventRegistration.query.filter_by(event_id=ev.id).delete()
+            seen = set()
+            for sid in request.form.getlist('archer_id'):
+                try:
+                    aid = int(sid)
+                except (TypeError, ValueError):
+                    continue
+                if aid in seen:
+                    continue
+                seen.add(aid)
+                arch = Archer.query.get(aid)
+                if not arch:
+                    continue
+                w = _registration_weapon_canonical(request.form.get(f'weapon_{aid}', '__fiche__'))
+                disc = _inscription_discipline_canonical(request.form.get(f'discipline_{aid}', ''))
+                age_db = _inscription_age_for_db(arch, request.form.get(f'age_category_{aid}', '__fiche__'))
+                blason_db = _inscription_blason_for_db(aid, request.form.get(f'blason_{aid}', ''))
+                dist = _inscription_distance_value(aid) or None
+                pike = _inscription_pike_value(aid) or None
+                db.session.add(
+                    InscriptionEventRegistration(
+                        event_id=ev.id,
+                        archer_id=aid,
+                        weapon_choice=w,
+                        discipline=disc,
+                        age_category=age_db,
+                        blason=blason_db,
+                        distance_label=dist,
+                        pike_label=pike,
+                    )
+                )
+            db.session.commit()
+            flash('Événement et inscriptions enregistrés.', 'success')
+            return redirect(url_for('inscription_evenement', event_id=ev.id))
+
+        if action == 'delete_event':
+            eid = request.form.get('event_id', type=int)
+            ev = InscriptionEvent.query.get(eid) if eid else None
+            if ev:
+                db.session.delete(ev)
+                db.session.commit()
+                flash('Événement supprimé.', 'success')
+            nxt = InscriptionEvent.query.order_by(InscriptionEvent.created_at.desc()).first()
+            if nxt:
+                return redirect(url_for('inscription_evenement', event_id=nxt.id))
+            return redirect(url_for('inscription_evenement'))
+
+        if action == 'texte':
+            form_values, selected_ids, weapon_saved, registration_extras = _inscription_form_snapshot(
+                archers_list
+            )
+            parsed, err = _parse_inscription_evenement_form()
+            if err:
+                flash(err, 'error')
+            else:
+                recipient, depart_phrase, lieu, blasons_line, rows = parsed
+                generated_text = _build_inscription_evenement_body(
+                    recipient, depart_phrase, lieu, blasons_line, rows
+                )
+            peid = request.form.get('event_id', type=int)
+            if peid:
+                current_event = InscriptionEvent.query.get(peid)
+
+    if request.method == 'GET':
+        eid = request.args.get('event_id', type=int)
+        if eid:
+            current_event = InscriptionEvent.query.get(eid)
+            if not current_event:
+                flash('Événement inconnu.', 'error')
+                current_event = events[0] if events else None
+        elif events:
+            current_event = events[0]
+        if current_event:
+            form_values = {
+                'title': current_event.title or '',
+                'recipient_name': current_event.recipient_name or '',
+                'depart_phrase': current_event.depart_phrase or '',
+                'lieu': current_event.lieu or '',
+                'blasons_line': (current_event.blasons_line or '').strip()
+                or DEFAULT_INSCRIPTION_BLASONS_LINE,
+            }
+            selected_ids = {r.archer_id for r in current_event.registrations}
+            weapon_saved = {
+                r.archer_id: _registration_weapon_canonical(r.weapon_choice or '__fiche__')
+                for r in current_event.registrations
+            }
+            reg_by_archer = {r.archer_id: r for r in current_event.registrations}
+            registration_extras = {
+                a.id: _inscription_row_form_state(a, reg_by_archer.get(a.id)) for a in archers_list
+            }
+
+    inscription_discipline_modes = {c: m for c, _lbl, m in INSCRIPTION_DISCIPLINES}
+    inscription_archer_cat_keys = {
+        a.id: (_normalize_inscription_category_key((a.categorie or '').strip()) or '')
+        for a in archers_list
+    }
+    inscription_archer_cat_keys_di = {
+        a.id: (
+            _normalize_inscription_category_key_exterieur_di((a.categorie or '').strip()) or ''
+        )
+        for a in archers_list
+    }
+    inscription_cat_weapon_targets = _inscription_cat_weapon_targets_for_json()
+    inscription_campagne_piquets = _inscription_campagne_targets_for_json()
+
+    return render_template(
+        'inscription_evenement.html',
+        archers=archers_list,
+        weapon_choices=REGISTRATION_WEAPON_CHOICES,
+        generated_text=generated_text,
+        form_values=form_values,
+        selected_ids=selected_ids,
+        weapon_saved=weapon_saved,
+        registration_extras=registration_extras,
+        events=events,
+        current_event=current_event,
+        inscription_disciplines=INSCRIPTION_DISCIPLINES,
+        inscription_discipline_modes=inscription_discipline_modes,
+        inscription_age_choices=INSCRIPTION_AGE_CATEGORY_CHOICES,
+        inscription_blason_choices=INSCRIPTION_BLASON_CHOICES,
+        inscription_distance_choices=INSCRIPTION_DISTANCE_CHOICES,
+        inscription_pike_choices=INSCRIPTION_PIKE_CHOICES,
+        inscription_archer_cat_keys=inscription_archer_cat_keys,
+        inscription_archer_cat_keys_di=inscription_archer_cat_keys_di,
+        inscription_cat_weapon_targets=inscription_cat_weapon_targets,
+        inscription_campagne_piquets=inscription_campagne_piquets,
+    )
+
+
+@app.route('/inscription_evenement/pdf', methods=['POST'])
+@login_required
+def inscription_evenement_pdf():
+    parsed, err = _parse_inscription_evenement_form()
+    if err:
+        flash(err, 'error')
+        eid = request.form.get('event_id', type=int)
+        return redirect(
+            url_for('inscription_evenement', event_id=eid) if eid else url_for('inscription_evenement')
+        )
+    recipient, depart_phrase, lieu, blasons_line, rows = parsed
+    body = _build_inscription_evenement_body(
+        recipient, depart_phrase, lieu, blasons_line, rows
+    )
+    try:
+        from io import BytesIO
+        from weasyprint import HTML, CSS
+
+        html = render_template('inscription_evenement_pdf.html', body_text=body)
+        css = CSS(
+            string='''
+            @page { margin: 2cm; size: A4; }
+            body {
+              font-family: "DejaVu Serif", "Liberation Serif", Georgia, serif;
+              font-size: 11pt;
+              line-height: 1.45;
+              color: #1a1a1a;
+            }
+            .letter {
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            '''
+        )
+        buffer = BytesIO()
+        HTML(string=html).write_pdf(target=buffer, stylesheets=[css])
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='inscription.pdf', mimetype='application/pdf')
+    except Exception:
+        import textwrap
+        from reportlab.pdfgen import canvas
+        from io import BytesIO
+
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=(595, 842))
+        y = 800
+        x = 72
+        for para in body.split('\n'):
+            if not para.strip():
+                y -= 10
+                continue
+            for chunk in textwrap.wrap(para, width=88):
+                if y < 72:
+                    p.showPage()
+                    y = 800
+                p.drawString(x, y, chunk[:200])
+                y -= 14
+        p.save()
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='inscription.pdf', mimetype='application/pdf')
+
+
 @app.route('/search')
 @login_required
 def search():
@@ -1302,58 +2435,216 @@ def import_archers():
             return redirect(request.url)
         if file and file.filename.endswith('.csv'):
             try:
-                # Lire le fichier avec gestion des guillemets et BOM
-                content = file.stream.read().decode("UTF-8-sig")  # UTF-8-sig supprime le BOM
-                stream = StringIO(content, newline=None)
-                csv_reader = csv.DictReader(stream, delimiter=';', quotechar='"')
-                
+                raw = file.stream.read()
+                content = _decode_csv_bytes(raw)
+                delim = _detect_csv_delimiter(content)
+                lines = content.splitlines()
+                if not lines:
+                    return render_template(
+                        'import_archers.html',
+                        error='Le fichier CSV est vide ou mal formaté',
+                    )
+                header_reader = csv.reader(StringIO(lines[0]), delimiter=delim, quotechar='"')
+                try:
+                    header_cells = next(header_reader)
+                except StopIteration:
+                    return render_template(
+                        'import_archers.html',
+                        error='Le fichier CSV est vide ou mal formaté',
+                    )
+                fieldnames = _make_unique_csv_fieldnames(header_cells)
+                body = '\n'.join(lines[1:])
+                stream = StringIO(body, newline=None)
+                csv_reader = csv.DictReader(
+                    stream, fieldnames=fieldnames, delimiter=delim, quotechar='"'
+                )
+
                 imported = 0
                 errors = []
                 
-                # Afficher les fieldnames pour debug
-                fieldnames = csv_reader.fieldnames
-                if not fieldnames:
-                    return render_template('import_archers.html', 
-                                         error="Le fichier CSV est vide ou mal formaté")
-                
-                # Fonction pour nettoyer les clés
                 def clean_key(key):
                     if key is None:
                         return None
-                    return key.strip().strip('"').strip()
-                
-                # Créer un mapping des colonnes nettoyées
-                clean_fieldnames = {clean_key(f): f for f in fieldnames if f}
-                
-                # Fonction pour trouver la colonne correspondante
-                def find_column(row_dict, *possible_names):
-                    for name in possible_names:
-                        clean_name = clean_key(name)
-                        # Chercher dans les fieldnames nettoyées
-                        if clean_name in clean_fieldnames:
-                            original_field = clean_fieldnames[clean_name]
-                            value = row_dict.get(original_field, '')
-                            return value.strip() if isinstance(value, str) else ''
-                        # Chercher directement dans la ligne
-                        for key, value in row_dict.items():
-                            if clean_key(key) == clean_name:
-                                return value.strip() if isinstance(value, str) else ''
-                    # Si rien n'est trouvé, chercher la première colonne (qui peut être le code)
-                    if len(row_dict) > 0:
-                        first_value = list(row_dict.values())[0]
-                        return first_value.strip() if isinstance(first_value, str) else ''
+                    s = str(key).strip().strip('"').strip()
+                    if s.startswith('\ufeff'):
+                        s = s[1:].lstrip()
+                    return s.strip()
+
+                def normalize_header_for_match(s):
+                    """Compare les en-têtes sans tenir compte des accents / casse / espaces."""
+                    if s is None:
+                        return ''
+                    t = str(s).strip().strip('"')
+                    if t.startswith('\ufeff'):
+                        t = t[1:].lstrip()
+                    t = unicodedata.normalize('NFD', t)
+                    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+                    t = ' '.join(t.lower().split())
+                    return t.strip(' :')
+
+                # En-tête normalisé -> nom de colonne tel que DictReader le fournit
+                norm_to_field = {}
+                for f in fieldnames:
+                    if f:
+                        n = normalize_header_for_match(clean_key(f))
+                        norm_to_field.setdefault(n, f)
+
+                combined_nom_prenom_col = None
+                for f in fieldnames:
+                    if not f:
+                        continue
+                    if _header_is_nom_prenom_combine(
+                        normalize_header_for_match(clean_key(f))
+                    ):
+                        combined_nom_prenom_col = f
+                        break
+
+                def cell_value(row_dict, field_name):
+                    v = row_dict.get(field_name, '')
+                    if v is None:
+                        return ''
+                    return v.strip() if isinstance(v, str) else str(v).strip()
+
+                def find_column_fuzzy_name(row_dict, want_last_name=True):
+                    """
+                    Colonnes Nom / Prénom si le libellé export ne figure pas dans la liste fixe.
+                    Ne pas utiliser « nom in prenom » (sinon on exclut « Prénom »).
+                    """
+                    bad = (
+                        'responsable',
+                        'legal',
+                        'secondaire',
+                        'structure',
+                        'mail',
+                        'telephone',
+                        'tel',
+                        'phone',
+                    )
+                    for key in row_dict:
+                        nk = normalize_header_for_match(key)
+                        if not nk or any(b in nk for b in bad):
+                            continue
+                        if want_last_name:
+                            if 'prenom' in nk:
+                                continue
+                            if nk == 'nom' or nk.startswith('nom '):
+                                return cell_value(row_dict, key)
+                        else:
+                            if nk == 'prenom' or nk.startswith('prenom'):
+                                return cell_value(row_dict, key)
                     return ''
-                
+
+                def find_column(row_dict, *possible_names):
+                    """Lit une cellule par libellés possibles d'en-tête."""
+                    for name in possible_names:
+                        n = normalize_header_for_match(name)
+                        if n in norm_to_field:
+                            return cell_value(row_dict, norm_to_field[n])
+                        for key in row_dict:
+                            if normalize_header_for_match(key) == n:
+                                return cell_value(row_dict, key)
+                    return ''
+
+                _age_cat_re = re.compile(
+                    r'U\s*\d{1,2}|S[ée]nior|Benjamin|Minime|Poussin|Cadet|Junior',
+                    re.I,
+                )
+
                 for row_num, row in enumerate(csv_reader, start=2):
                     try:
-                        license_number = find_column(row, 'Code adhérent').strip()
-                        first_name = find_column(row, 'Prénom').strip()
-                        last_name = find_column(row, 'Nom').strip()
-                        dob_str = find_column(row, 'DDN').strip()
-                        categorie = find_column(row, 'Catégorie âge sportif').strip()
+                        license_number = find_column(
+                            row,
+                            'Code adhérent',
+                            'Code adherent',
+                            'Code',
+                            'N° adhérent',
+                            'Numero adherent',
+                            'N°',
+                            'Numéro',
+                            'No',
+                        ).strip()
+                        if not license_number and fieldnames and fieldnames[0]:
+                            v0 = cell_value(row, fieldnames[0]).strip()
+                            if v0 and _IMPORT_LICENSE_RE.match(v0.replace(' ', '')):
+                                license_number = v0
+                        if not license_number and row:
+                            k0 = list(row.keys())[0]
+                            v0 = cell_value(row, k0).strip()
+                            if v0 and _IMPORT_LICENSE_RE.match(v0.replace(' ', '')):
+                                license_number = v0
+
+                        first_name = find_column(
+                            row,
+                            'Prénom',
+                            'Prenom',
+                            'PRENOM',
+                            'Prénom usuel',
+                            'Prenom usuel',
+                        ).strip()
+                        if not first_name:
+                            first_name = find_column_fuzzy_name(
+                                row, want_last_name=False
+                            ).strip()
+                        last_name = find_column(
+                            row,
+                            'Nom',
+                            'NOM',
+                            'Nom de famille',
+                            'Nom de naissance',
+                            'Nom de l\'adhérent',
+                            'Nom de l adhérent',
+                            'Nom adhérent',
+                            'Nom adherent',
+                        ).strip()
+                        if not last_name:
+                            last_name = find_column_fuzzy_name(
+                                row, want_last_name=True
+                            ).strip()
+
+                        if combined_nom_prenom_col:
+                            combo = cell_value(row, combined_nom_prenom_col).strip()
+                            if combo:
+                                ln, fn = _split_nom_prenom_combined_cell(combo)
+                                if ln:
+                                    last_name = ln
+                                if fn:
+                                    first_name = fn
+
+                        dob_str = find_column(
+                            row,
+                            'DDN',
+                            'Date de naissance',
+                            'Naissance',
+                        ).strip()
+                        categorie = find_column(
+                            row,
+                            'Catégorie âge sportif',
+                            'Categorie age sportif',
+                            'Catégorie',
+                            'Categorie',
+                            'Cat. sportive',
+                        ).strip()
+                        if not categorie or not _age_cat_re.search(categorie):
+                            for k in row:
+                                nk = normalize_header_for_match(k).replace(' ', '')
+                                if 'categorie' not in nk:
+                                    continue
+                                v = cell_value(row, k).strip()
+                                if v and _age_cat_re.search(v):
+                                    categorie = v
+                                    break
                         
                         if not license_number or not last_name:
-                            errors.append(f"Ligne {row_num}: Code adhérent et Nom sont obligatoires (reçu: code='{license_number}', nom='{last_name}')")
+                            if not any(
+                                cell_value(row, k).strip()
+                                for k in row
+                                if k is not None
+                            ):
+                                continue
+                            errors.append(
+                                f"Ligne {row_num}: Code adhérent et Nom sont obligatoires "
+                                f"(reçu: code='{license_number}', nom='{last_name}')"
+                            )
                             continue
                         
                         # Calculer l'âge à partir de la date de naissance
@@ -1758,6 +3049,38 @@ def delete_user(user_id):
     db.session.commit()
     flash(f'Utilisateur "{username}" supprimé avec succès.', 'success')
     return redirect(url_for('users'))
+
+
+@app.cli.command('reset-admin-password')
+@click.option('--username', '-u', default='admin', show_default=True, help='Compte à mettre à jour.')
+@click.option(
+    '--password',
+    '-p',
+    default=None,
+    help='Nouveau mot de passe (évite la saisie interactive ; reste visible dans l’historique du shell).',
+)
+def reset_admin_password_command(username, password):
+    """Réinitialise le mot de passe d’un utilisateur (ex. admin oublié)."""
+    import getpass
+
+    with app.app_context():
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            click.echo(f'Utilisateur « {username} » introuvable.', err=True)
+            raise SystemExit(1)
+        if password is None:
+            password = getpass.getpass('Nouveau mot de passe : ')
+            confirm = getpass.getpass('Confirmation : ')
+            if password != confirm:
+                click.echo('Les mots de passe ne correspondent pas.', err=True)
+                raise SystemExit(1)
+        if not password:
+            click.echo('Mot de passe vide.', err=True)
+            raise SystemExit(1)
+        user.set_password(password)
+        db.session.commit()
+        click.echo(f'Mot de passe mis à jour pour « {username} ».')
+
 
 if __name__ == '__main__':
     import os
