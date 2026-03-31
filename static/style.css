@@ -408,6 +408,31 @@ textarea{
   align-items:center;
 }
 
+/* Tri au clic sur les en-têtes (table-sort.js) */
+.table-sortable thead th:not([data-sort="disable"]){
+  cursor:pointer;
+  user-select:none;
+}
+.table-sortable thead th:not([data-sort="disable"]):hover{
+  background:var(--bg);
+}
+.table-sortable thead th.th-sort-asc,
+.table-sortable thead th.th-sort-desc{
+  background:var(--bg-alt);
+}
+.table-sortable thead th.th-sort-asc::after{
+  content:" ▲";
+  font-size:0.7em;
+  opacity:0.7;
+  font-weight:700;
+}
+.table-sortable thead th.th-sort-desc::after{
+  content:" ▼";
+  font-size:0.7em;
+  opacity:0.7;
+  font-weight:700;
+}
+
 /* Flash messages */
 .flash{
   padding:14px 18px;

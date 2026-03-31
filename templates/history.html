@@ -8,11 +8,11 @@
 <div class="card" style="margin-bottom:24px">
     <h2>Assignations</h2>
     {% if assignment_events %}
-    <table class="table">
+    <table class="table table-sortable">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap">ID</th>
-                <th>Date</th>
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th data-sort="date">Date</th>
                 <th>Action</th>
                 <th>Détails</th>
             </tr>
@@ -42,11 +42,11 @@
 <div class="card" style="margin-bottom:24px">
     <h2>Changements de composition d'arc</h2>
     {% if composite_events %}
-    <table class="table">
+    <table class="table table-sortable">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap">ID</th>
-                <th>Date</th>
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th data-sort="date">Date</th>
                 <th>Action</th>
                 <th>Détails</th>
             </tr>
@@ -98,11 +98,11 @@
 <div class="card">
     <h2>Produits</h2>
     {% if product_events %}
-    <table class="table">
+    <table class="table table-sortable">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap">ID</th>
-                <th>Date</th>
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th data-sort="date">Date</th>
                 <th>Action</th>
                 <th>Détails</th>
             </tr>

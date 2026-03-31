@@ -27,13 +27,13 @@
 
     {% if users %}
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-sortable">
                 <thead>
                     <tr>
-                        <th style="width: 1%; white-space: nowrap;">ID</th>
+                        <th style="width: 1%; white-space: nowrap;" data-sort="number">ID</th>
                         <th style="width: 40%;">Nom d'utilisateur</th>
                         <th style="width: 30%;">Rôle</th>
-                        <th style="width: 30%; text-align: right;">Actions</th>
+                        <th style="width: 30%; text-align: right;" data-sort="disable">Actions</th>
                     </tr>
                 </thead>
                 <tbody>

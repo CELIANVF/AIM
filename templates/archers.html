@@ -66,19 +66,19 @@
 
 {% if archers %}
 <div class="table-responsive">
-    <table class="table archers-table" style="margin:0;min-width:960px">
+    <table class="table table-sortable archers-table" style="margin:0;min-width:960px">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap">ID</th>
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
                 <th>Prénom</th>
                 <th>Nom</th>
-                <th>Âge</th>
+                <th data-sort="number">Âge</th>
                 <th>Licence</th>
                 <th>Catégorie</th>
                 <th>Cours</th>
                 <th>Arc assigné</th>
                 <th>Matériel</th>
-                <th style="text-align:right;white-space:nowrap">Actions</th>
+                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody>

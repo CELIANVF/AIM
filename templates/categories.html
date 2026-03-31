@@ -19,14 +19,14 @@
 {% if categories %}
 <p class="small muted" style="margin-bottom:12px">Glissez l’icône <strong>≡</strong> pour réordonner les catégories.</p>
 <div class="table-responsive">
-    <table class="table categories-table" style="margin:0;min-width:640px">
+    <table class="table table-sortable categories-table" style="margin:0;min-width:640px">
         <thead>
             <tr>
-                {% if current_user.can_edit() %}<th style="width:40px"></th>{% endif %}
-                <th style="width:1%;white-space:nowrap">ID</th>
+                {% if current_user.can_edit() %}<th style="width:40px" data-sort="disable" title="Réordonner par glisser-déposer"></th>{% endif %}
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
                 <th>Nom</th>
                 <th>Attributs</th>
-                <th style="text-align:right;white-space:nowrap">Actions</th>
+                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody class="categories-dnd">

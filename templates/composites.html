@@ -29,15 +29,15 @@
 
 {% if composites %}
 <div class="table-responsive">
-    <table class="table" style="margin:0;min-width:720px">
+    <table class="table table-sortable" style="margin:0;min-width:720px">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap">ID</th>
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
                 <th>Nom</th>
                 <th>Type</th>
                 <th>Statut</th>
                 <th>Caractéristiques</th>
-                <th style="text-align:right;white-space:nowrap">Actions</th>
+                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody>

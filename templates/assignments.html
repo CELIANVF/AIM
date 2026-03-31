@@ -19,14 +19,14 @@
 
 {% if assignments %}
 <div class="table-responsive">
-    <table class="table" style="margin:0;min-width:560px">
+    <table class="table table-sortable" style="margin:0;min-width:560px">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap">ID</th>
+                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
                 <th>Arc</th>
                 <th>Archer</th>
-                <th>Date d'assignation</th>
-                <th style="text-align:right;white-space:nowrap">Actions</th>
+                <th data-sort="date">Date d'assignation</th>
+                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody>
