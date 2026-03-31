@@ -64,102 +64,90 @@
     </div>
 </div>
 
-<div class="grid">
-    {% for a in archers %}
-    <div class="item">
-        <div style="display:flex;flex-direction:column;gap:12px">
-            <div>
-                <h3 style="margin:0 0 8px 0">{{ (a.first_name + ' ' if a.first_name else '') + (a.last_name or '') or 'Sans nom' }}</h3>
-                <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-                    {% if a.age %}
-                        <span class="badge badge-primary">🎂 {{ a.age }} ans</span>
-                    {% endif %}
-                    {% if a.license_number %}
-                        <span class="badge badge-success">🎫 {{ a.license_number }}</span>
-                    {% endif %}
-                    {% if a.categorie %}
-                        <span class="badge" style="background-color: #e3f2fd; color: #1976d2;">📌 {{ a.categorie }}</span>
-                    {% endif %}
-                    {% set active_courses = a.courses | selectattr('active') | list %}
-                    {% if active_courses %}
-                        {% for course in active_courses %}
-                            <span class="badge" style="background-color:#fff7ed;color:#92400e">📚 {{ course.name }}</span>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-                {% if a.bow_type or a.bow_length or a.draw_length %}
-                <div style="padding-top:8px;border-top:1px solid var(--border-light)">
-                    {% if a.bow_type %}
-                        <p class="small" style="margin:4px 0"><strong>Type d'arc:</strong> {{ a.bow_type }}</p>
-                    {% endif %}
-                    {% if a.bow_length %}
-                        <p class="small" style="margin:4px 0"><strong>Longueur:</strong> {{ a.bow_length }}</p>
-                    {% endif %}
-                    {% if a.draw_length %}
-                        <p class="small" style="margin:4px 0"><strong>Tirage:</strong> {{ a.draw_length }}</p>
-                    {% endif %}
-                    {% if a.current_assignment %}
-                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span></p>
-                        {% if a.courses %}
-                            <p class="small" style="margin:4px 0"><strong>Cours:</strong>
-                                {% for c in a.courses %}
-                                    <span class="muted">{{ c.name }}{% if not loop.last %}, {% endif %}</span>
-                                {% else %}
-                                    <span class="muted">Aucun</span>
-                                {% endfor %}
-                            </p>
-                        {% endif %}
-                    {% else %}
-                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="muted">Aucun</span></p>
-                        {% if a.courses %}
-                            <p class="small" style="margin:4px 0"><strong>Cours:</strong>
-                                {% for c in a.courses %}
-                                    <span class="muted">{{ c.name }}{% if not loop.last %}, {% endif %}</span>
-                                {% else %}
-                                    <span class="muted">Aucun</span>
-                                {% endfor %}
-                            </p>
-                        {% endif %}
-                    {% endif %}
-                </div>
+{% if archers %}
+<div class="table-responsive">
+    <table class="table archers-table" style="margin:0;min-width:960px">
+        <thead>
+            <tr>
+                <th style="width:1%;white-space:nowrap">ID</th>
+                <th>Prénom</th>
+                <th>Nom</th>
+                <th>Âge</th>
+                <th>Licence</th>
+                <th>Catégorie</th>
+                <th>Cours</th>
+                <th>Arc assigné</th>
+                <th>Matériel</th>
+                <th style="text-align:right;white-space:nowrap">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in archers %}
+            {% set active_courses = a.courses | selectattr('active') | list %}
+            <tr>
+                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ a.id }}</td>
+                {% if not a.first_name and not a.last_name %}
+                <td colspan="2" class="muted">Sans nom</td>
                 {% else %}
-                <div style="padding-top:8px;border-top:1px solid var(--border-light)">
-                    {% if a.current_assignment %}
-                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span></p>
-                    {% else %}
-                        <p class="small" style="margin:4px 0"><strong>Arc assigné:</strong> <span class="muted">Aucun</span></p>
-                    {% endif %}
-                </div>
+                <td>{{ a.first_name or '—' }}</td>
+                <td>{{ a.last_name or '—' }}</td>
                 {% endif %}
-            </div>
-            <div style="padding-top:8px;border-top:1px solid var(--border-light)">
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    {% if current_user.can_edit() %}
-                    <a class="btn btn-outline" href="/edit_archer/{{ a.id }}" style="flex:1">✏️ Modifier</a>
-                    {% if a.current_assignment %}
-                    <form method="POST" action="/return/{{ a.current_assignment.id }}" style="flex:1" onsubmit="return confirm('Retourner l\'arc {{ a.current_assignment.composite.name }} ?');">
-                        <button type="submit" class="btn btn-warning" style="width:100%;cursor:pointer">↩️ Retourner arc</button>
-                    </form>
+                <td>{% if a.age is not none %}{{ a.age }}{% else %}—{% endif %}</td>
+                <td>{{ a.license_number or '—' }}</td>
+                <td>{{ a.categorie or '—' }}</td>
+                <td class="small">
+                    {% if active_courses %}
+                        {% for course in active_courses %}{{ course.name }}{% if not loop.last %}, {% endif %}{% endfor %}
                     {% else %}
-                    <a class="btn btn-success" href="/assign?archer_id={{ a.id }}" style="flex:1;text-align:center">🎯 Assigner arc</a>
+                        <span class="muted">—</span>
                     {% endif %}
+                </td>
+                <td>
+                    {% if a.current_assignment %}
+                        <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span>
+                    {% else %}
+                        <span class="muted">Aucun</span>
                     {% endif %}
-                    {% if current_user.can_delete() %}
-                    <form method="POST" action="/delete_archer/{{ a.id }}" style="flex:1" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
-                        <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer">🗑️ Supprimer</button>
-                    </form>
+                </td>
+                <td class="small">
+                    {% if a.bow_type or a.bow_length or a.draw_length %}
+                        {% if a.bow_type %}{{ a.bow_type }}{% endif %}
+                        {% if a.bow_length %}{% if a.bow_type %} · {% endif %}L {{ a.bow_length }}{% endif %}
+                        {% if a.draw_length %}{% if a.bow_type or a.bow_length %} · {% endif %}T {{ a.draw_length }}{% endif %}
+                    {% else %}
+                        <span class="muted">—</span>
                     {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
-        <p class="muted">Aucun archer enregistré pour le moment</p>
-        {% if current_user.can_edit() %}
-        <a href="/add_archer" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier archer</a>
-        {% endif %}
-    </div>
-    {% endfor %}
+                </td>
+                <td style="text-align:right">
+                    <div class="table-row-actions">
+                        {% if current_user.can_edit() %}
+                        <a class="btn btn-outline" href="/edit_archer/{{ a.id }}" style="padding:6px 10px;font-size:13px">✏️ Modifier</a>
+                        {% if a.current_assignment %}
+                        <form method="POST" action="/return/{{ a.current_assignment.id }}" style="display:inline;margin:0" onsubmit="return confirm('Retourner l\'arc {{ a.current_assignment.composite.name }} ?');">
+                            <button type="submit" class="btn btn-warning" style="padding:6px 10px;font-size:13px;cursor:pointer">↩️ Retour</button>
+                        </form>
+                        {% else %}
+                        <a class="btn btn-success" href="/assign?archer_id={{ a.id }}" style="padding:6px 10px;font-size:13px">🎯 Arc</a>
+                        {% endif %}
+                        {% endif %}
+                        {% if current_user.can_delete() %}
+                        <form method="POST" action="/delete_archer/{{ a.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer">🗑️</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px 24px">
+    <p class="muted">Aucun archer enregistré pour le moment</p>
+    {% if current_user.can_edit() %}
+    <a href="/add_archer" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier archer</a>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}

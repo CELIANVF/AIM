@@ -44,17 +44,35 @@
 <div class="card" style="margin-top:24px;background-color:rgba(255,191,0,0.1);border-color:var(--warning)">
     <h3 style="margin-top:0">ℹ️ Arcs non disponibles</h3>
     <p class="small muted">Les arcs suivants ne sont pas disponibles au club mais peuvent être rendus disponibles:</p>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
-        {% for c in all_composites %}
-            {% if c.status != 'club' %}
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:white;border-radius:4px;border:1px solid var(--border-light)">
-                <span><strong>{{ c.name }}</strong> ({{ c.type }}) - Statut: <code>{{ c.status }}</code></span>
-                <form method="POST" action="{{ url_for('reset_composite_status', comp_id=c.id) }}" style="display:inline;margin:0">
-                    <button type="submit" class="btn btn-small btn-warning">Rendre disponible</button>
-                </form>
-            </div>
-            {% endif %}
-        {% endfor %}
+    <div class="table-responsive" style="margin-top:12px">
+        <table class="table" style="margin:0">
+            <thead>
+                <tr>
+                    <th style="width:1%;white-space:nowrap">ID</th>
+                    <th>Arc</th>
+                    <th>Type</th>
+                    <th>Statut</th>
+                    <th style="text-align:right">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in all_composites %}
+                {% if c.status != 'club' %}
+                <tr>
+                    <td class="small muted" style="font-variant-numeric:tabular-nums">{{ c.id }}</td>
+                    <td><strong>{{ c.name }}</strong></td>
+                    <td class="small">{{ c.type }}</td>
+                    <td><code>{{ c.status }}</code></td>
+                    <td style="text-align:right">
+                        <form method="POST" action="{{ url_for('reset_composite_status', comp_id=c.id) }}" style="display:inline;margin:0">
+                            <button type="submit" class="btn btn-small btn-warning" style="cursor:pointer">Rendre disponible</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}

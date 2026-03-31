@@ -15,63 +15,126 @@
   </div>
 
   {% if products %}
-    <div class="card">
-      <h3>Produits</h3>
-      <ul>
+    <h2 style="font-size:1.15rem;margin:20px 0 10px">Produits</h2>
+    <div class="table-responsive">
+      <table class="table" style="margin:0 0 20px;min-width:480px">
+        <thead>
+          <tr>
+            <th style="width:1%;white-space:nowrap">ID</th>
+            <th>Produit</th>
+            <th>Catégorie</th>
+            <th style="text-align:right">Lien</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for p in products %}
-          <li>
-            <a href="/edit_product/{{ p.id }}">{{ p.brand }}{% if p.model %} — {{ p.model }}{% endif %}</a>
-            <span class="muted">({{ p.category.name if p.category else '—' }})</span>
-          </li>
+          <tr>
+            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ p.id }}</td>
+            <td><strong>{{ p.brand }}{% if p.model %} — {{ p.model }}{% endif %}</strong></td>
+            <td class="small">{{ p.category.name if p.category else '—' }}</td>
+            <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_product/{{ p.id }}">Modifier</a></td>
+          </tr>
         {% endfor %}
-      </ul>
+        </tbody>
+      </table>
     </div>
   {% endif %}
 
   {% if archers %}
-    <div class="card" style="margin-top:12px">
-      <h3>Archers</h3>
-      <ul>
+    <h2 style="font-size:1.15rem;margin:20px 0 10px">Archers</h2>
+    <div class="table-responsive">
+      <table class="table" style="margin:0 0 20px;min-width:400px">
+        <thead>
+          <tr>
+            <th style="width:1%;white-space:nowrap">ID</th>
+            <th>Nom</th>
+            <th>Licence</th>
+            <th style="text-align:right">Lien</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for a in archers %}
-          <li>
-            <a href="/edit_archer/{{ a.id }}">{{ a.name }}</a>
-            <span class="muted">— {{ a.license_number }}</span>
-          </li>
+          <tr>
+            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ a.id }}</td>
+            <td><strong>{{ a.name }}</strong></td>
+            <td class="small">{{ a.license_number or '—' }}</td>
+            <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_archer/{{ a.id }}">Modifier</a></td>
+          </tr>
         {% endfor %}
-      </ul>
+        </tbody>
+      </table>
     </div>
   {% endif %}
 
   {% if categories %}
-    <div class="card" style="margin-top:12px">
-      <h3>Catégories</h3>
-      <ul>
+    <h2 style="font-size:1.15rem;margin:20px 0 10px">Catégories</h2>
+    <div class="table-responsive">
+      <table class="table" style="margin:0 0 20px;min-width:360px">
+        <thead>
+          <tr>
+            <th style="width:1%;white-space:nowrap">ID</th>
+            <th>Nom</th>
+            <th style="text-align:right">Lien</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for c in categories %}
-          <li><a href="/edit_category/{{ c.id }}">{{ c.name }}</a></li>
+          <tr>
+            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ c.id }}</td>
+            <td><strong>{{ c.name }}</strong></td>
+            <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_category/{{ c.id }}">Modifier</a></td>
+          </tr>
         {% endfor %}
-      </ul>
+        </tbody>
+      </table>
     </div>
   {% endif %}
 
   {% if composites %}
-    <div class="card" style="margin-top:12px">
-      <h3>Arcs / Composites</h3>
-      <ul>
+    <h2 style="font-size:1.15rem;margin:20px 0 10px">Arcs / Composites</h2>
+    <div class="table-responsive">
+      <table class="table" style="margin:0 0 20px;min-width:360px">
+        <thead>
+          <tr>
+            <th style="width:1%;white-space:nowrap">ID</th>
+            <th>Nom</th>
+            <th style="text-align:right">Lien</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for comp in composites %}
-          <li><a href="/edit_composite/{{ comp.id }}">{{ comp.name }}</a></li>
+          <tr>
+            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ comp.id }}</td>
+            <td><strong>{{ comp.name }}</strong></td>
+            <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_composite/{{ comp.id }}">Modifier</a></td>
+          </tr>
         {% endfor %}
-      </ul>
+        </tbody>
+      </table>
     </div>
   {% endif %}
 
   {% if users %}
-    <div class="card" style="margin-top:12px">
-      <h3>Utilisateurs</h3>
-      <ul>
+    <h2 style="font-size:1.15rem;margin:20px 0 10px">Utilisateurs</h2>
+    <div class="table-responsive">
+      <table class="table" style="margin:0 0 20px;min-width:320px">
+        <thead>
+          <tr>
+            <th style="width:1%;white-space:nowrap">ID</th>
+            <th>Nom d'utilisateur</th>
+            <th style="text-align:right">Lien</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for u in users %}
-          <li><a href="/users">{{ u.username }}</a></li>
+          <tr>
+            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ u.id }}</td>
+            <td><strong>{{ u.username }}</strong></td>
+            <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="{{ url_for('users') }}">Utilisateurs</a></td>
+          </tr>
         {% endfor %}
-      </ul>
+        </tbody>
+      </table>
     </div>
   {% endif %}
 

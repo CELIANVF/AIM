@@ -30,6 +30,7 @@
             <table class="table">
                 <thead>
                     <tr>
+                        <th style="width: 1%; white-space: nowrap;">ID</th>
                         <th style="width: 40%;">Nom d'utilisateur</th>
                         <th style="width: 30%;">Rôle</th>
                         <th style="width: 30%; text-align: right;">Actions</th>
@@ -38,6 +39,7 @@
                 <tbody>
                     {% for user in users %}
                         <tr>
+                            <td class="small" style="color:var(--muted);font-variant-numeric:tabular-nums">{{ user.id }}</td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 12px;">
                                     <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--primary);">

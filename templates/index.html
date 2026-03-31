@@ -35,38 +35,74 @@
 	</div>
 </div>
 
-<div class="grid">
-	<div class="card">
-		<h2>🚀 Actions rapides</h2>
-		<ul style="list-style:none;padding:0;margin:16px 0 0 0">
+<div class="table-responsive">
+	<table class="table" style="margin:0;min-width:520px">
+		<thead>
+			<tr>
+				<th style="width:22%">Section</th>
+				<th>Description</th>
+				<th style="text-align:right;white-space:nowrap">Accès</th>
+			</tr>
+		</thead>
+		<tbody>
 			{% if current_user.can_edit() %}
-			<li style="margin-bottom:12px"><a href="{{ url_for('add_product') }}" style="font-weight:500">➕ Ajouter un produit</a></li>
-			<li style="margin-bottom:12px"><a href="{{ url_for('add_category') }}" style="font-weight:500">📁 Créer une catégorie</a></li>
-			<li style="margin-bottom:12px"><a href="{{ url_for('add_composite') }}" style="font-weight:500">🎯 Enregistrer un arc</a></li>
-			<li style="margin-bottom:12px"><a href="{{ url_for('add_archer') }}" style="font-weight:500">👤 Ajouter un archer</a></li>
-			<li style="margin-bottom:0"><a href="{{ url_for('assign') }}" style="font-weight:500">🔄 Nouvelle affectation</a></li>
+			<tr>
+				<td><span class="badge badge-primary">Création</span></td>
+				<td class="small">Enregistrer un nouveau produit dans le stock</td>
+				<td style="text-align:right"><a href="{{ url_for('add_product') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">➕ Produit</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-primary">Création</span></td>
+				<td class="small">Créer une catégorie pour classer les produits</td>
+				<td style="text-align:right"><a href="{{ url_for('add_category') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📁 Catégorie</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-primary">Création</span></td>
+				<td class="small">Ajouter un arc composé au parc</td>
+				<td style="text-align:right"><a href="{{ url_for('add_composite') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🎯 Arc</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-primary">Création</span></td>
+				<td class="small">Inscrire un nouvel archer</td>
+				<td style="text-align:right"><a href="{{ url_for('add_archer') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">👤 Archer</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-warning">Prêt</span></td>
+				<td class="small">Attribuer un arc à un archer</td>
+				<td style="text-align:right"><a href="{{ url_for('assign') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🔄 Affectation</a></td>
+			</tr>
 			{% endif %}
-		</ul>
-	</div>
-	
-	<div class="card">
-		<h2>📋 Navigation</h2>
-		<p class="muted" style="margin-bottom:16px">Accédez aux différentes sections de gestion</p>
-		<div class="action-group" style="flex-direction:column;align-items:stretch">
-			<a href="{{ url_for('products') }}" class="btn btn-outline" style="justify-content:flex-start">📦 Voir les produits</a>
-			<a href="{{ url_for('archers') }}" class="btn btn-outline" style="justify-content:flex-start">👥 Liste des archers</a>
-			<a href="{{ url_for('composites') }}" class="btn btn-outline" style="justify-content:flex-start">🎯 Gérer les arcs</a>
-			<a href="{{ url_for('assignments') }}" class="btn btn-outline" style="justify-content:flex-start">🔄 Affectations actives</a>
-		</div>
-	</div>
-
-	<div class="card">
-		<h2>📊 Rapports</h2>
-		<p class="muted" style="margin-bottom:16px">Exportez et consultez les données</p>
-		<div class="action-group" style="flex-direction:column;align-items:stretch">
-			<a href="/export_products" class="btn btn-outline" style="justify-content:flex-start">📄 Export produits (PDF)</a>
-			<a href="/export_archers" class="btn btn-outline" style="justify-content:flex-start">📄 Export archers (PDF)</a>
-		</div>
-	</div>
+			<tr>
+				<td><span class="badge badge-info">Stock</span></td>
+				<td class="small">Liste et recherche des produits unitaires</td>
+				<td style="text-align:right"><a href="{{ url_for('products') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📦 Produits</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-info">Membres</span></td>
+				<td class="small">Archers, cours et matériel personnel</td>
+				<td style="text-align:right"><a href="{{ url_for('archers') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">👥 Archers</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-info">Arcs</span></td>
+				<td class="small">Arcs composés et statuts club / prêt</td>
+				<td style="text-align:right"><a href="{{ url_for('composites') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🎯 Arcs</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-info">Suivi</span></td>
+				<td class="small">Prêts en cours et retours</td>
+				<td style="text-align:right"><a href="{{ url_for('assignments') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🔄 Assignations</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-secondary">Exports</span></td>
+				<td class="small">Inventaire produits (PDF)</td>
+				<td style="text-align:right"><a href="/export_products" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📄 PDF</a></td>
+			</tr>
+			<tr>
+				<td><span class="badge badge-secondary">Exports</span></td>
+				<td class="small">Liste des archers (PDF)</td>
+				<td style="text-align:right"><a href="/export_archers" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📄 PDF</a></td>
+			</tr>
+		</tbody>
+	</table>
 </div>
 {% endblock %}

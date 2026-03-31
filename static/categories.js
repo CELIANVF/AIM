@@ -5,9 +5,10 @@
         window.addEventListener('error', function(e){
             console.error('JS error in categories drag script', e.error, e.message);
         });
-        const grid = document.querySelector('.grid');
-        if(!grid) { console.log('no grid element found'); return; }
-        console.log('grid items count', grid.querySelectorAll('.item').length);
+        const grid = document.querySelector('tbody.categories-dnd');
+        if(!grid) { console.log('no categories tbody found'); return; }
+        const orderFeedback = grid.closest('.table-responsive');
+        console.log('category rows count', grid.querySelectorAll('.item').length);
         let dragSrc = null;
 
         function sendOrder(){
@@ -20,9 +21,9 @@
             }).then(r=>{
                 if(!r.ok) console.error('Reorder failed');
                 else {
-                    // brief visual feedback on container
-                    grid.classList.add('order-saved');
-                    setTimeout(()=>grid.classList.remove('order-saved'), 300);
+                    const el = orderFeedback || grid;
+                    el.classList.add('categories-order-saved');
+                    setTimeout(()=>el.classList.remove('categories-order-saved'), 300);
                 }
             }).catch(err=>console.error('Network error', err));
         }

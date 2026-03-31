@@ -16,49 +16,57 @@
     </div>
 </div>
 
-<div class="grid">
-    {% for course in courses %}
-    <div class="item">
-        <div style="display:flex;flex-direction:column;gap:12px">
-            <div>
-                <h3 style="margin:0 0 4px 0">{{ course.name }}</h3>
-                <p class="small muted" style="margin:0">{{ days_names[course.day_of_week] }} {{ course.start_time }} - {{ course.end_time }}</p>
-                {% if course.level %}
-                    <span class="badge badge-primary" style="margin-top:8px">{{ course.level }}</span>
-                {% endif %}
-                {% if course.max_archers %}
-                    <p class="small muted" style="margin:8px 0 0 0">👥 Max: {{ course.max_archers }} archers</p>
-                {% endif %}
-                {% if course.archers %}
-                    <p class="small muted" style="margin:8px 0 0 0">
-                        <strong>Inscrits:</strong> {{ course.archers|length }} archer(s)
-                    </p>
-                {% endif %}
-                {% if course.notes %}
-                    <p class="small muted" style="margin:8px 0 0 0">{{ course.notes }}</p>
-                {% endif %}
-            </div>
-            <div style="padding-top:8px;border-top:1px solid var(--border-light);display:flex;flex-direction:column;gap:8px">
-                {% if current_user.can_manage_courses() %}
-                <a class="btn btn-outline" href="/course/{{ course.id }}/archers" style="width:100%">👥 Gérer les archers</a>
-                <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="width:100%">✓ Présences</a>
-                <a class="btn btn-outline" href="/edit_course/{{ course.id }}" style="width:100%">✏️ Modifier</a>
-                <form method="POST" action="/delete_course/{{ course.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce cours ?');">
-                    <button type="submit" class="btn btn-danger" style="width:100%;cursor:pointer">🗑️ Supprimer</button>
-                </form>
-                {% elif current_user.can_manage_attendance() %}
-                <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="width:100%">✓ Présences</a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px">
-        <p class="muted">Aucun cours enregistré pour le moment</p>
-        {% if current_user.can_manage_courses() %}
-        <a href="/add_course" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier cours</a>
-        {% endif %}
-    </div>
-    {% endfor %}
+{% if courses %}
+<div class="table-responsive">
+    <table class="table" style="margin:0;min-width:800px">
+        <thead>
+            <tr>
+                <th style="width:1%;white-space:nowrap">ID</th>
+                <th>Cours</th>
+                <th>Créneau</th>
+                <th>Niveau</th>
+                <th>Inscrits</th>
+                <th>Notes</th>
+                <th style="text-align:right;white-space:nowrap">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for course in courses %}
+            <tr>
+                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ course.id }}</td>
+                <td><strong>{{ course.name }}</strong></td>
+                <td class="small">{{ days_names[course.day_of_week] }} · {{ course.start_time }} – {{ course.end_time }}</td>
+                <td>{% if course.level %}<span class="badge badge-primary">{{ course.level }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td class="small">
+                    {% if course.max_archers %}max {{ course.max_archers }}{% else %}<span class="muted">—</span>{% endif %}
+                    {% if course.archers %}<br><span class="muted">{{ course.archers|length }} inscrit(s)</span>{% endif %}
+                </td>
+                <td class="small muted">{{ course.notes or '—' }}</td>
+                <td style="text-align:right">
+                    <div class="table-row-actions">
+                        {% if current_user.can_manage_courses() %}
+                        <a class="btn btn-outline" href="/course/{{ course.id }}/archers" style="padding:6px 10px;font-size:13px">👥 Archers</a>
+                        <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="padding:6px 10px;font-size:13px">✓ Présences</a>
+                        <a class="btn btn-outline" href="/edit_course/{{ course.id }}" style="padding:6px 10px;font-size:13px">✏️</a>
+                        <form method="POST" action="/delete_course/{{ course.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce cours ?');">
+                            <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer">🗑️</button>
+                        </form>
+                        {% elif current_user.can_manage_attendance() %}
+                        <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="padding:6px 10px;font-size:13px">✓ Présences</a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px 24px">
+    <p class="muted">Aucun cours enregistré pour le moment</p>
+    {% if current_user.can_manage_courses() %}
+    <a href="/add_course" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier cours</a>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}

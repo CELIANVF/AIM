@@ -51,6 +51,12 @@
     .accordion-header.collapsed {
         border-bottom: none;
     }
+    .accordion-controls.collapsed {
+        max-height: 0;
+        padding: 0 !important;
+        overflow: hidden;
+        border: none !important;
+    }
 
     .accordion-icon {
         transition: transform 0.2s;
@@ -62,19 +68,18 @@
     }
 
     .accordion-content {
-        padding: 16px;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 12px;
+        padding: 0;
         max-height: 10000px;
         overflow: hidden;
         transition: max-height 0.3s ease-in-out;
     }
-
-    /* Product-specific compact actions */
-    .accordion .item .action-group{padding-top:8px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap}
-    .accordion .item .action-group a.btn, .accordion .item .action-group button.btn{padding:6px 10px;font-size:13px;border-radius:8px;flex:none}
-    .accordion .item .action-group form{margin:0;padding:0}
+    .accordion-content .table-responsive { margin: 0; }
+    .accordion-content .table { margin: 0; font-size: 14px; }
+    .accordion-content .table th,
+    .accordion-content .table td { padding: 10px 12px; vertical-align: top; }
+    .accordion .item .table-row-actions { justify-content: flex-start; }
+    .accordion .item .table-row-actions a.btn,
+    .accordion .item .table-row-actions button.btn { padding: 6px 10px; font-size: 13px; }
 
     .accordion-content.collapsed {
         max-height: 0;
@@ -142,6 +147,23 @@
             <button class="btn btn-outline btn-clear-filter">Réinitialiser</button>
         </div>
         <div class="accordion-content">
+            <div class="table-responsive">
+            <table class="table" style="margin:0;min-width:880px">
+                <thead>
+                    <tr>
+                        <th style="width:1%;white-space:nowrap">ID</th>
+                        <th>Statut</th>
+                        <th>Marque</th>
+                        <th>Modèle</th>
+                        <th>Taille</th>
+                        <th>Puissance</th>
+                        <th>Lieu</th>
+                        <th>État</th>
+                        <th>Détails</th>
+                        <th style="text-align:right;white-space:nowrap">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
             {% for p in products_by_category %}
             {%- set comps = p.composites|list -%}
             {%- set assigned_comps = comps|selectattr('status','equalto','loan')|list -%}
@@ -157,78 +179,70 @@
                 {%- set _status_label = p.state or '' -%}
             {%- endif -%}
 
-            <div class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-power="{{ p.power|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}" data-status="{{ _status_label }}"
+            <tr class="item" data-brand="{{ p.brand|e }}" data-state="{{ p.state|e }}" data-size="{{ p.size|e }}" data-model="{{ p.model|e }}" data-power="{{ p.power|e }}" data-location="{{ p.location|e }}" data-comments="{{ p.comments|e }}" data-status="{{ _status_label }}"
                 {% if p.custom_values %}
                     {% for k, v in p.custom_values.items() %}
                         data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
                     {% endfor %}
                 {% endif %}>
-                <div style="display:flex;flex-direction:column;gap:12px">
-                    <div>
-                        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                            <h3 style="margin:0">{{ p.brand }}</h3>
-                            {% if p.model %}
-                            <span class="badge badge-info">{{ p.model }}</span>
-                            {% endif %}
-                        </div>
-                        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                            {% if assigned_comps %}
-                                <span class="badge badge-warning">→ Assigné</span>
-                            {% elif comps %}
-                                <span class="badge badge-primary">✓ Monté</span>
-                            {% elif p.state == 'stock' %}
-                                <span class="badge badge-success">✓ Disponible</span>
-                            {% elif p.state == 'broken' %}
-                                <span class="badge badge-danger">✗ Cassé</span>
-                            {% endif %}
-                        </div>
-                        {# Show all standard fields plus custom fields in category order #}
-                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
-                            <span class="small" style="margin-right:12px"><strong>État:</strong> {{ p.state or '' }}</span>
-                            <span class="small" style="margin-right:12px"><strong>Lieu:</strong> {{ p.location or '' }}</span>
-                            {% if p.size %}
-                                <span class="small" style="margin-right:12px"><strong>Taille:</strong> {{ p.size }}{% if p.category and p.category.field_units and p.category.field_units.get('size') %} {{ p.category.field_units.get('size') }}{% endif %}</span>
-                            {% endif %}
-                            {% if p.power %}
-                                <span class="small" style="margin-right:12px"><strong>Puissance:</strong> {{ p.power }}{% if p.category and p.category.field_units and p.category.field_units.get('power') %} {{ p.category.field_units.get('power') }}{% endif %}</span>
-                            {% endif %}
-                            {% if p.model %}
-                                <span class="small" style="margin-right:12px"><strong>Modèle:</strong> {{ p.model }}</span>
-                            {% endif %}
-                            {# Custom fields in category-defined order #}
-                            {% set cat_cf = p.category.custom_fields if p.category and p.category.custom_fields else None %}
-                            {% if cat_cf %}
-                                {%- set parts = cat_cf.split(',') -%}
-                                {%- for part in parts -%}
-                                    {%- set label = part.split(':')[0].strip() -%}
-                                    {%- set key = label.lower() -%}
-                                    {%- set val = (p.custom_values[key] if p.custom_values and key in p.custom_values else '') -%}
-                                    <span class="small" style="margin-right:12px"><strong>{{ label }}:</strong> {{ val }}</span>
-                                {%- endfor -%}
-                            {% elif p.custom_values %}
-                                {% for k, v in p.custom_values.items() %}
-                                    <span class="small" style="margin-right:12px"><strong>{{ k }}:</strong> {{ v }}</span>
-                                {% endfor %}
-                            {% endif %}
-                            {% if p.comments %}
-                                <div style="margin-top:6px"><span class="small muted">💬 {{ p.comments }}</span></div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="action-group">
+                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ p.id }}</td>
+                <td>
+                    {% if assigned_comps %}
+                        <span class="badge badge-warning">Assigné</span>
+                    {% elif comps %}
+                        <span class="badge badge-primary">Monté</span>
+                    {% elif p.state == 'stock' %}
+                        <span class="badge badge-success">Dispo</span>
+                    {% elif p.state == 'broken' %}
+                        <span class="badge badge-danger">Cassé</span>
+                    {% else %}
+                        <span class="small muted">{{ p.state or '—' }}</span>
+                    {% endif %}
+                </td>
+                <td><strong>{{ p.brand or '—' }}</strong></td>
+                <td class="small">{{ p.model or '—' }}</td>
+                <td class="small">{% if p.size %}{{ p.size }}{% if p.category and p.category.field_units and p.category.field_units.get('size') %} {{ p.category.field_units.get('size') }}{% endif %}{% else %}—{% endif %}</td>
+                <td class="small">{% if p.power %}{{ p.power }}{% if p.category and p.category.field_units and p.category.field_units.get('power') %} {{ p.category.field_units.get('power') }}{% endif %}{% else %}—{% endif %}</td>
+                <td class="small">{{ p.location or '—' }}</td>
+                <td class="small">{{ p.state or '—' }}</td>
+                <td class="small">
+                    {% set cat_cf = p.category.custom_fields if p.category and p.category.custom_fields else None %}
+                    {% if cat_cf %}
+                        {%- set parts = cat_cf.split(',') -%}
+                        {%- for part in parts -%}
+                            {%- set label = part.split(':')[0].strip() -%}
+                            {%- set key = label.lower() -%}
+                            {%- set val = (p.custom_values[key] if p.custom_values and key in p.custom_values else '') -%}
+                            {% if val %}<div><span class="muted">{{ label }}:</span> {{ val }}</div>{% endif %}
+                        {%- endfor -%}
+                    {% elif p.custom_values %}
+                        {% for k, v in p.custom_values.items() %}
+                            {% if v %}<div><span class="muted">{{ k }}:</span> {{ v }}</div>{% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if p.comments %}
+                        <div class="muted" style="margin-top:4px">💬 {{ p.comments }}</div>
+                    {% endif %}
+                    {% if not cat_cf and not p.custom_values and not p.comments %}<span class="muted">—</span>{% endif %}
+                </td>
+                <td style="text-align:right">
+                    <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}">✏️ Modifier</a>
-                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}">📋 Dupliquer</a>
+                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}">✏️</a>
+                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}">📋</a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_product/{{ p.id }}" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger">🗑️ Supprimer</button>
+                        <form method="POST" action="/delete_product/{{ p.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger">🗑️</button>
                         </form>
                         {% endif %}
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             {% endfor %}
+                </tbody>
+            </table>
+            </div>
         </div>
     </div>
         {% endif %}
@@ -244,9 +258,12 @@
 
 <script>
 function toggleAccordion(header) {
-    const content = header.nextElementSibling;
+    const acc = header.closest('.accordion');
+    const controls = acc.querySelector('.accordion-controls');
+    const content = acc.querySelector('.accordion-content');
     header.classList.toggle('collapsed');
-    content.classList.toggle('collapsed');
+    if (controls) controls.classList.toggle('collapsed');
+    if (content) content.classList.toggle('collapsed');
 }
 </script>
 <script>
@@ -452,7 +469,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 return 0;
             });
             // append in order
-            visible.forEach(v => content.appendChild(v));
+            const tbody = content.querySelector('tbody');
+            const parent = tbody || content;
+            visible.forEach(v => parent.appendChild(v));
         }
 
         // wire controls

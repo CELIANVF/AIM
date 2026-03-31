@@ -3,35 +3,59 @@
 {% block title %}Assignations{% endblock %}
 
 {% block content %}
-<h1>Assignations actuelles</h1>
-<div class="grid">
-    {% for ass in assignments %}
-    <div class="item">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div>
-                <div style="display:flex;gap:8px;align-items:baseline">
-                    <h3 style="margin:0">{{ ass.composite.name }}</h3>
-                    <span class="muted small">&mdash; {{ ass.archer.name }}</span>
-                </div>
-                <p class="small muted" style="margin:6px 0 0 0">Assigné le {{ ass.date_assigned.strftime('%d/%m/%Y') }}</p>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center">
-                {% if current_user.can_manage_assignments_for_coach() %}
-                <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" style="display:inline;">
-                    <button class="btn btn-outline" type="submit">Retourner</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
+<div class="header-with-actions">
+    <div>
+        <h1>Assignations actuelles</h1>
+        <p class="muted">{{ assignments|length }} assignation(s)</p>
     </div>
-    {% endfor %}
+    <div class="action-group">
+        {% if current_user.can_manage_assignments_for_coach() %}
+        <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
+        {% endif %}
+        <a class="btn btn-secondary" href="/export_assignments">📄 Exporter en PDF</a>
+        <a class="btn btn-outline" href="/export_assignments_csv">📊 Exporter en CSV</a>
+    </div>
 </div>
 
-<p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+{% if assignments %}
+<div class="table-responsive">
+    <table class="table" style="margin:0;min-width:560px">
+        <thead>
+            <tr>
+                <th style="width:1%;white-space:nowrap">ID</th>
+                <th>Arc</th>
+                <th>Archer</th>
+                <th>Date d'assignation</th>
+                <th style="text-align:right;white-space:nowrap">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ass in assignments %}
+            <tr>
+                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ ass.id }}</td>
+                <td><strong>{{ ass.composite.name }}</strong></td>
+                <td>{{ ass.archer.name }}</td>
+                <td class="small">{{ ass.date_assigned.strftime('%d/%m/%Y') }}</td>
+                <td style="text-align:right">
+                    {% if current_user.can_manage_assignments_for_coach() %}
+                    <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" style="display:inline;margin:0">
+                        <button class="btn btn-outline" type="submit" style="padding:6px 10px;font-size:13px;cursor:pointer">Retourner</button>
+                    </form>
+                    {% else %}
+                    <span class="muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px 24px">
+    <p class="muted">Aucune assignation en cours</p>
     {% if current_user.can_manage_assignments_for_coach() %}
-    <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
+    <a href="/assign" class="btn btn-primary" style="margin-top:16px">Nouvelle assignation</a>
     {% endif %}
-    <a class="btn btn-secondary" href="/export_assignments">📄 Exporter en PDF</a>
-    <a class="btn btn-outline" href="/export_assignments_csv">📊 Exporter en CSV</a>
-</p>
+</div>
+{% endif %}
 {% endblock %}
