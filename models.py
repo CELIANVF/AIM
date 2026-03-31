@@ -180,6 +180,7 @@ class InscriptionEvent(db.Model):
     title = db.Column(db.String(200), nullable=False, default='Événement')
     recipient_name = db.Column(db.String(120), nullable=True)
     depart_phrase = db.Column(db.String(500), nullable=True)
+    depart_phrases_json = db.Column(db.Text, nullable=True)
     lieu = db.Column(db.String(200), nullable=True)
     blasons_line = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
@@ -204,6 +205,7 @@ class InscriptionEventRegistration(db.Model):
     blason = db.Column(db.String(120), nullable=True)
     distance_label = db.Column(db.String(60), nullable=True)
     pike_label = db.Column(db.String(60), nullable=True)
+    depart_index = db.Column(db.Integer, nullable=True)
 
     event = db.relationship('InscriptionEvent', back_populates='registrations')
     archer = db.relationship('Archer', backref='inscription_event_registrations')

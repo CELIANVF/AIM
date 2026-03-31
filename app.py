@@ -19,8 +19,10 @@ from models import (
 )
 from datetime import datetime, date, timedelta
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from dateutil import parser as date_parser
 import csv
+import json
 import re
 import unicodedata
 from io import StringIO
@@ -54,9 +56,7 @@ def _registration_weapon_canonical(weapon_choice):
         return '__fiche__'
     return REGISTRATION_WEAPON_ALIASES.get(w, w)
 
-DEFAULT_INSCRIPTION_BLASONS_LINE = (
-    'U11 12m Ø 80cm - U13 15m Ø 80cm - U15 20m 80cm - U18 à S3 30m Ø122 cm'
-)
+
 
 # (code, libellé affiché, mode distance/pique pour le formulaire et le texte)
 INSCRIPTION_DISCIPLINES = [
@@ -305,13 +305,20 @@ def _inscription_weapon_group(weapon_choice, bow_type):
     """CL / CO / BB / LD (arc droit / longbow) pour les tableaux distances-blasons."""
     w = _registration_weapon_canonical(weapon_choice)
     if w == '__fiche__':
-        bt = (bow_type or '').lower()
-        if 'compound' in bt or 'poulie' in bt:
+        bt_norm = (bow_type or '').lower().strip()
+        if bt_norm == 'co' or 'compound' in bt_norm or 'poulie' in bt_norm:
             return 'CO'
-        if 'longbow' in bt or 'arc droit' in bt or bt.strip() in ('ld', 'long bow'):
+        if (
+            bt_norm in ('ld', 'ad', 'longbow')
+            or 'longbow' in bt_norm
+            or 'arc droit' in bt_norm
+            or bt_norm == 'long bow'
+        ):
             return 'LD'
-        if 'bare' in bt or bt.strip() == 'bb':
+        if bt_norm == 'bb' or 'bare' in bt_norm:
             return 'BB'
+        if bt_norm == 'cl':
+            return 'CL'
         return 'CL'
     if w in ('Compound', 'CO'):
         return 'CO'
@@ -608,7 +615,10 @@ def _inscription_parse_row(archer):
     blason_sel = request.form.get(f'blason_{aid}', '')
     dist = _inscription_distance_value(aid)
     pike = _inscription_pike_value(aid)
-    weapon_label = _registration_weapon_label(archer, w)
+    weapon_label = _inscription_mail_weapon_abbrev(archer, w)
+    _wl = (weapon_label or '').strip()
+    if not _wl or _wl in ('—', '-', '\u2014'):
+        weapon_label = 'CL'
     age_label = _inscription_age_label(archer, age_code)
     blason_label = _inscription_blason_label(aid, blason_sel)
     dist_pike = _inscription_dist_pike_summary(disc, dist, pike)
@@ -623,6 +633,7 @@ def _inscription_parse_row(archer):
         'distance_stored': dist,
         'pike_stored': pike,
         'dist_pike_label': dist_pike,
+        'depart_index': _inscription_parse_depart_index(aid),
     }
 
 
@@ -654,9 +665,9 @@ def _preset_match(stored, choices):
     return '__custom__', stored
 
 
-def _inscription_row_form_state(archer, reg=None):
+def _inscription_row_form_state(archer, reg=None, depart_option_count=1):
     """État formulaire pour un archer (depuis DB ou défauts)."""
-    aid = archer.id
+    dc = max(1, int(depart_option_count or 1))
     if reg is None:
         st = {
             'discipline': DEFAULT_INSCRIPTION_DISCIPLINE,
@@ -668,6 +679,7 @@ def _inscription_row_form_state(archer, reg=None):
             'distance_custom': '',
             'pike': '',
             'pike_custom': '',
+            'depart_index': 0,
         }
         auto = _inscription_default_distance_blason_fields(
             archer, '__fiche__', '', '__fiche__', st['discipline']
@@ -684,6 +696,13 @@ def _inscription_row_form_state(archer, reg=None):
     )
     dist, dist_cust = _preset_match(reg.distance_label or '', INSCRIPTION_DISTANCE_CHOICES)
     pike, pike_cust = _preset_match(reg.pike_label or '', INSCRIPTION_PIKE_CHOICES)
+    di = 0
+    if reg.depart_index is not None:
+        try:
+            di = int(reg.depart_index)
+        except (TypeError, ValueError):
+            di = 0
+    di = _inscription_clamp_depart_index(di, dc)
     return {
         'discipline': disc,
         'age_category': age_cat or '__fiche__',
@@ -694,6 +713,7 @@ def _inscription_row_form_state(archer, reg=None):
         'distance_custom': dist_cust,
         'pike': pike,
         'pike_custom': pike_cust,
+        'depart_index': di,
     }
 
 
@@ -1596,13 +1616,105 @@ def _registration_weapon_label(archer, weapon_choice):
     return REGISTRATION_WEAPON_LABELS.get(choice, choice)
 
 
+def _inscription_mail_weapon_abbrev(archer, weapon_choice):
+    """
+    Abréviation arme pour le texte généré (mail / PDF) :
+    CL classique, CO poulies, BB barebow, AD arc droit (longbow).
+    « Comme sur la fiche » sans type d'arc en base : CL.
+    « Comme sur la fiche » avec arc renseigné : même logique que les tableaux (CO/BB/AD/CL).
+    """
+    w = _registration_weapon_canonical(weapon_choice)
+    if w == '__fiche__':
+        if not (archer.bow_type or '').strip():
+            return 'CL'
+        grp = _inscription_weapon_group('__fiche__', archer.bow_type)
+        return {'CO': 'CO', 'BB': 'BB', 'LD': 'AD', 'CL': 'CL'}.get(grp, 'CL')
+    if w in ('CL', 'Classique'):
+        return 'CL'
+    if w in ('BB', 'Barebow'):
+        return 'BB'
+    if w in ('Compound', 'CO'):
+        return 'CO'
+    if w in ('Longbow', 'LD'):
+        return 'AD'
+    if w == 'Autre':
+        return 'Autre'
+    return 'CL'
+
+
+def _inscription_depart_phrases_from_event(ev):
+    """Liste des phrases « départ » (JSON en base ou ancien champ unique)."""
+    if not ev:
+        return []
+    raw = getattr(ev, 'depart_phrases_json', None)
+    if raw:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return [str(x).strip() for x in data if str(x).strip()]
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+    p = (getattr(ev, 'depart_phrase', None) or '').strip()
+    return [p] if p else []
+
+
+def _inscription_depart_phrases_from_form():
+    return [p.strip() for p in request.form.getlist('depart_phrases') if p and str(p).strip()]
+
+
+def _inscription_depart_select_options(deps):
+    """(index, libellé court) pour chaque départ non vide ; au moins une entrée."""
+    out = []
+    for p in deps or []:
+        s = (p or '').strip()
+        if s:
+            out.append((len(out), s[:200]))
+    if not out:
+        out = [(0, '—')]
+    return out
+
+
+def _inscription_clamp_depart_index(idx, num_departs):
+    try:
+        i = int(idx)
+    except (TypeError, ValueError):
+        i = 0
+    n = max(1, int(num_departs or 1))
+    return max(0, min(i, n - 1))
+
+
+def _inscription_parse_depart_index(aid):
+    opts = _inscription_depart_select_options(_inscription_depart_phrases_from_form())
+    return _inscription_clamp_depart_index(request.form.get(f'depart_index_{aid}', '0'), len(opts))
+
+
+def _inscription_store_depart_phrases_on_event(ev, phrases):
+    clean = [p.strip() for p in (phrases or []) if p and str(p).strip()]
+    if clean:
+        ev.depart_phrases_json = json.dumps(clean, ensure_ascii=False)
+        ev.depart_phrase = clean[0][:500]
+    else:
+        ev.depart_phrases_json = None
+        ev.depart_phrase = None
+
+
+def _inscription_format_mail_depart_intro(depart_phrases):
+    parts = [p.strip() for p in (depart_phrases or []) if p and str(p).strip()]
+    if not parts:
+        return 'Voici les archers que je souhaite inscrire.'
+    if len(parts) == 1:
+        return f'Voici les archers que je souhaite inscrire pour le départ de {parts[0]}.'
+    return 'Voici les archers que je souhaite inscrire, répartis par départ :'
+
+
 def _parse_inscription_evenement_form():
     """
-    Retourne ((recipient, depart_phrase, lieu, blasons_line, rows), None) ou (None, erreur).
+    Retourne ((recipient, depart_phrases, lieu, blasons_line, rows), None) ou (None, erreur).
+    depart_phrases : liste de chaînes.
     rows : liste de tuples (Archer, meta dict pour _format_inscription_archer_line).
     """
     recipient = request.form.get('recipient_name', '').strip()
-    depart_phrase = request.form.get('depart_phrase', '').strip()
+    depart_phrases = _inscription_depart_phrases_from_form()
     lieu = request.form.get('lieu', '').strip()
     blasons_line = request.form.get('blasons_line', '').strip()
     ids = request.form.getlist('archer_id')
@@ -1624,7 +1736,7 @@ def _parse_inscription_evenement_form():
         rows.append((arch, _inscription_parse_row(arch)))
     if not rows:
         return None, 'Aucun archer valide sélectionné.'
-    return (recipient, depart_phrase, lieu, blasons_line, rows), None
+    return (recipient, depart_phrases, lieu, blasons_line, rows), None
 
 
 def _format_inscription_archer_line(archer, meta):
@@ -1645,21 +1757,42 @@ def _format_inscription_archer_line(archer, meta):
     return ' — '.join(bits)
 
 
-def _build_inscription_evenement_body(recipient, depart_phrase, lieu, blasons_line, rows):
+def _build_inscription_evenement_body(recipient, depart_phrases, lieu, blasons_line, rows):
     """Texte type courrier / mail pour l’organisateur."""
+    from collections import defaultdict
+
+    parts = [p.strip() for p in (depart_phrases or []) if p and str(p).strip()]
     r = (recipient or '').strip()
     salut = f'Bonjour {r},' if r else 'Bonjour,'
-    dep = (depart_phrase or '').strip() or '—'
     lines = [
         salut,
         '',
-        f'Voici les archers que je souhaite inscrire pour le départ de {dep}.',
+        _inscription_format_mail_depart_intro(depart_phrases),
     ]
     if (lieu or '').strip():
         lines.append(f'Lieu : {lieu.strip()}.')
     lines.append('')
-    for arch, meta in rows:
-        lines.append(_format_inscription_archer_line(arch, meta))
+
+    if len(parts) <= 1:
+        for arch, meta in rows:
+            lines.append(_format_inscription_archer_line(arch, meta))
+    else:
+        n = len(parts)
+        by_dep = defaultdict(list)
+        for arch, meta in rows:
+            idx = _inscription_clamp_depart_index(meta.get('depart_index', 0), n)
+            by_dep[idx].append((arch, meta))
+        for i, phrase in enumerate(parts):
+            archs = by_dep.get(i, [])
+            if not archs:
+                continue
+            lines.append(f'Pour le départ de {phrase} :')
+            for arch, meta in archs:
+                lines.append(_format_inscription_archer_line(arch, meta))
+            lines.append('')
+        while lines and lines[-1] == '':
+            lines.pop()
+
     lines.append('')
     bl = (blasons_line or '').strip()
     if bl:
@@ -1669,10 +1802,15 @@ def _build_inscription_evenement_body(recipient, depart_phrase, lieu, blasons_li
 
 def _inscription_form_snapshot(archers_list):
     """Reconstitue l’état formulaire après un POST (texte / PDF)."""
+    deps = _inscription_depart_phrases_from_form()
+    if not deps:
+        deps = ['']
+    dep_opts = _inscription_depart_select_options(deps)
+    dep_n = len(dep_opts)
     form_values = {
         'title': request.form.get('title', ''),
         'recipient_name': request.form.get('recipient_name', ''),
-        'depart_phrase': request.form.get('depart_phrase', ''),
+        'depart_phrases': deps,
         'lieu': request.form.get('lieu', ''),
         'blasons_line': request.form.get('blasons_line', ''),
     }
@@ -1686,6 +1824,8 @@ def _inscription_form_snapshot(archers_list):
     registration_extras = {}
     for a in archers_list:
         aid = a.id
+        if aid not in selected_ids:
+            continue
         weapon_saved[a.id] = _registration_weapon_canonical(
             request.form.get(f'weapon_{aid}', '__fiche__')
         )
@@ -1701,23 +1841,63 @@ def _inscription_form_snapshot(archers_list):
             'distance_custom': request.form.get(f'distance_custom_{aid}', '') or '',
             'pike': request.form.get(f'pike_{aid}', '') or '',
             'pike_custom': request.form.get(f'pike_custom_{aid}', '') or '',
+            'depart_index': _inscription_clamp_depart_index(
+                request.form.get(f'depart_index_{aid}', '0'), dep_n
+            ),
         }
     return form_values, selected_ids, weapon_saved, registration_extras
+
+
+def _inscription_archers_by_depart(selected_ids, registration_extras, archers_by_id, dep_n):
+    """Liste de listes d'archers : une sous-liste par index de départ (0 .. dep_n-1)."""
+    buckets = [[] for _ in range(max(1, int(dep_n or 1)))]
+    n = len(buckets)
+    for aid in selected_ids:
+        arch = archers_by_id.get(aid)
+        if not arch:
+            continue
+        ex = registration_extras.get(aid, {})
+        di = _inscription_clamp_depart_index(ex.get('depart_index', 0), n)
+        buckets[di].append(arch)
+    for lst in buckets:
+        lst.sort(key=lambda a: ((a.last_name or '').lower(), (a.first_name or '').lower()))
+    return buckets
+
+
+def _inscription_archers_picker_payload(archers_list, inscription_archer_cat_keys, inscription_archer_cat_keys_di):
+    """Données JSON pour ajout d'archers côté client (un archer ne peut être qu'une fois par événement)."""
+    out = []
+    for a in archers_list:
+        out.append(
+            {
+                'id': a.id,
+                'name': a.name,
+                'license_number': (a.license_number or '').strip(),
+                'categorie': (a.categorie or '').strip(),
+                'bow_type': (a.bow_type or '').strip(),
+                'fiche_cat_key': inscription_archer_cat_keys.get(a.id, '') or '',
+                'fiche_cat_key_di': inscription_archer_cat_keys_di.get(a.id, '') or '',
+            }
+        )
+    return out
 
 
 @app.route('/inscription_evenement', methods=['GET', 'POST'])
 @login_required
 def inscription_evenement():
     archers_list = Archer.query.order_by(Archer.last_name.asc(), Archer.first_name.asc()).all()
-    events = InscriptionEvent.query.order_by(InscriptionEvent.created_at.desc()).all()
+    events = (
+        InscriptionEvent.query.options(selectinload(InscriptionEvent.registrations))
+        .order_by(InscriptionEvent.created_at.desc())
+        .all()
+    )
     generated_text = None
     current_event = None
     form_values = {
         'title': '',
         'recipient_name': '',
-        'depart_phrase': '',
+        'depart_phrases': [''],
         'lieu': '',
-        'blasons_line': DEFAULT_INSCRIPTION_BLASONS_LINE,
     }
     selected_ids = set()
     weapon_saved = {}
@@ -1730,11 +1910,10 @@ def inscription_evenement():
             title = (request.form.get('new_event_title') or '').strip() or 'Événement'
             ev = InscriptionEvent(
                 title=title,
-                blasons_line=DEFAULT_INSCRIPTION_BLASONS_LINE,
             )
             db.session.add(ev)
             db.session.commit()
-            flash('Événement créé. Cochez les archers puis enregistrez.', 'success')
+            flash('Événement créé. Ajoutez des archers par départ puis enregistrez.', 'success')
             return redirect(url_for('inscription_evenement', event_id=ev.id))
 
         if action == 'save_event':
@@ -1745,7 +1924,9 @@ def inscription_evenement():
                 return redirect(url_for('inscription_evenement'))
             ev.title = (request.form.get('title') or '').strip() or ev.title
             ev.recipient_name = (request.form.get('recipient_name') or '').strip() or None
-            ev.depart_phrase = (request.form.get('depart_phrase') or '').strip() or None
+            _inscription_store_depart_phrases_on_event(
+                ev, request.form.getlist('depart_phrases')
+            )
             ev.lieu = (request.form.get('lieu') or '').strip() or None
             ev.blasons_line = (request.form.get('blasons_line') or '').strip() or None
             InscriptionEventRegistration.query.filter_by(event_id=ev.id).delete()
@@ -1777,6 +1958,7 @@ def inscription_evenement():
                         blason=blason_db,
                         distance_label=dist,
                         pike_label=pike,
+                        depart_index=_inscription_parse_depart_index(aid),
                     )
                 )
             db.session.commit()
@@ -1803,9 +1985,9 @@ def inscription_evenement():
             if err:
                 flash(err, 'error')
             else:
-                recipient, depart_phrase, lieu, blasons_line, rows = parsed
+                recipient, depart_phrases, lieu, blasons_line, rows = parsed
                 generated_text = _build_inscription_evenement_body(
-                    recipient, depart_phrase, lieu, blasons_line, rows
+                    recipient, depart_phrases, lieu, blasons_line, rows
                 )
             peid = request.form.get('event_id', type=int)
             if peid:
@@ -1817,17 +1999,15 @@ def inscription_evenement():
             current_event = InscriptionEvent.query.get(eid)
             if not current_event:
                 flash('Événement inconnu.', 'error')
-                current_event = events[0] if events else None
-        elif events:
-            current_event = events[0]
+        # Sans ?event_id= : afficher la liste des événements (pas de sélection auto)
         if current_event:
+            deps = _inscription_depart_phrases_from_event(current_event)
             form_values = {
                 'title': current_event.title or '',
                 'recipient_name': current_event.recipient_name or '',
-                'depart_phrase': current_event.depart_phrase or '',
+                'depart_phrases': deps if deps else [''],
                 'lieu': current_event.lieu or '',
                 'blasons_line': (current_event.blasons_line or '').strip()
-                or DEFAULT_INSCRIPTION_BLASONS_LINE,
             }
             selected_ids = {r.archer_id for r in current_event.registrations}
             weapon_saved = {
@@ -1835,8 +2015,12 @@ def inscription_evenement():
                 for r in current_event.registrations
             }
             reg_by_archer = {r.archer_id: r for r in current_event.registrations}
+            dep_opts = _inscription_depart_select_options(deps if deps else [''])
+            dep_n = len(dep_opts)
             registration_extras = {
-                a.id: _inscription_row_form_state(a, reg_by_archer.get(a.id)) for a in archers_list
+                a.id: _inscription_row_form_state(a, reg_by_archer.get(a.id), dep_n)
+                for a in archers_list
+                if a.id in selected_ids
             }
 
     inscription_discipline_modes = {c: m for c, _lbl, m in INSCRIPTION_DISCIPLINES}
@@ -1852,10 +2036,23 @@ def inscription_evenement():
     }
     inscription_cat_weapon_targets = _inscription_cat_weapon_targets_for_json()
     inscription_campagne_piquets = _inscription_campagne_targets_for_json()
+    inscription_depart_options = _inscription_depart_select_options(
+        form_values.get('depart_phrases') or ['']
+    )
+    archers_by_id = {a.id: a for a in archers_list}
+    dep_n = len(inscription_depart_options)
+    archers_by_depart = _inscription_archers_by_depart(
+        selected_ids, registration_extras, archers_by_id, dep_n
+    )
+    inscription_archers_picker = _inscription_archers_picker_payload(
+        archers_list, inscription_archer_cat_keys, inscription_archer_cat_keys_di
+    )
+    inscription_new_row_extras = (
+        _inscription_row_form_state(archers_list[0], None, dep_n) if archers_list else {}
+    )
 
     return render_template(
         'inscription_evenement.html',
-        archers=archers_list,
         weapon_choices=REGISTRATION_WEAPON_CHOICES,
         generated_text=generated_text,
         form_values=form_values,
@@ -1874,6 +2071,11 @@ def inscription_evenement():
         inscription_archer_cat_keys_di=inscription_archer_cat_keys_di,
         inscription_cat_weapon_targets=inscription_cat_weapon_targets,
         inscription_campagne_piquets=inscription_campagne_piquets,
+        inscription_depart_options=inscription_depart_options,
+        archers_by_depart=archers_by_depart,
+        inscription_archers_picker=inscription_archers_picker,
+        has_archers=bool(archers_list),
+        inscription_new_row_extras=inscription_new_row_extras,
     )
 
 
@@ -1887,9 +2089,9 @@ def inscription_evenement_pdf():
         return redirect(
             url_for('inscription_evenement', event_id=eid) if eid else url_for('inscription_evenement')
         )
-    recipient, depart_phrase, lieu, blasons_line, rows = parsed
+    recipient, depart_phrases, lieu, blasons_line, rows = parsed
     body = _build_inscription_evenement_body(
-        recipient, depart_phrase, lieu, blasons_line, rows
+        recipient, depart_phrases, lieu, blasons_line, rows
     )
     try:
         from io import BytesIO
