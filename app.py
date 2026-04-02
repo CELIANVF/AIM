@@ -1284,6 +1284,20 @@ def _record_login_event(*, user_id, attempted_username, success):
         app.logger.exception("Impossible d'enregistrer l'événement de connexion")
 
 
+def _archer_never_logged_in_successfully(archer):
+    """True si aucune connexion réussie enregistrée pour l’e-mail de ce compte archer."""
+    email = (archer.email or '').strip().lower()
+    if not email:
+        return False
+    return (
+        UserLoginEvent.query.filter(
+            UserLoginEvent.success.is_(True),
+            func.lower(UserLoginEvent.attempted_username) == email,
+        ).first()
+        is None
+    )
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -1298,7 +1312,11 @@ def login():
                 _record_login_event(user_id=user.id, attempted_username=None, success=True)
                 return redirect(url_for('index'))
             _record_login_event(user_id=user.id, attempted_username=None, success=False)
-            return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
+            return render_template(
+                'login.html',
+                error='Nom d\'utilisateur ou mot de passe incorrect',
+                login_username=username,
+            )
 
         # Compte archer : identifiant = adresse e-mail (insensible à la casse)
         archer = None
@@ -1317,11 +1335,46 @@ def login():
             attempted_username=uname_audit,
             success=False,
         )
+        suggest_resend = bool(
+            archer
+            and archer.has_account
+            and username
+            and '@' in username
+            and _archer_never_logged_in_successfully(archer)
+        )
         return render_template(
             'login.html',
             error='Nom d\'utilisateur ou mot de passe incorrect',
+            login_username=username,
+            suggest_resend_password=suggest_resend,
         )
     return render_template('login.html')
+
+
+@app.route('/login/resend-archer-password', methods=['POST'])
+def login_resend_archer_password():
+    """Renvoie un mot de passe provisoire par e-mail (uniquement avant la 1re connexion réussie)."""
+    email = (request.form.get('username') or '').strip()
+    if not email or '@' not in email:
+        flash('Adresse e-mail invalide.', 'error')
+        return redirect(url_for('login'))
+    archer = Archer.query.filter(
+        Archer.email.isnot(None),
+        func.lower(Archer.email) == email.lower(),
+    ).first()
+    if not archer or not archer.has_account:
+        flash('Aucun compte archer actif à cette adresse.', 'error')
+        return redirect(url_for('login'))
+    if not _archer_never_logged_in_successfully(archer):
+        flash(
+            'Un nouveau mot de passe automatique n’est disponible qu’avant la première connexion. '
+            'Contactez le club en cas de besoin.',
+            'error',
+        )
+        return redirect(url_for('login'))
+    ok, msg = _resend_archer_temporary_password(archer)
+    flash(msg, 'success' if ok else 'error')
+    return redirect(url_for('login'))
 
 @app.route('/logout')
 @login_required
@@ -4485,6 +4538,34 @@ def delete_user(user_id):
 # =============================================================================
 # Routes Admin - Création de compte Archer
 # =============================================================================
+
+def _resend_archer_temporary_password(archer):
+    """
+    Nouveau mot de passe provisoire + e-mail (compte archer déjà créé).
+    Réservé aux comptes n’ayant jamais réussi à se connecter (voir appelant).
+    """
+    email = (archer.email or '').strip()
+    if not email:
+        return False, 'Impossible d’envoyer l’e-mail : aucune adresse renseignée pour ce compte.'
+
+    temp_password = generate_temporary_password()
+    archer.set_password(temp_password)
+    email_sent = send_archer_credentials(archer, temp_password)
+
+    if email_sent:
+        db.session.commit()
+        log_history(
+            event_type='archer_password_resent',
+            entity_type='archer',
+            entity_id=archer.id,
+            summary=f"Mot de passe provisoire renvoyé : {archer.name} ({archer.email})",
+            details={'archer_id': archer.id, 'email': archer.email},
+        )
+        db.session.commit()
+        return True, f'Un nouveau mot de passe provisoire a été envoyé à {email}.'
+    db.session.rollback()
+    return False, 'Erreur lors de l’envoi de l’e-mail. Réessayez plus tard ou contactez le club.'
+
 
 def _create_and_email_archer_account(archer):
     """
