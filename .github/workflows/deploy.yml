@@ -1,5 +1,5 @@
 # Déploiement automatique : à chaque push sur `main`, SSH vers le VPS puis
-# git pull + deps + migrations + restart du service Gunicorn.
+# sauvegarde BDD → git pull + deps + migrations + restart du service Gunicorn.
 #
 # Secrets GitHub (Settings → Secrets and variables → Actions) :
 #   DEPLOY_HOST     — IP ou domaine du serveur (ex. matos.anc93.com)
@@ -10,6 +10,7 @@
 #   - dépôt git cloné (même remote que GitHub), branche main à jour une première fois
 #   - sudo NOPASSWD pour : systemctl restart aim (et éventuellement nginx)
 #   - accès git : pour un dépôt privé, clé de déploiement ou token configuré sur le serveur (git pull)
+#   - PostgreSQL : paquet client avec pg_dump si DATABASE_URL pointe vers Postgres
 
 name: Deploy to server
 

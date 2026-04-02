@@ -16,6 +16,9 @@ fi
 source venv/bin/activate
 export FLASK_APP=app.py
 
+# Sauvegarde BDD avant mise à jour du code / migrations (voir scripts/backup_database.py)
+python scripts/backup_database.py
+
 git fetch origin
 git checkout main
 git reset --hard origin/main
