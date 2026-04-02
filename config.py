@@ -42,3 +42,5 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or None
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD') or None
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or None
+    # 0/1 pour Flask-Mail (journal SMTP sur stderr, utile avec scripts/send_test_mail.py --verbose)
+    MAIL_DEBUG = int(_env_bool('MAIL_DEBUG', False))
