@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block content %}
 <div class="container mt-4">
@@ -39,14 +40,14 @@
                 <tbody>
                     {% for user in users %}
                         <tr>
-                            <td class="small" style="color:var(--muted);font-variant-numeric:tabular-nums">{{ user.id }}</td>
+                            <td class="small td-tabular" style="color:var(--muted)">{{ er.ref_user(user.id, user.id) }}</td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 12px;">
                                     <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--primary);">
                                         {{ user.username[0]|upper }}
                                     </div>
                                     <div>
-                                        <strong style="font-size: 15px;">{{ user.username }}</strong>
+                                        <strong style="font-size: 15px;">{{ er.ref_user(user.id, user.username) }}</strong>
                                         {% if user.id == current_user.id %}
                                             <span class="badge" style="background: #e0f2fe; color: #0369a1; margin-left: 8px;">Vous</span>
                                         {% endif %}

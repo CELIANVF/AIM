@@ -12,19 +12,19 @@
 </div>
 
 {% if not events %}
-<div class="card" style="padding:40px 24px;text-align:center">
+<div class="card empty-state--tight">
     <p class="muted">Aucun événement n’est ouvert aux inscriptions en ligne pour l’instant.</p>
 </div>
 {% else %}
-<ul class="insc-event-grid" role="list" style="list-style:none;padding:0;margin:0;display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+<ul class="archer-event-grid" role="list">
     {% for ev in events %}
     <li>
-        <div class="card" style="padding:18px 20px;height:100%;display:flex;flex-direction:column;gap:10px">
+        <div class="card event-card">
             <div>
                 <strong>{{ ev.title }}</strong>
-                {% if ev.lieu %}<div class="small muted" style="margin-top:4px">{{ ev.lieu }}</div>{% endif %}
+                {% if ev.lieu %}<div class="small muted note-below">{{ ev.lieu }}</div>{% endif %}
                 {% if ev.start_date or ev.end_date %}
-                <div class="small muted" style="margin-top:4px">
+                <div class="small muted note-below">
                     {% if ev.start_date and ev.end_date %}Du {{ ev.start_date.strftime('%d/%m/%Y') }} au {{ ev.end_date.strftime('%d/%m/%Y') }}{% elif ev.start_date %}À partir du {{ ev.start_date.strftime('%d/%m/%Y') }}{% else %}Jusqu’au {{ ev.end_date.strftime('%d/%m/%Y') }}{% endif %}
                 </div>
                 {% endif %}
@@ -32,11 +32,11 @@
             {% if ev.archer_registration_deadline %}
             <div class="small muted">Limite : {{ ev.archer_registration_deadline.strftime('%d/%m/%Y') }}</div>
             {% endif %}
-            <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px;align-items:stretch">
+            <div class="event-card__actions">
                 {% if ev.id in reg_by_event %}
                 <a class="btn btn-outline" href="{{ url_for('archer_event_signup', event_id=ev.id) }}">Modifier mon inscription</a>
                 <form method="post" action="{{ url_for('archer_event_cancel_registration', event_id=ev.id) }}" onsubmit="return confirm('Annuler votre inscription à cet événement ?');">
-                    <button type="submit" class="btn btn-danger" style="width:100%">Annuler mon inscription</button>
+                    <button type="submit" class="btn btn-danger btn-block">Annuler mon inscription</button>
                 </form>
                 {% else %}
                 <a class="btn btn-primary" href="{{ url_for('archer_event_signup', event_id=ev.id) }}">M’inscrire</a>

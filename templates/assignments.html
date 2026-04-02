@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Assignations{% endblock %}
 
@@ -32,9 +33,9 @@
         <tbody>
             {% for ass in assignments %}
             <tr>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ ass.id }}</td>
-                <td><strong>{{ ass.composite.name }}</strong></td>
-                <td>{{ ass.archer.name }}</td>
+                <td class="small muted td-tabular">{{ ass.id }}</td>
+                <td><strong>{{ er.ref_composite(ass.composite_id, ass.composite.name) }}</strong></td>
+                <td>{{ er.ref_archer(ass.archer_id, ass.archer.name) }}</td>
                 <td class="small">{{ ass.date_assigned.strftime('%d/%m/%Y') }}</td>
                 <td style="text-align:right">
                     {% if current_user.can_manage_assignments_for_coach() %}

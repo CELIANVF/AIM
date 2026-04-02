@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Recherche: {{ q }}{% endblock %}
 
@@ -29,9 +30,9 @@
         <tbody>
         {% for p in products %}
           <tr>
-            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ p.id }}</td>
-            <td><strong>{{ p.brand }}{% if p.model %} — {{ p.model }}{% endif %}</strong></td>
-            <td class="small">{{ p.category.name if p.category else '—' }}</td>
+            <td class="small muted td-tabular">{{ er.ref_product(p.id, p.id) }}</td>
+            <td><strong>{% if p.brand or p.model %}{% set _pl = (p.brand ~ (' — ' ~ p.model if p.model else '')) if p.brand else (p.model or '') %}{{ er.ref_product(p.id, _pl) }}{% else %}—{% endif %}</strong></td>
+            <td class="small">{% if p.category %}{{ er.ref_category(p.category.id, p.category.name) }}{% else %}—{% endif %}</td>
             <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_product/{{ p.id }}">Modifier</a></td>
           </tr>
         {% endfor %}
@@ -55,9 +56,9 @@
         <tbody>
         {% for a in archers %}
           <tr>
-            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ a.id }}</td>
-            <td><strong>{{ a.name }}</strong></td>
-            <td class="small">{{ a.license_number or '—' }}</td>
+            <td class="small muted td-tabular">{{ er.ref_archer(a.id, a.id) }}</td>
+            <td><strong>{{ er.ref_archer(a.id, a.name) }}</strong></td>
+            <td class="small">{% if a.license_number %}{{ er.ref_archer(a.id, a.license_number) }}{% else %}—{% endif %}</td>
             <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_archer/{{ a.id }}">Modifier</a></td>
           </tr>
         {% endfor %}
@@ -80,8 +81,8 @@
         <tbody>
         {% for c in categories %}
           <tr>
-            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ c.id }}</td>
-            <td><strong>{{ c.name }}</strong></td>
+            <td class="small muted td-tabular">{{ er.ref_category(c.id, c.id) }}</td>
+            <td><strong>{{ er.ref_category(c.id, c.name) }}</strong></td>
             <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_category/{{ c.id }}">Modifier</a></td>
           </tr>
         {% endfor %}
@@ -104,8 +105,8 @@
         <tbody>
         {% for comp in composites %}
           <tr>
-            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ comp.id }}</td>
-            <td><strong>{{ comp.name }}</strong></td>
+            <td class="small muted td-tabular">{{ er.ref_composite(comp.id, comp.id) }}</td>
+            <td><strong>{{ er.ref_composite(comp.id, comp.name) }}</strong></td>
             <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="/edit_composite/{{ comp.id }}">Modifier</a></td>
           </tr>
         {% endfor %}
@@ -128,9 +129,9 @@
         <tbody>
         {% for u in users %}
           <tr>
-            <td class="small muted" style="font-variant-numeric:tabular-nums">{{ u.id }}</td>
-            <td><strong>{{ u.username }}</strong></td>
-            <td style="text-align:right"><a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="{{ url_for('users') }}">Utilisateurs</a></td>
+            <td class="small muted td-tabular">{{ er.ref_user(u.id, u.id) }}</td>
+            <td><strong>{{ er.ref_user(u.id, u.username) }}</strong></td>
+            <td style="text-align:right">{% if current_user.is_admin() %}<a class="btn btn-outline" style="padding:6px 10px;font-size:13px" href="{{ url_for('edit_user', user_id=u.id) }}">Modifier</a>{% else %}<span class="muted small">—</span>{% endif %}</td>
           </tr>
         {% endfor %}
         </tbody>

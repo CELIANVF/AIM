@@ -1,5 +1,4 @@
-/* Modern responsive stylesheet */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Modern responsive stylesheet — Inter chargée depuis layout.html (preconnect + link) */
 
 :root{
   --bg: #f8fafc;
@@ -72,6 +71,30 @@ body{
   font-weight:700;
   color:var(--primary);
   letter-spacing:-0.02em;
+}
+.logo-link{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  text-decoration:none;
+  color:inherit;
+}
+.logo-link:hover{
+  color:inherit;
+  opacity:0.92;
+}
+.logo-img{
+  height:32px;
+  width:auto;
+  vertical-align:middle;
+  display:block;
+}
+.logo-wordmark{
+  font-size:1.2rem;
+  font-weight:700;
+  vertical-align:middle;
+  letter-spacing:0.05em;
+  color:var(--primary);
 }
 .search{flex:1;max-width:480px}
 .search input{
@@ -249,6 +272,43 @@ h3{
 .badge-primary{background:var(--primary-light);color:var(--primary)}
 .badge-success{background:var(--success-light);color:var(--success)}
 .badge-warning{background:var(--warning-light);color:var(--warning)}
+
+/* Statut produit : assigné + nom archer */
+a.product-assign-badge{
+  text-decoration:none;
+  display:inline-flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  max-width:min(260px,100%);
+  white-space:normal;
+  text-align:left;
+  line-height:1.3;
+  padding:6px 10px;
+}
+span.product-assign-badge--static{
+  display:inline-flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  max-width:min(260px,100%);
+  white-space:normal;
+  text-align:left;
+  line-height:1.3;
+  padding:6px 10px;
+}
+.product-assign-name{
+  display:block;
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-secondary);
+  max-width:100%;
+  overflow-wrap:anywhere;
+}
+a.product-assign-badge:hover .product-assign-name{
+  color:var(--primary-hover);
+  text-decoration:underline;
+}
 .badge-danger{background:var(--danger-light);color:var(--danger)}
 .badge-info{background:#e0f2fe;color:#0369a1}
 .badge-secondary{background:var(--bg-alt);color:var(--text-secondary)}
@@ -273,7 +333,12 @@ label{
 }
 input[type="text"],
 input[type="email"],
+input[type="password"],
 input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"],
 select,
 textarea{
   width:100%;
@@ -285,6 +350,19 @@ textarea{
   font-size:14px;
   color:var(--text);
   transition:var(--transition);
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator{
+  cursor:pointer;
+  opacity:0.65;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover{
+  opacity:1;
 }
 input:focus,
 select:focus,
@@ -351,6 +429,33 @@ textarea{
 .btn-danger:hover{
   background:#dc2626;
   box-shadow:var(--shadow);
+}
+.btn-success{
+  background:var(--success);
+  color:#fff;
+  box-shadow:var(--shadow-sm);
+}
+.btn-success:hover{
+  background:#059669;
+  box-shadow:var(--shadow);
+  transform:translateY(-1px);
+}
+.btn-warning{
+  background:var(--warning-light);
+  color:#92400e;
+  border:1px solid #fbbf24;
+}
+.btn-warning:hover{
+  background:#fde68a;
+  color:#78350f;
+}
+.btn-sm{
+  padding:6px 10px;
+  font-size:13px;
+}
+.btn-block{
+  width:100%;
+  justify-content:center;
 }
 .btn:active{
   transform:translateY(0);
@@ -1298,8 +1403,202 @@ a:focus, button:focus, input:focus-visible, .btn:focus-visible{outline:3px solid
   gap:12px;
 }
 
+/* --- Shell minimal (page connexion) --- */
+body.shell-minimal .menu-toggle{display:none}
+body.shell-minimal .search{display:none}
+body.shell-minimal .user-menu{display:none}
+body.shell-minimal .sidebar{display:none}
+body.shell-minimal{
+  display:flex;
+  flex-direction:column;
+  min-height:100dvh;
+}
+body.shell-minimal .top-bar .container{
+  justify-content:center;
+}
+body.shell-minimal .content--minimal{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:32px 16px 48px;
+  width:100%;
+}
+body.shell-minimal .content--minimal .login-page-inner{
+  width:100%;
+  max-width:420px;
+}
+body.shell-minimal .content--minimal > .flash{
+  width:100%;
+  max-width:420px;
+}
+.login-card{
+  width:100%;
+}
+.login-card h1{
+  margin:0 0 8px;
+  font-size:1.5rem;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  text-align:center;
+}
+.login-card .login-lead{
+  text-align:center;
+  margin:0 0 24px;
+  color:var(--muted);
+  font-size:14px;
+}
+.login-card .form-group{margin-bottom:20px}
+.login-card label{display:block;margin-bottom:8px;font-size:14px;font-weight:600;color:var(--text)}
+.login-resend-box{
+  margin-top:20px;
+  padding:16px;
+  border-radius:var(--radius-sm);
+  background:var(--warning-light);
+  border:1px solid #fcd34d;
+  color:#78350f;
+  font-size:14px;
+  line-height:1.5;
+}
+.login-resend-box p{margin:0 0 12px}
+.login-resend-box .btn-resend{
+  width:100%;
+  padding:10px 14px;
+  border:none;
+  border-radius:var(--radius-sm);
+  background:var(--warning);
+  color:#fff;
+  font-weight:600;
+  font-size:14px;
+  cursor:pointer;
+  font-family:inherit;
+  transition:var(--transition);
+}
+.login-resend-box .btn-resend:hover{
+  filter:brightness(0.95);
+}
+
+/* --- Tableaux & dashboard --- */
+.table--flush{margin:0}
+.table--wide{min-width:960px}
+.table--dashboard{min-width:520px}
+.th-col-narrow{width:22%}
+.th-id{width:1%;white-space:nowrap}
+.td-tabular{font-variant-numeric:tabular-nums}
+.td-actions{text-align:right}
+.th-actions{text-align:right;white-space:nowrap}
+.text-nowrap{white-space:nowrap}
+.btn-muted{opacity:0.85}
+.form-inline{display:inline;margin:0}
+
+/* --- Filtres (liste archers) --- */
+.filter-panel{
+  margin-bottom:20px;
+  padding:16px 18px;
+  background:var(--bg-alt);
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+}
+.filter-panel__label{
+  display:block;
+  font-weight:600;
+  font-size:14px;
+  margin-bottom:10px;
+  color:var(--text);
+}
+.filter-panel__row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+}
+.filter-panel__form{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+  margin:0;
+}
+.filter-panel__form .input-age{width:90px}
+.empty-state{
+  text-align:center;
+  padding:48px 24px;
+}
+.empty-state--tight{
+  padding:40px 24px;
+}
+.empty-state .btn{margin-top:16px}
+
+/* --- Cartes archer / événements --- */
+.archer-event-grid{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:grid;
+  gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+}
+.event-card{
+  padding:18px 20px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.event-card__actions{
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:stretch;
+}
+.card-section-title{
+  margin:0 0 12px;
+  font-size:1.1rem;
+  font-weight:600;
+}
+.card--portal{margin-bottom:16px}
+.stats-grid--below-header{margin-bottom:28px}
+.list-events{margin:0;padding-left:1.2rem;line-height:1.7}
+.badge--inline{margin-left:6px}
+.badge--inline-sm{margin-left:6px;font-size:11px;vertical-align:middle}
+.note-below{margin-top:4px}
+.mon-arc-title{margin:0 0 8px;font-size:1.15rem}
+.mon-arc-meta{margin:0}
+
+/* --- Formulaires centrés --- */
+.form-narrow{
+  max-width:600px;
+  margin:0 auto;
+}
+.form-actions{
+  margin-top:20px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.label-required{color:var(--danger)}
+
+/* --- Pages inscription archer (largeurs statiques) --- */
+.form-card--archer-insc{max-width:720px}
+.archer-insc-cancel{margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
+.h3-tight{margin-top:0}
+.h3-spaced{margin-top:24px}
+.p-muted-tight{margin:0 0 8px}
+
 /* Smooth scrolling */
 html{scroll-behavior:smooth}
+
+/* Liens type référence (IDs / noms dans tableaux) */
+.ref-link{
+  color:var(--primary);
+  font-weight:600;
+  text-decoration:none;
+  font-variant-numeric:tabular-nums;
+}
+.ref-link:hover{text-decoration:underline}
+.ref-link.small{font-size:13px;font-weight:600}
 
 /* Links */
 a{

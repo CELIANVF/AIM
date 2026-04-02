@@ -1,0 +1,89 @@
+{# Références cliquables vers les fiches (selon les droits utilisateur). #}
+{% macro ref_archer(aid, text=None) -%}
+{%- set label = text if text is not none else aid -%}
+{%- if current_user.can_edit() -%}
+<a class="ref-link" href="{{ url_for('edit_archer', archer_id=aid) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro ref_product(pid, text=None) -%}
+{%- set label = text if text is not none else pid -%}
+{%- if current_user.can_edit() -%}
+<a class="ref-link" href="{{ url_for('edit_product', prod_id=pid) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro ref_composite(cid, text=None) -%}
+{%- set label = text if text is not none else cid -%}
+{%- if current_user.can_edit() -%}
+<a class="ref-link" href="{{ url_for('edit_composite', comp_id=cid) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro ref_category(cat_id, text=None) -%}
+{%- set label = text if text is not none else cat_id -%}
+{%- if current_user.can_edit() -%}
+<a class="ref-link" href="{{ url_for('edit_category', cat_id=cat_id) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro ref_course(cid, text=None) -%}
+{%- set label = text if text is not none else cid -%}
+{%- if current_user.can_manage_courses() -%}
+<a class="ref-link" href="{{ url_for('edit_course', course_id=cid) }}">{{ label }}</a>
+{%- elif current_user.can_manage_attendance() -%}
+<a class="ref-link" href="{{ url_for('course_attendance', course_id=cid) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro ref_user(uid, text=None) -%}
+{%- set label = text if text is not none else uid -%}
+{%- if current_user.is_admin() -%}
+<a class="ref-link" href="{{ url_for('edit_user', user_id=uid) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro ref_inscription_event(eid, text=None) -%}
+{%- set label = text if text is not none else eid -%}
+{%- if current_user.can_edit() -%}
+<a class="ref-link" href="{{ url_for('inscription_evenement', event_id=eid) }}">{{ label }}</a>
+{%- else -%}
+{{ label }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro history_entity_ref(ev) -%}
+{%- if ev.entity_id is none -%}
+<span class="muted">—</span>
+{%- elif ev.entity_type == 'product' and current_user.can_edit() -%}
+<a class="ref-link small" href="{{ url_for('edit_product', prod_id=ev.entity_id) }}">Produit #{{ ev.entity_id }}</a>
+{%- elif ev.entity_type == 'composite' and current_user.can_edit() -%}
+<a class="ref-link small" href="{{ url_for('edit_composite', comp_id=ev.entity_id) }}">Arc #{{ ev.entity_id }}</a>
+{%- elif ev.entity_type == 'assignment' and current_user.can_view_assignments() -%}
+<a class="ref-link small" href="{{ url_for('assignments') }}">Assignations</a>
+{%- elif ev.entity_type == 'course' and current_user.can_manage_courses() -%}
+<a class="ref-link small" href="{{ url_for('edit_course', course_id=ev.entity_id) }}">Cours #{{ ev.entity_id }}</a>
+{%- elif ev.entity_type == 'course' and current_user.can_manage_attendance() -%}
+<a class="ref-link small" href="{{ url_for('course_attendance', course_id=ev.entity_id) }}">Cours #{{ ev.entity_id }}</a>
+{%- elif ev.entity_type == 'archer' and current_user.can_edit() -%}
+<a class="ref-link small" href="{{ url_for('edit_archer', archer_id=ev.entity_id) }}">Archer #{{ ev.entity_id }}</a>
+{%- elif ev.entity_type == 'user' and current_user.is_admin() -%}
+<a class="ref-link small" href="{{ url_for('edit_user', user_id=ev.entity_id) }}">Utilisateur #{{ ev.entity_id }}</a>
+{%- elif ev.entity_type == 'inscription_event' and current_user.can_edit() -%}
+<a class="ref-link small" href="{{ url_for('inscription_evenement', event_id=ev.entity_id) }}">Événement #{{ ev.entity_id }}</a>
+{%- else -%}
+<span class="small muted" title="{{ ev.entity_type }}">#{{ ev.entity_id }}</span>
+{%- endif -%}
+{%- endmacro %}

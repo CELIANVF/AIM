@@ -23,16 +23,16 @@
 </div>
 
 {% if event.lieu %}
-<p class="muted" style="margin-bottom:16px">Lieu : {{ event.lieu }}</p>
+<p class="muted mb-2">Lieu : {{ event.lieu }}</p>
 {% endif %}
 {% if event.start_date or event.end_date %}
-<p class="muted" style="margin-bottom:16px">
+<p class="muted mb-2">
     {% if event.start_date and event.end_date %}Du {{ event.start_date.strftime('%d/%m/%Y') }} au {{ event.end_date.strftime('%d/%m/%Y') }}{% elif event.start_date %}À partir du {{ event.start_date.strftime('%d/%m/%Y') }}{% else %}Jusqu’au {{ event.end_date.strftime('%d/%m/%Y') }}{% endif %}
 </p>
 {% endif %}
 
-<form method="post" class="form-card page-inscription-event" style="max-width:720px" id="archer-inscription-form">
-    <h3 style="margin-top:0">Départ</h3>
+<form method="post" class="form-card page-inscription-event form-card--archer-insc" id="archer-inscription-form">
+    <h3 class="h3-tight">Départ</h3>
     <div class="form-group">
         <label for="depart_index_{{ aid }}">Créneau</label>
         <select id="depart_index_{{ aid }}" name="depart_index_{{ aid }}" class="insc-control">
@@ -45,7 +45,7 @@
     {% if archer_simple_only %}
     <input type="hidden" name="discipline_{{ aid }}" class="archer-insc-discipline-hidden" value="inscription_simple">
     {% else %}
-    <h3 style="margin-top:24px">Paramètres de tir</h3>
+    <h3 class="h3-spaced">Paramètres de tir</h3>
     {% if archer_show_disc_select %}
     <div class="form-group">
         <label for="discipline_{{ aid }}">Discipline</label>
@@ -57,7 +57,7 @@
     </div>
     {% else %}
     <div class="form-group">
-        <p class="muted" style="margin:0 0 8px">{{ archer_fixed_label }}</p>
+        <p class="muted p-muted-tight">{{ archer_fixed_label }}</p>
         <input type="hidden" name="discipline_{{ aid }}" class="archer-insc-discipline-hidden" value="{{ archer_fixed_code }}">
     </div>
     {% endif %}
@@ -114,12 +114,12 @@
         <input type="text" name="pike_custom_{{ aid }}" class="insc-control archer-insc-pike-custom" placeholder="{{ 'ex. Piquet / pique…' if form_ex.pike == '__custom__' else '' }}" value="{{ form_ex.pike_custom or '' }}" style="margin-top:8px;display:{% if form_ex.pike == '__custom__' %}block{% else %}none{% endif %}">
     </div>
 
-    <button type="submit" class="btn btn-primary" style="margin-top:16px">Enregistrer mon inscription</button>
+    <button type="submit" class="btn btn-primary mt-2">Enregistrer mon inscription</button>
 </form>
 
 {% if archer_has_saved_registration %}
-<div class="form-card page-inscription-event" style="max-width:720px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
-    <p class="small muted" style="margin:0 0 12px">Retirer votre nom de la liste des inscrits pour cet événement.</p>
+<div class="form-card page-inscription-event form-card--archer-insc archer-insc-cancel">
+    <p class="small muted mb-2">Retirer votre nom de la liste des inscrits pour cet événement.</p>
     <form method="post" action="{{ url_for('archer_event_cancel_registration', event_id=event.id) }}" onsubmit="return confirm('Annuler votre inscription à cet événement ?');">
         <button type="submit" class="btn btn-danger">Annuler mon inscription</button>
     </form>

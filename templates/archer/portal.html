@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="stats-grid" style="margin-bottom:28px">
+<div class="stats-grid stats-grid--below-header">
     <div class="stat-card">
         <div class="stat-value">{% if assignment %}1{% else %}0{% endif %}</div>
         <div class="stat-label">🎯 Arc assigné</div>
@@ -25,8 +25,8 @@
     </div>
 </div>
 
-<div class="card" style="padding:24px;margin-bottom:16px">
-    <h2 style="margin:0 0 12px;font-size:1.1rem">Accès rapide</h2>
+<div class="card card--portal">
+    <h2 class="card-section-title">Accès rapide</h2>
     <div class="action-group">
         <a class="btn btn-primary" href="{{ url_for('archer_my_bow') }}">🎯 Voir mon arc</a>
         <a class="btn btn-outline" href="{{ url_for('archer_my_courses') }}">📚 Mes cours</a>
@@ -35,20 +35,20 @@
 </div>
 
 {% if open_events %}
-<div class="card" style="padding:24px">
-    <h2 style="margin:0 0 12px;font-size:1.1rem">Événements disponibles</h2>
-    <ul class="muted" style="margin:0;padding-left:1.2rem;line-height:1.7">
+<div class="card">
+    <h2 class="card-section-title">Événements disponibles</h2>
+    <ul class="muted list-events">
         {% for ev in open_events[:5] %}
         <li>
             <a href="{{ url_for('archer_event_signup', event_id=ev.id) }}">{{ ev.title }}</a>
             {% if ev.id in registered_event_ids %}
-            <span class="badge badge-success" style="margin-left:6px">Inscrit</span>
+            <span class="badge badge-success badge--inline">Inscrit</span>
             {% endif %}
         </li>
         {% endfor %}
     </ul>
     {% if open_events|length > 5 %}
-    <p class="small muted" style="margin:12px 0 0"><a href="{{ url_for('archer_events') }}">Voir tous les événements →</a></p>
+    <p class="small muted mt-2"><a href="{{ url_for('archer_events') }}">Voir tous les événements →</a></p>
     {% endif %}
 </div>
 {% endif %}

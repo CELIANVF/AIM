@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Archers{% endblock %}
 
@@ -22,31 +23,31 @@
     </div>
 </div>
 
-<div style="margin-bottom: 20px; padding: 16px; background-color: #f9f9f9; border-radius: 8px; border: 1px solid #ddd;">
-    <label style="font-weight: bold; margin-bottom: 8px; display: block;">📊 Trier par:</label>
-    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-        <form method="GET" action="/archers" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0;">
-            <input type="text" name="q" placeholder="Recherche (nom/prénom)" style="padding:8px;border:1px solid #ddd;border-radius:4px;" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}">
-            <select name="course_id" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+<div class="filter-panel">
+    <span class="filter-panel__label">📊 Filtrer et trier</span>
+    <div class="filter-panel__row">
+        <form method="GET" action="/archers" class="filter-panel__form">
+            <input type="text" name="q" placeholder="Recherche (nom/prénom)" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}">
+            <select name="course_id" onchange="this.form.submit()">
                 <option value="">Tous les cours</option>
                 {% for course in courses %}
                 <option value="{{ course.id }}" {% if current_filters.course_id and (current_filters.course_id|int) == course.id %}selected{% endif %}>{{ course.name }}</option>
                 {% endfor %}
             </select>
-            <select name="has_arc" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+            <select name="has_arc" onchange="this.form.submit()">
                 <option value="">Arc</option>
                 <option value="yes" {% if current_filters.has_arc == 'yes' %}selected{% endif %}>Assigné</option>
                 <option value="no" {% if current_filters.has_arc == 'no' %}selected{% endif %}>Non assigné</option>
             </select>
-            <select name="category" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+            <select name="category" onchange="this.form.submit()">
                 <option value="">Toutes catégories</option>
                 {% for cat in categories %}
                 <option value="{{ cat }}" {% if current_filters.category == cat %}selected{% endif %}>{{ cat }}</option>
                 {% endfor %}
             </select>
-            <input type="number" name="min_age" placeholder="Min âge" style="width:90px;padding:8px;border:1px solid #ddd;border-radius:4px;" value="{% if current_filters.min_age %}{{ current_filters.min_age }}{% endif %}">
-            <input type="number" name="max_age" placeholder="Max âge" style="width:90px;padding:8px;border:1px solid #ddd;border-radius:4px;" value="{% if current_filters.max_age %}{{ current_filters.max_age }}{% endif %}">
-            <select name="sort_by" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+            <input type="number" name="min_age" class="input-age" placeholder="Min âge" value="{% if current_filters.min_age %}{{ current_filters.min_age }}{% endif %}">
+            <input type="number" name="max_age" class="input-age" placeholder="Max âge" value="{% if current_filters.max_age %}{{ current_filters.max_age }}{% endif %}">
+            <select name="sort_by" onchange="this.form.submit()">
                 <option value="nom" {% if current_sort.by == 'nom' %}selected{% endif %}>Nom</option>
                 <option value="prenom" {% if current_sort.by == 'prenom' %}selected{% endif %}>Prénom</option>
                 <option value="age" {% if current_sort.by == 'age' %}selected{% endif %}>Âge</option>
@@ -55,13 +56,11 @@
                 <option value="arc" {% if current_sort.by == 'arc' %}selected{% endif %}>Arc assigné</option>
                 <option value="course" {% if current_sort.by == 'course' %}selected{% endif %}>Cours assigné</option>
             </select>
-            
-            <select name="sort_order" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background-color: white; cursor: pointer;">
+            <select name="sort_order" onchange="this.form.submit()">
                 <option value="asc" {% if current_sort.order == 'asc' %}selected{% endif %}>↑ Croissant</option>
                 <option value="desc" {% if current_sort.order == 'desc' %}selected{% endif %}>↓ Décroissant</option>
             </select>
-            
-            <a href="/archers" class="btn btn-outline" style="padding: 8px 12px; font-size: 14px;">↻ Réinitialiser</a>
+            <a href="/archers" class="btn btn-outline btn-sm">↻ Réinitialiser</a>
             <button type="submit" class="btn btn-primary">Appliquer</button>
         </form>
     </div>
@@ -69,10 +68,10 @@
 
 {% if archers %}
 <div class="table-responsive">
-    <table class="table table-sortable archers-table" style="margin:0;min-width:960px">
+    <table class="table table-sortable archers-table table--flush table--wide">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th class="th-id" data-sort="number">ID</th>
                 <th>Prénom</th>
                 <th>Nom</th>
                 <th data-sort="number">Âge</th>
@@ -82,34 +81,39 @@
                 <th>Cours</th>
                 <th>Arc assigné</th>
                 <th>Matériel</th>
-                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
+                <th class="th-actions" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for a in archers %}
             {% set active_courses = a.courses | selectattr('active') | list %}
             <tr>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ a.id }}</td>
+                <td class="small muted td-tabular">{{ er.ref_archer(a.id, a.id) }}</td>
                 {% if not a.first_name and not a.last_name %}
-                <td colspan="2" class="muted">Sans nom</td>
+                <td colspan="2" class="muted">{{ er.ref_archer(a.id, 'Sans nom') }}</td>
                 {% else %}
-                <td>{{ a.first_name or '—' }}</td>
-                <td>{{ a.last_name or '—' }}</td>
+                <td>{{ er.ref_archer(a.id, a.first_name or '—') }}</td>
+                <td>{{ er.ref_archer(a.id, a.last_name or '—') }}</td>
                 {% endif %}
                 <td>{% if a.age is not none %}{{ a.age }}{% else %}—{% endif %}</td>
-                <td>{{ a.license_number or '—' }}</td>
+                <td>{% if a.license_number %}{{ er.ref_archer(a.id, a.license_number) }}{% else %}—{% endif %}</td>
                 <td class="small">{% if a.email %}<a href="mailto:{{ a.email }}">{{ a.email }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
                 <td>{{ a.categorie or '—' }}</td>
                 <td class="small">
                     {% if active_courses %}
-                        {% for course in active_courses %}{{ course.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        {% for course in active_courses %}{{ er.ref_course(course.id, course.name) }}{% if not loop.last %}, {% endif %}{% endfor %}
                     {% else %}
                         <span class="muted">—</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if a.current_assignment %}
-                        <span class="badge badge-success">{{ a.current_assignment.composite.name }}</span>
+                        {% set comp = a.current_assignment.composite %}
+                        {% if current_user.can_edit() %}
+                        <a class="badge badge-success" style="text-decoration:none" href="{{ url_for('edit_composite', comp_id=comp.id) }}">{{ comp.name }}</a>
+                        {% else %}
+                        <span class="badge badge-success">{{ comp.name }}</span>
+                        {% endif %}
                     {% else %}
                         <span class="muted">Aucun</span>
                     {% endif %}
@@ -123,32 +127,32 @@
                         <span class="muted">—</span>
                     {% endif %}
                 </td>
-                <td style="text-align:right">
+                <td class="td-actions">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_archer/{{ a.id }}" style="padding:6px 10px;font-size:13px">✏️ Modifier</a>
+                        <a class="btn btn-outline btn-sm" href="/edit_archer/{{ a.id }}">✏️ Modifier</a>
                         {% if a.current_assignment %}
-                        <form method="POST" action="/return/{{ a.current_assignment.id }}" style="display:inline;margin:0" onsubmit="return confirm('Retourner l\'arc {{ a.current_assignment.composite.name }} ?');">
-                            <button type="submit" class="btn btn-warning" style="padding:6px 10px;font-size:13px;cursor:pointer">↩️ Retour</button>
+                        <form method="POST" action="/return/{{ a.current_assignment.id }}" class="form-inline" onsubmit="return confirm('Retourner l\'arc {{ a.current_assignment.composite.name }} ?');">
+                            <button type="submit" class="btn btn-warning btn-sm">↩️ Retour</button>
                         </form>
                         {% else %}
-                        <a class="btn btn-success" href="/assign?archer_id={{ a.id }}" style="padding:6px 10px;font-size:13px">🎯 Arc</a>
+                        <a class="btn btn-success btn-sm" href="/assign?archer_id={{ a.id }}">🎯 Arc</a>
                         {% endif %}
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_archer/{{ a.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer">🗑️</button>
+                        <form method="POST" action="/delete_archer/{{ a.id }}" class="form-inline" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
                         </form>
                         {% endif %}
                         {% if current_user.can_create_archer_account() and not a.has_account %}
                             {% if a.email %}
-                            <form method="POST" action="{{ url_for('create_archer_account_row', archer_id=a.id) }}" style="display:inline;margin:0" onsubmit="return confirm('Créer un compte et envoyer les identifiants par e-mail à cet archer ?');">
-                                <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:13px;cursor:pointer">🔐 Créer compte</button>
+                            <form method="POST" action="{{ url_for('create_archer_account_row', archer_id=a.id) }}" class="form-inline" onsubmit="return confirm('Créer un compte et envoyer les identifiants par e-mail à cet archer ?');">
+                                <button type="submit" class="btn btn-outline btn-sm">🔐 Créer compte</button>
                             </form>
                             {% elif current_user.can_edit() %}
-                            <a class="btn btn-outline" href="{{ url_for('edit_archer', archer_id=a.id) }}" style="padding:6px 10px;font-size:13px;opacity:0.85" title="Ajoutez un e-mail sur la fiche pour pouvoir créer un compte">📧 E-mail requis</a>
+                            <a class="btn btn-outline btn-sm btn-muted" href="{{ url_for('edit_archer', archer_id=a.id) }}" title="Ajoutez un e-mail sur la fiche pour pouvoir créer un compte">📧 E-mail requis</a>
                             {% else %}
-                            <span class="muted small" style="white-space:nowrap" title="Adresse e-mail manquante — un responsable peut la renseigner sur la fiche archer">Sans e-mail</span>
+                            <span class="muted small text-nowrap" title="Adresse e-mail manquante — un responsable peut la renseigner sur la fiche archer">Sans e-mail</span>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -159,10 +163,10 @@
     </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center;padding:48px 24px">
+<div class="card empty-state">
     <p class="muted">Aucun archer enregistré pour le moment</p>
     {% if current_user.can_edit() %}
-    <a href="/add_archer" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier archer</a>
+    <a href="/add_archer" class="btn btn-primary">➕ Ajouter le premier archer</a>
     {% endif %}
 </div>
 {% endif %}

@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Produits{% endblock %}
 
@@ -185,12 +186,26 @@
                         data-custom-{{ k.replace(' ', '_')|lower }}="{{ v|e }}"
                     {% endfor %}
                 {% endif %}>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ p.id }}</td>
+                <td class="small muted td-tabular">{{ er.ref_product(p.id, p.id) }}</td>
                 <td>
                     {% if assigned_comps %}
-                        <span class="badge badge-warning">Assigné</span>
+                        {% set _ac = assigned_comps[0] %}
+                        {% set _loan = (_ac.assignments|rejectattr('date_returned')|list)|first %}
+                        {% set _who = (_loan.archer.name if _loan and _loan.archer else ('#' ~ _loan.archer_id if _loan else None)) %}
+                        {% if current_user.can_edit() and _loan %}
+                        <a class="badge badge-warning product-assign-badge" href="{{ url_for('edit_archer', archer_id=_loan.archer_id) }}" title="Fiche archer">Assigné{% if _who %}<span class="product-assign-name">{{ _who }}</span>{% endif %}</a>
+                        {% elif current_user.can_edit() %}
+                        <a class="badge badge-warning product-assign-badge" href="{{ url_for('edit_composite', comp_id=_ac.id) }}" title="Ouvrir l’arc">Assigné{% if _who %}<span class="product-assign-name">{{ _who }}</span>{% endif %}</a>
+                        {% else %}
+                        <span class="badge badge-warning product-assign-badge product-assign-badge--static">Assigné{% if _who %}<span class="product-assign-name">{{ _who }}</span>{% endif %}</span>
+                        {% endif %}
                     {% elif comps %}
+                        {% set _mc = comps[0] %}
+                        {% if current_user.can_edit() %}
+                        <a class="badge badge-primary" style="text-decoration:none" href="{{ url_for('edit_composite', comp_id=_mc.id) }}" title="Ouvrir l’arc">Monté</a>
+                        {% else %}
                         <span class="badge badge-primary">Monté</span>
+                        {% endif %}
                     {% elif p.state == 'stock' %}
                         <span class="badge badge-success">Dispo</span>
                     {% elif p.state == 'broken' %}
@@ -199,8 +214,8 @@
                         <span class="small muted">{{ p.state or '—' }}</span>
                     {% endif %}
                 </td>
-                <td><strong>{{ p.brand or '—' }}</strong></td>
-                <td class="small">{{ p.model or '—' }}</td>
+                <td><strong>{% if p.brand %}{{ er.ref_product(p.id, p.brand) }}{% else %}—{% endif %}</strong></td>
+                <td class="small">{% if p.model %}{{ er.ref_product(p.id, p.model) }}{% else %}—{% endif %}</td>
                 <td class="small">{% if p.size %}{{ p.size }}{% if p.category and p.category.field_units and p.category.field_units.get('size') %} {{ p.category.field_units.get('size') }}{% endif %}{% else %}—{% endif %}</td>
                 <td class="small">{% if p.power %}{{ p.power }}{% if p.category and p.category.field_units and p.category.field_units.get('power') %} {{ p.category.field_units.get('power') }}{% endif %}{% else %}—{% endif %}</td>
                 <td class="small">{{ p.location or '—' }}</td>

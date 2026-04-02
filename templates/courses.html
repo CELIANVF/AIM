@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Cours{% endblock %}
 
@@ -33,8 +34,8 @@
         <tbody>
             {% for course in courses %}
             <tr>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ course.id }}</td>
-                <td><strong>{{ course.name }}</strong></td>
+                <td class="small muted td-tabular">{{ er.ref_course(course.id, course.id) }}</td>
+                <td><strong>{{ er.ref_course(course.id, course.name) }}</strong></td>
                 <td class="small">{{ days_names[course.day_of_week] }} · {{ course.start_time }} – {{ course.end_time }}</td>
                 <td>{% if course.level %}<span class="badge badge-primary">{{ course.level }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
                 <td class="small">

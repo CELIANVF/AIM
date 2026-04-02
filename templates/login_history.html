@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block content %}
 <div class="container mt-4">
@@ -51,7 +52,7 @@
                     </td>
                     <td>
                         {% if ev.user %}
-                        <strong>{{ ev.user.username }}</strong>
+                        <strong>{{ er.ref_user(ev.user.id, ev.user.username) }}</strong>
                         {% elif ev.attempted_username %}
                         <span class="text-muted">{{ ev.attempted_username }}</span>
                         <span class="badge" style="background: #fef3c7; color: #92400e; font-size: 11px;">inconnu</span>

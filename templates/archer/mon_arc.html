@@ -12,14 +12,14 @@
 </div>
 
 {% if not assignment %}
-<div class="card" style="padding:40px 24px;text-align:center">
+<div class="card empty-state--tight">
     <p class="muted">Aucun arc ne vous est actuellement assigné.</p>
-    <p class="small muted" style="margin-top:12px">Rapprochez-vous du club pour une mise à disposition.</p>
+    <p class="small muted mt-2">Rapprochez-vous du club pour une mise à disposition.</p>
 </div>
 {% else %}
-<div class="card" style="padding:24px;margin-bottom:20px">
-    <h2 style="margin:0 0 8px;font-size:1.15rem">{{ composite.name }}</h2>
-    <p class="small muted" style="margin:0">
+<div class="card card--portal">
+    <h2 class="mon-arc-title">{{ composite.name }}</h2>
+    <p class="small muted mon-arc-meta">
         {% if composite.type %}Type {{ composite.type }}{% endif %}
         {% if composite.status %} · Statut {{ composite.status }}{% endif %}
         {% if assignment.date_assigned %} · Assigné le {{ assignment.date_assigned.strftime('%d/%m/%Y') }}{% endif %}
@@ -28,7 +28,7 @@
 
 {% if products %}
 <div class="table-responsive">
-    <table class="table" style="margin:0">
+    <table class="table table--flush">
         <thead>
             <tr>
                 <th>Catégorie</th>

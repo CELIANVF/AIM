@@ -22,23 +22,33 @@
      <meta name="twitter:title" content="{{ meta_title }}">
      <meta name="twitter:description" content="{{ meta_description }}">
      <meta name="twitter:image" content="{{ meta_image }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+{% set shell_minimal = (request.endpoint == 'login') %}
+<body{% if shell_minimal %} class="shell-minimal"{% endif %}>
     <div class="top-bar">
         <div class="container">
+            {% if not shell_minimal %}
             <button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
+            {% endif %}
             <div class="logo">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo AIM" style="height:32px;vertical-align:middle">
-                <span style="font-size:1.2rem;font-weight:700;vertical-align:middle;margin-left:8px;letter-spacing:0.05em;">AIM</span>
+                <a href="{% if current_user.is_authenticated %}{{ url_for('index') }}{% else %}{{ url_for('login') }}{% endif %}" class="logo-link">
+                    <img class="logo-img" src="{{ url_for('static', filename='logo.png') }}" alt="Logo AIM">
+                    <span class="logo-wordmark">AIM</span>
+                </a>
             </div>
-            {% if not (current_user.is_authenticated and current_user.role == 'archer') %}
+            {% if not shell_minimal and not (current_user.is_authenticated and current_user.role == 'archer') %}
             <div class="search">
                 <form action="/search" method="get">
                     <input type="text" name="q" placeholder="Rechercher un produit, archer, catégorie..." aria-label="Recherche">
                 </form>
             </div>
             {% endif %}
+            {% if not shell_minimal %}
             <div class="user-menu">
                 {% if current_user.is_authenticated %}
                 <span>👤 {{ current_user.username }}</span>
@@ -47,10 +57,12 @@
                 <a href="{{ url_for('login') }}">Connexion</a>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
 
-    <div class="main-layout">
+    {% if not shell_minimal %}<div class="main-layout">{% endif %}
+        {% if not shell_minimal %}
         <aside class="sidebar">
             <nav>
                 <ul>
@@ -85,7 +97,9 @@
                 </ul>
             </nav>
         </aside>
-        <main class="content">
+        {% endif %}
+
+        <main class="content{% if shell_minimal %} content--minimal{% endif %}">
             {% block breadcrumbs %}{% endblock %}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -96,9 +110,13 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
+            {% if shell_minimal and info_message is defined and info_message %}
+            <div class="flash info">{{ info_message }}</div>
+            {% endif %}
             {% block content %}{% endblock %}
         </main>
-    </div>
+    {% if not shell_minimal %}</div>{% endif %}
+
         <script>
             (function(){
                 const btn = document.querySelector('.menu-toggle');
@@ -118,7 +136,9 @@
                 });
             })();
         </script>
+    {% if not shell_minimal %}
     <script src="{{ url_for('static', filename='table-sort.js') }}" defer></script>
+    {% endif %}
     {% block scripts %}{% endblock %}
 
 </body>

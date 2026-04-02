@@ -3,30 +3,27 @@
 {% block title %}Créer un compte Archer{% endblock %}
 
 {% block content %}
-<div class="form-card" style="max-width: 600px; margin: 0 auto;">
+<div class="form-card form-narrow">
     <h1>Créer un compte Archer</h1>
-    <p class="text-muted">
+    <p class="muted">
         Entrez l'adresse e-mail de l'archer pour créer un compte. Un mot de passe temporaire sera généré automatiquement et envoyé par e-mail.
     </p>
 
     <form method="POST" class="needs-validation" novalidate>
         <div class="form-group">
-            <label for="email">Adresse e-mail de l'archer <span style="color: red;">*</span></label>
+            <label for="email">Adresse e-mail de l'archer <span class="label-required" aria-hidden="true">*</span></label>
             <input
                 type="email"
                 id="email"
                 name="email"
-                class="form-control"
                 placeholder="prenom.nom@exemple.fr"
                 required
                 autocomplete="email"
             >
-            <small class="form-text text-muted">
-                L'archer doit déjà exister dans la base de données avec cette adresse e-mail.
-            </small>
+            <p class="small muted mt-1">L'archer doit déjà exister dans la base de données avec cette adresse e-mail.</p>
         </div>
 
-        <div style="margin-top: 20px; display: flex; gap: 10px;">
+        <div class="form-actions">
             <button type="submit" class="btn btn-primary">
                 Créer le compte et envoyer les identifiants
             </button>
@@ -36,7 +33,6 @@
 </div>
 
 <script>
-    // Form validation
     (function() {
         'use strict';
         var forms = document.querySelectorAll('.needs-validation');

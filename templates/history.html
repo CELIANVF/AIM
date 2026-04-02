@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Historique{% endblock %}
 
@@ -12,6 +13,7 @@
         <thead>
             <tr>
                 <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th data-sort="disable">Réf.</th>
                 <th data-sort="date">Date</th>
                 <th>Action</th>
                 <th>Détails</th>
@@ -20,7 +22,8 @@
         <tbody>
             {% for event in assignment_events %}
             <tr>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ event.id }}</td>
+                <td class="small muted td-tabular">{{ event.id }}</td>
+                <td class="small">{{ er.history_entity_ref(event) }}</td>
                 <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                 <td>
                     {% if event.event_type == 'assignment' %}
@@ -46,6 +49,7 @@
         <thead>
             <tr>
                 <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th data-sort="disable">Réf.</th>
                 <th data-sort="date">Date</th>
                 <th>Action</th>
                 <th>Détails</th>
@@ -54,7 +58,8 @@
         <tbody>
             {% for event in composite_events %}
             <tr>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ event.id }}</td>
+                <td class="small muted td-tabular">{{ event.id }}</td>
+                <td class="small">{{ er.history_entity_ref(event) }}</td>
                 <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                 <td>
                     {% if event.event_type == 'composite_created' %}
@@ -102,6 +107,7 @@
         <thead>
             <tr>
                 <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th data-sort="disable">Réf.</th>
                 <th data-sort="date">Date</th>
                 <th>Action</th>
                 <th>Détails</th>
@@ -110,7 +116,8 @@
         <tbody>
             {% for event in product_events %}
             <tr>
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ event.id }}</td>
+                <td class="small muted td-tabular">{{ event.id }}</td>
+                <td class="small">{{ er.history_entity_ref(event) }}</td>
                 <td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                 <td>
                     {% if event.event_type == 'product_created' %}

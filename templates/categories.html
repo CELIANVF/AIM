@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import '_entity_refs.html' as er with context %}
 
 {% block title %}Catégories{% endblock %}
 
@@ -37,8 +38,8 @@
                     <span class="drag-handle" draggable="true" style="cursor:grab;padding:4px 6px;font-size:18px;display:inline-block;user-select:none" title="Réordonner">≡</span>
                 </td>
                 {% endif %}
-                <td class="small muted" style="font-variant-numeric:tabular-nums">{{ cat.id }}</td>
-                <td><strong>{{ cat.name }}</strong></td>
+                <td class="small muted td-tabular">{{ er.ref_category(cat.id, cat.id) }}</td>
+                <td><strong>{{ er.ref_category(cat.id, cat.name) }}</strong></td>
                 <td class="small">
                     <div style="display:flex;flex-wrap:wrap;gap:4px">
                         {% if cat.has_size %}<span class="badge badge-primary">Taille</span>{% endif %}

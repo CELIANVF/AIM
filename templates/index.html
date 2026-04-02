@@ -36,12 +36,12 @@
 </div>
 
 <div class="table-responsive">
-	<table class="table table-sortable" style="margin:0;min-width:520px">
+	<table class="table table-sortable table--flush table--dashboard">
 		<thead>
 			<tr>
-				<th style="width:22%">Section</th>
+				<th class="th-col-narrow">Section</th>
 				<th>Description</th>
-				<th style="text-align:right;white-space:nowrap" data-sort="disable">Accès</th>
+				<th class="th-actions" data-sort="disable">Accès</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -49,58 +49,58 @@
 			<tr>
 				<td><span class="badge badge-primary">Création</span></td>
 				<td class="small">Enregistrer un nouveau produit dans le stock</td>
-				<td style="text-align:right"><a href="{{ url_for('add_product') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">➕ Produit</a></td>
+				<td class="td-actions"><a href="{{ url_for('add_product') }}" class="btn btn-outline btn-sm">➕ Produit</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-primary">Création</span></td>
 				<td class="small">Créer une catégorie pour classer les produits</td>
-				<td style="text-align:right"><a href="{{ url_for('add_category') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📁 Catégorie</a></td>
+				<td class="td-actions"><a href="{{ url_for('add_category') }}" class="btn btn-outline btn-sm">📁 Catégorie</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-primary">Création</span></td>
 				<td class="small">Ajouter un arc composé au parc</td>
-				<td style="text-align:right"><a href="{{ url_for('add_composite') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🎯 Arc</a></td>
+				<td class="td-actions"><a href="{{ url_for('add_composite') }}" class="btn btn-outline btn-sm">🎯 Arc</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-primary">Création</span></td>
 				<td class="small">Inscrire un nouvel archer</td>
-				<td style="text-align:right"><a href="{{ url_for('add_archer') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">👤 Archer</a></td>
+				<td class="td-actions"><a href="{{ url_for('add_archer') }}" class="btn btn-outline btn-sm">👤 Archer</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-warning">Prêt</span></td>
 				<td class="small">Attribuer un arc à un archer</td>
-				<td style="text-align:right"><a href="{{ url_for('assign') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🔄 Affectation</a></td>
+				<td class="td-actions"><a href="{{ url_for('assign') }}" class="btn btn-outline btn-sm">🔄 Affectation</a></td>
 			</tr>
 			{% endif %}
 			<tr>
 				<td><span class="badge badge-info">Stock</span></td>
 				<td class="small">Liste et recherche des produits unitaires</td>
-				<td style="text-align:right"><a href="{{ url_for('products') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📦 Produits</a></td>
+				<td class="td-actions"><a href="{{ url_for('products') }}" class="btn btn-outline btn-sm">📦 Produits</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-info">Membres</span></td>
 				<td class="small">Archers, cours et matériel personnel</td>
-				<td style="text-align:right"><a href="{{ url_for('archers') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">👥 Archers</a></td>
+				<td class="td-actions"><a href="{{ url_for('archers') }}" class="btn btn-outline btn-sm">👥 Archers</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-info">Arcs</span></td>
 				<td class="small">Arcs composés et statuts club / prêt</td>
-				<td style="text-align:right"><a href="{{ url_for('composites') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🎯 Arcs</a></td>
+				<td class="td-actions"><a href="{{ url_for('composites') }}" class="btn btn-outline btn-sm">🎯 Arcs</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-info">Suivi</span></td>
 				<td class="small">Prêts en cours et retours</td>
-				<td style="text-align:right"><a href="{{ url_for('assignments') }}" class="btn btn-outline" style="padding:6px 10px;font-size:13px">🔄 Assignations</a></td>
+				<td class="td-actions"><a href="{{ url_for('assignments') }}" class="btn btn-outline btn-sm">🔄 Assignations</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-secondary">Exports</span></td>
 				<td class="small">Inventaire produits (PDF)</td>
-				<td style="text-align:right"><a href="/export_products" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📄 PDF</a></td>
+				<td class="td-actions"><a href="/export_products" class="btn btn-outline btn-sm">📄 PDF</a></td>
 			</tr>
 			<tr>
 				<td><span class="badge badge-secondary">Exports</span></td>
 				<td class="small">Liste des archers (PDF)</td>
-				<td style="text-align:right"><a href="/export_archers" class="btn btn-outline" style="padding:6px 10px;font-size:13px">📄 PDF</a></td>
+				<td class="td-actions"><a href="/export_archers" class="btn btn-outline btn-sm">📄 PDF</a></td>
 			</tr>
 		</tbody>
 	</table>
