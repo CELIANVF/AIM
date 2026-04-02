@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+
+{% block title %}Mon arc{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>🎯 Mon arc</h1>
+        <p class="muted">Matériel du club qui vous est assigné</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('archer_portal') }}">← Mon espace</a>
+</div>
+
+{% if not assignment %}
+<div class="card" style="padding:40px 24px;text-align:center">
+    <p class="muted">Aucun arc ne vous est actuellement assigné.</p>
+    <p class="small muted" style="margin-top:12px">Rapprochez-vous du club pour une mise à disposition.</p>
+</div>
+{% else %}
+<div class="card" style="padding:24px;margin-bottom:20px">
+    <h2 style="margin:0 0 8px;font-size:1.15rem">{{ composite.name }}</h2>
+    <p class="small muted" style="margin:0">
+        {% if composite.type %}Type {{ composite.type }}{% endif %}
+        {% if composite.status %} · Statut {{ composite.status }}{% endif %}
+        {% if assignment.date_assigned %} · Assigné le {{ assignment.date_assigned.strftime('%d/%m/%Y') }}{% endif %}
+    </p>
+</div>
+
+{% if products %}
+<div class="table-responsive">
+    <table class="table" style="margin:0">
+        <thead>
+            <tr>
+                <th>Catégorie</th>
+                <th>Marque</th>
+                <th>Détails</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr>
+                <td>{{ p.category.name if p.category else '—' }}</td>
+                <td>{{ p.brand or '—' }}</td>
+                <td class="small">
+                    {% if p.model %}{{ p.model }}{% endif %}
+                    {% if p.size %}{% if p.model %} · {% endif %}Taille {{ p.size }}{% endif %}
+                    {% if p.power %}{% if p.model or p.size %} · {% endif %}{{ p.power }}{% endif %}
+                    {% if not p.model and not p.size and not p.power %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="muted">Aucun composant listé sur cet arc.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

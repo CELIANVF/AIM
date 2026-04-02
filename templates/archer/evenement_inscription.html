@@ -1,0 +1,238 @@
+{% extends "layout.html" %}
+{% set aid = archer.id %}
+{% set archer_disc_count = inscription_disciplines|length %}
+{% set archer_fixed_disc = archer_disc_count == 1 %}
+{% set archer_fixed_code = inscription_disciplines[0][0] if archer_fixed_disc else '' %}
+{% set archer_fixed_label = inscription_disciplines[0][1] if archer_fixed_disc else '' %}
+{% set archer_simple_only = archer_fixed_disc and archer_fixed_code == 'inscription_simple' %}
+{% set archer_show_disc_select = not archer_fixed_disc %}
+{% set eff_disc = archer_fixed_code if archer_fixed_disc else form_ex.discipline %}
+{% set disc_mode = inscription_discipline_modes.get(eff_disc, 'distance') %}
+{% set show_blason_dist = disc_mode == 'distance' or disc_mode == 'both' %}
+{% set show_pike = disc_mode == 'pike' or disc_mode == 'both' %}
+
+{% block title %}Inscription · {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>📅 {{ event.title }}</h1>
+        <p class="muted">Complétez ou modifiez votre inscription</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('archer_events') }}">← Événements</a>
+</div>
+
+{% if event.lieu %}
+<p class="muted" style="margin-bottom:16px">Lieu : {{ event.lieu }}</p>
+{% endif %}
+{% if event.start_date or event.end_date %}
+<p class="muted" style="margin-bottom:16px">
+    {% if event.start_date and event.end_date %}Du {{ event.start_date.strftime('%d/%m/%Y') }} au {{ event.end_date.strftime('%d/%m/%Y') }}{% elif event.start_date %}À partir du {{ event.start_date.strftime('%d/%m/%Y') }}{% else %}Jusqu’au {{ event.end_date.strftime('%d/%m/%Y') }}{% endif %}
+</p>
+{% endif %}
+
+<form method="post" class="form-card page-inscription-event" style="max-width:720px" id="archer-inscription-form">
+    <h3 style="margin-top:0">Départ</h3>
+    <div class="form-group">
+        <label for="depart_index_{{ aid }}">Créneau</label>
+        <select id="depart_index_{{ aid }}" name="depart_index_{{ aid }}" class="insc-control">
+            {% for idx, label in dep_opts %}
+            <option value="{{ idx }}" {% if form_ex.depart_index|default(0)|int == idx %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {% if archer_simple_only %}
+    <input type="hidden" name="discipline_{{ aid }}" class="archer-insc-discipline-hidden" value="inscription_simple">
+    {% else %}
+    <h3 style="margin-top:24px">Paramètres de tir</h3>
+    {% if archer_show_disc_select %}
+    <div class="form-group">
+        <label for="discipline_{{ aid }}">Discipline</label>
+        <select id="discipline_{{ aid }}" name="discipline_{{ aid }}" class="insc-control archer-insc-discipline">
+            {% for code, label, _m in inscription_disciplines %}
+            <option value="{{ code }}" {% if form_ex.discipline == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% else %}
+    <div class="form-group">
+        <p class="muted" style="margin:0 0 8px">{{ archer_fixed_label }}</p>
+        <input type="hidden" name="discipline_{{ aid }}" class="archer-insc-discipline-hidden" value="{{ archer_fixed_code }}">
+    </div>
+    {% endif %}
+
+    <div class="archer-insc-group-extras" style="display:{% if disc_mode == 'simple' %}none{% else %}block{% endif %}">
+    <div class="form-group">
+        <label for="age_category_{{ aid }}">Catégorie d’âge</label>
+        <select id="age_category_{{ aid }}" name="age_category_{{ aid }}" class="insc-control archer-insc-age-cat">
+            {% for val, label in inscription_age_choices %}
+            <option value="{{ val }}" {% if form_ex.age_category == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="age_custom_{{ aid }}" class="insc-control archer-insc-age-custom" placeholder="" value="{{ form_ex.age_custom or '' }}" style="margin-top:8px;display:{% if form_ex.age_category == '__custom__' %}block{% else %}none{% endif %}">
+    </div>
+
+    <div class="form-group">
+        <label for="weapon_{{ aid }}">Arme</label>
+        <select id="weapon_{{ aid }}" name="weapon_{{ aid }}" class="insc-control">
+            {% for val, label in weapon_choices %}
+            <option value="{{ val }}" {% if weapon_saved_val == val %}selected{% endif %}>{{ label }}{% if val == '__fiche__' and archer.bow_type %} ({{ archer.bow_type }}){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    </div>
+    {% endif %}
+
+    <div class="form-group archer-insc-wrap-blason" style="display:{% if show_blason_dist %}block{% else %}none{% endif %}">
+        <label for="blason_{{ aid }}">Blason</label>
+        <select id="blason_{{ aid }}" name="blason_{{ aid }}" class="insc-control archer-insc-blason-sel">
+            {% for val, label in form_ex|inscription_blason_choices_for_row %}
+            <option value="{{ val }}" {% if form_ex.blason == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="blason_custom_{{ aid }}" class="insc-control archer-insc-blason-custom" placeholder="{{ 'Préciser blason…' if form_ex.blason == '__custom__' else '' }}" value="{{ form_ex.blason_custom or '' }}" style="margin-top:8px;display:{% if form_ex.blason == '__custom__' %}block{% else %}none{% endif %}">
+    </div>
+
+    <div class="form-group archer-insc-wrap-distance" style="display:{% if show_blason_dist %}block{% else %}none{% endif %}">
+        <label for="distance_{{ aid }}">Distance</label>
+        <select id="distance_{{ aid }}" name="distance_{{ aid }}" class="insc-control archer-insc-distance-sel">
+            {% for val, label in form_ex|inscription_distance_choices_for_row %}
+            <option value="{{ val }}" {% if form_ex.distance == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="distance_custom_{{ aid }}" class="insc-control archer-insc-distance-custom" placeholder="{{ 'ex. 33 m' if form_ex.distance == '__custom__' else '' }}" value="{{ form_ex.distance_custom or '' }}" style="margin-top:8px;display:{% if form_ex.distance == '__custom__' %}block{% else %}none{% endif %}">
+    </div>
+
+    <div class="form-group archer-insc-wrap-pike" style="display:{% if show_pike %}block{% else %}none{% endif %}">
+        <label for="pike_{{ aid }}">Piquet</label>
+        <select id="pike_{{ aid }}" name="pike_{{ aid }}" class="insc-control archer-insc-pike-sel">
+            {% for val, label in inscription_pike_choices %}
+            <option value="{{ val }}" {% if form_ex.pike == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="pike_custom_{{ aid }}" class="insc-control archer-insc-pike-custom" placeholder="{{ 'ex. Piquet / pique…' if form_ex.pike == '__custom__' else '' }}" value="{{ form_ex.pike_custom or '' }}" style="margin-top:8px;display:{% if form_ex.pike == '__custom__' %}block{% else %}none{% endif %}">
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="margin-top:16px">Enregistrer mon inscription</button>
+</form>
+
+{% if archer_has_saved_registration %}
+<div class="form-card page-inscription-event" style="max-width:720px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+    <p class="small muted" style="margin:0 0 12px">Retirer votre nom de la liste des inscrits pour cet événement.</p>
+    <form method="post" action="{{ url_for('archer_event_cancel_registration', event_id=event.id) }}" onsubmit="return confirm('Annuler votre inscription à cet événement ?');">
+        <button type="submit" class="btn btn-danger">Annuler mon inscription</button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var modes = {{ inscription_discipline_modes | tojson }};
+  var blasonChoicesByDisc = {{ inscription_blason_choices_by_disc_json | tojson }};
+  var distanceChoicesByDisc = {{ inscription_distance_choices_by_disc_json | tojson }};
+  function discMode(code) {
+    return (modes && modes[code]) || 'distance';
+  }
+  function currentDiscCode() {
+    var sel = document.querySelector('.archer-insc-discipline');
+    if (sel) return sel.value;
+    var hid = document.querySelector('.archer-insc-discipline-hidden');
+    return (hid && hid.value) ? hid.value : 'salle';
+  }
+  function setSelectOptions(selectEl, pairs) {
+    if (!selectEl || !pairs || !pairs.length) return;
+    var cur = selectEl.value;
+    selectEl.innerHTML = '';
+    pairs.forEach(function(p) {
+      var o = document.createElement('option');
+      o.value = p[0];
+      o.textContent = p[1];
+      selectEl.appendChild(o);
+    });
+    var allowed = {};
+    pairs.forEach(function(p) { allowed[p[0]] = true; });
+    if (cur && allowed[cur]) selectEl.value = cur;
+    else if (allowed['']) selectEl.value = '';
+    else selectEl.selectedIndex = 0;
+  }
+  function refillBlasonDistanceForDiscipline(code) {
+    if (code === 'inscription_simple') return;
+    var bch = (blasonChoicesByDisc && blasonChoicesByDisc[code]) || (blasonChoicesByDisc && blasonChoicesByDisc.salle);
+    var dch = (distanceChoicesByDisc && distanceChoicesByDisc[code]) || (distanceChoicesByDisc && distanceChoicesByDisc.salle);
+    setSelectOptions(document.querySelector('.archer-insc-blason-sel'), bch);
+    setSelectOptions(document.querySelector('.archer-insc-distance-sel'), dch);
+  }
+  function toggleCustom(select, customEl, placeholderOn) {
+    if (!select || !customEl) return;
+    var on = select.value === '__custom__';
+    customEl.style.display = on ? 'block' : 'none';
+    customEl.placeholder = on ? placeholderOn : '';
+  }
+  var discSel = document.querySelector('.archer-insc-discipline');
+  var blWrap = document.querySelector('.archer-insc-wrap-blason');
+  var distWrap = document.querySelector('.archer-insc-wrap-distance');
+  var pikeWrap = document.querySelector('.archer-insc-wrap-pike');
+  var extrasWrap = document.querySelector('.archer-insc-group-extras');
+  var formEl = document.getElementById('archer-inscription-form');
+  function setArcherFormSimpleMode(simple) {
+    if (extrasWrap) extrasWrap.style.display = simple ? 'none' : 'block';
+    if (!formEl) return;
+    formEl.querySelectorAll('input, select').forEach(function(el) {
+      var n = el.name || '';
+      if (!n) return;
+      if (n.indexOf('depart_index_') === 0 || n.indexOf('discipline_') === 0) {
+        el.disabled = false;
+        return;
+      }
+      el.disabled = !!simple;
+    });
+  }
+  function updateDisciplineUI() {
+    var code = currentDiscCode();
+    var m = discMode(code);
+    var simple = m === 'simple';
+    var showB = !simple && (m === 'distance' || m === 'both');
+    var showP = !simple && (m === 'pike' || m === 'both');
+    if (blWrap) blWrap.style.display = showB ? 'block' : 'none';
+    if (distWrap) distWrap.style.display = showB ? 'block' : 'none';
+    if (pikeWrap) pikeWrap.style.display = showP ? 'block' : 'none';
+    setArcherFormSimpleMode(simple);
+  }
+  var age = document.querySelector('.archer-insc-age-cat');
+  var ageC = document.querySelector('.archer-insc-age-custom');
+  var bls = document.querySelector('.archer-insc-blason-sel');
+  var blc = document.querySelector('.archer-insc-blason-custom');
+  var dls = document.querySelector('.archer-insc-distance-sel');
+  var dlc = document.querySelector('.archer-insc-distance-custom');
+  var pls = document.querySelector('.archer-insc-pike-sel');
+  var plc = document.querySelector('.archer-insc-pike-custom');
+  if (discSel) discSel.addEventListener('change', function() {
+    refillBlasonDistanceForDiscipline(discSel.value);
+    updateDisciplineUI();
+    if (bls && blc) toggleCustom(bls, blc, 'Préciser blason…');
+    if (dls && dlc) toggleCustom(dls, dlc, 'ex. 33 m');
+  });
+  if (age && ageC) {
+    age.addEventListener('change', function(){ toggleCustom(age, ageC, ''); });
+    toggleCustom(age, ageC, '');
+  }
+  if (bls && blc) {
+    bls.addEventListener('change', function(){ toggleCustom(bls, blc, 'Préciser blason…'); });
+    toggleCustom(bls, blc, 'Préciser blason…');
+  }
+  if (dls && dlc) {
+    dls.addEventListener('change', function(){ toggleCustom(dls, dlc, 'ex. 33 m'); });
+    toggleCustom(dls, dlc, 'ex. 33 m');
+  }
+  if (pls && plc) {
+    pls.addEventListener('change', function(){ toggleCustom(pls, plc, 'ex. Piquet / pique…'); });
+    toggleCustom(pls, plc, 'ex. Piquet / pique…');
+  }
+  refillBlasonDistanceForDiscipline(currentDiscCode());
+  updateDisciplineUI();
+})();
+</script>
+{% endblock %}

@@ -33,6 +33,10 @@ class User(UserMixin, db.Model):
     def can_view(self):
         return True
     
+    def can_create_archer_account(self):
+        """Compte de connexion archer (e-mail + mot de passe provisoire) : pas réservé au seul rôle éditeur fiche."""
+        return self.role in ('admin', 'responsable', 'entraineur', 'editeur')
+    
     # Permissions spécifiques par fonctionnalité
     def can_manage_archers(self):
         return self.role in ('admin', 'responsable', 'editeur')
@@ -121,7 +125,7 @@ class CompositeProduct(db.Model):
     status = db.Column(db.String(20), default='club')  # club, loan
     components = db.relationship('Product', secondary=composite_components, backref='composites')
 
-class Archer(db.Model):
+class Archer(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(100), nullable=True)
     last_name = db.Column(db.String(100), nullable=False)
@@ -134,9 +138,89 @@ class Archer(db.Model):
     draw_length = db.Column(db.String(50))
     bow_type = db.Column(db.String(50))
     notes = db.Column(db.Text)
+    # Account credentials (for archers with login access)
+    password_hash = db.Column(db.String(255), nullable=True)
     # Relationships with cascade delete
     assignments = db.relationship('Assignment', backref='archer', cascade='all, delete-orphan')
     attendances = db.relationship('Attendance', backref='archer', cascade='all, delete-orphan')
+
+    def get_id(self):
+        """Évite collision d'id avec la table user dans la session Flask-Login."""
+        return f'archer:{self.id}'
+
+    @property
+    def role(self):
+        """Profil affichage / menus (pas une colonne SQL)."""
+        return 'archer'
+
+    @property
+    def username(self):
+        """Libellé en-tête : identifiant de connexion = e-mail."""
+        return (self.email or '').strip() or (self.name or 'archer')
+
+    def set_password(self, password):
+        """Hash and set the password for this archer account."""
+        from werkzeug.security import generate_password_hash
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Check if the provided password matches the stored hash."""
+        from werkzeug.security import check_password_hash
+        return check_password_hash(self.password_hash, password) if self.password_hash else False
+
+    @property
+    def has_account(self):
+        """Check if this archer has a login account."""
+        return self.password_hash is not None
+
+    # Droits type « lecteur » (consultation club, sans gestion)
+    def is_admin(self):
+        return False
+
+    def is_responsable(self):
+        return False
+
+    def can_delete(self):
+        return False
+
+    def can_edit(self):
+        return False
+
+    def can_view(self):
+        return True
+
+    def can_create_archer_account(self):
+        return False
+
+    def can_manage_archers(self):
+        return False
+
+    def can_manage_equipment(self):
+        return False
+
+    def can_view_equipment(self):
+        return False
+
+    def can_manage_courses(self):
+        return False
+
+    def can_manage_attendance(self):
+        return False
+
+    def can_view_courses(self):
+        return False
+
+    def can_manage_assignments(self):
+        return False
+
+    def can_manage_assignments_for_coach(self):
+        return False
+
+    def can_view_assignments(self):
+        return False
+
+    def can_view_history(self):
+        return False
 
     @hybrid_property
     def name(self):
@@ -204,8 +288,14 @@ class InscriptionEvent(db.Model):
     depart_phrase = db.Column(db.String(500), nullable=True)
     depart_phrases_json = db.Column(db.Text, nullable=True)
     lieu = db.Column(db.String(200), nullable=True)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
     blasons_line = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
+    open_for_archer_registration = db.Column(db.Boolean, default=False, nullable=False)
+    archer_registration_deadline = db.Column(db.Date, nullable=True)
+    # JSON liste de codes discipline (ex. ["salle"]). Vide / NULL = toutes les disciplines.
+    allowed_disciplines_json = db.Column(db.Text, nullable=True)
 
     registrations = db.relationship(
         'InscriptionEventRegistration',

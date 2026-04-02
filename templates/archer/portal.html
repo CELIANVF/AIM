@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block title %}Mon espace{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>🏠 Mon espace</h1>
+        <p class="muted">{{ archer.name }}{% if archer.license_number %} · Licence {{ archer.license_number }}{% endif %}</p>
+    </div>
+</div>
+
+<div class="stats-grid" style="margin-bottom:28px">
+    <div class="stat-card">
+        <div class="stat-value">{% if assignment %}1{% else %}0{% endif %}</div>
+        <div class="stat-label">🎯 Arc assigné</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ courses|length }}</div>
+        <div class="stat-label">📚 Cours actifs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ open_events|length }}</div>
+        <div class="stat-label">📅 Événements ouverts</div>
+    </div>
+</div>
+
+<div class="card" style="padding:24px;margin-bottom:16px">
+    <h2 style="margin:0 0 12px;font-size:1.1rem">Accès rapide</h2>
+    <div class="action-group">
+        <a class="btn btn-primary" href="{{ url_for('archer_my_bow') }}">🎯 Voir mon arc</a>
+        <a class="btn btn-outline" href="{{ url_for('archer_my_courses') }}">📚 Mes cours</a>
+        <a class="btn btn-outline" href="{{ url_for('archer_events') }}">📅 Événements</a>
+    </div>
+</div>
+
+{% if open_events %}
+<div class="card" style="padding:24px">
+    <h2 style="margin:0 0 12px;font-size:1.1rem">Événements disponibles</h2>
+    <ul class="muted" style="margin:0;padding-left:1.2rem;line-height:1.7">
+        {% for ev in open_events[:5] %}
+        <li>
+            <a href="{{ url_for('archer_event_signup', event_id=ev.id) }}">{{ ev.title }}</a>
+            {% if ev.id in registered_event_ids %}
+            <span class="badge badge-success" style="margin-left:6px">Inscrit</span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% if open_events|length > 5 %}
+    <p class="small muted" style="margin:12px 0 0"><a href="{{ url_for('archer_events') }}">Voir tous les événements →</a></p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

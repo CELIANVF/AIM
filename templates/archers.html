@@ -13,6 +13,9 @@
         <a class="btn btn-primary" href="/add_archer">➕ Ajouter un archer</a>
         <a class="btn btn-outline" href="/import_archers">📥 Importer CSV</a>
         {% endif %}
+        {% if current_user.can_create_archer_account() %}
+        <a class="btn btn-outline" href="{{ url_for('create_archer_account') }}">🔐 Créer compte Archer</a>
+        {% endif %}
         <a class="btn btn-outline" href="{{ url_for('inscription_evenement') }}">📧 Texte d'inscription</a>
         <a class="btn btn-outline" href="/export_archers">📄 Exporter PDF</a>
         <a class="btn btn-outline" href="/export_archers_csv">📊 Exporter CSV</a>
@@ -136,6 +139,17 @@
                         <form method="POST" action="/delete_archer/{{ a.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
                             <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer">🗑️</button>
                         </form>
+                        {% endif %}
+                        {% if current_user.can_create_archer_account() and not a.has_account %}
+                            {% if a.email %}
+                            <form method="POST" action="{{ url_for('create_archer_account_row', archer_id=a.id) }}" style="display:inline;margin:0" onsubmit="return confirm('Créer un compte et envoyer les identifiants par e-mail à cet archer ?');">
+                                <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:13px;cursor:pointer">🔐 Créer compte</button>
+                            </form>
+                            {% elif current_user.can_edit() %}
+                            <a class="btn btn-outline" href="{{ url_for('edit_archer', archer_id=a.id) }}" style="padding:6px 10px;font-size:13px;opacity:0.85" title="Ajoutez un e-mail sur la fiche pour pouvoir créer un compte">📧 E-mail requis</a>
+                            {% else %}
+                            <span class="muted small" style="white-space:nowrap" title="Adresse e-mail manquante — un responsable peut la renseigner sur la fiche archer">Sans e-mail</span>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </td>

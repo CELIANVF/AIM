@@ -3,12 +3,17 @@
 {% block title %}Inscription événement{% endblock %}
 
 {% block content %}
-{% macro inscription_archer_row(section_idx, a=None, ex=None, tpl=False, new_row_extras=None) -%}
+{% macro inscription_archer_row(section_idx, a=None, ex=None, tpl=False, new_row_extras=None, hide_staff_detail_cols=False) -%}
+{% set staff_one_disc = inscription_disciplines|length == 1 %}
+{% if staff_one_disc %}
+  {% set _sd_code = inscription_disciplines[0][0] %}
+  {% set _sd_label = inscription_disciplines[0][1] %}
+{% endif %}
 {% if tpl %}
   {% set aid = '__INSC_AID__' %}
   {% set ex = new_row_extras if new_row_extras is not none else {} %}
   {% set dm = inscription_discipline_modes.get(ex.get('discipline', 'salle'), 'distance') %}
-  {% set wsel = '__fiche__' %}
+  {% set wsel = inscription_new_row_weapon_default|default('CL') %}
   {% set fiche_cat = '' %}
   {% set fiche_cat_di = '' %}
   {% set bow = '' %}
@@ -27,6 +32,9 @@
     <td class="small muted insc-archer-id" style="font-variant-numeric:tabular-nums">{% if tpl %}{{ aid }}{% else %}{{ a.id }}{% endif %}</td>
     <td>
         <input type="hidden" name="archer_id" value="{{ aid }}">
+        {% if staff_one_disc %}
+        <input type="hidden" name="discipline_{{ aid }}" class="insc-discipline-hidden" value="{{ _sd_code }}">
+        {% endif %}
         <input type="hidden" name="depart_index_{{ aid }}" value="{{ section_idx }}" class="insc-depart-index-hidden">
         <span class="insc-archer-name">{% if tpl %}{% else %}{{ a.name }}{% endif %}</span>
         {% if not tpl and a.categorie %}
@@ -36,63 +44,78 @@
         {% endif %}
     </td>
     <td class="muted insc-archer-license insc-td--license">{% if not tpl %}{{ a.license_number or '—' }}{% endif %}</td>
-    <td class="insc-td--stack">
+    {% if not staff_one_disc %}
+    <td class="insc-td--stack insc-td-discipline">
         <select name="discipline_{{ aid }}" class="insc-discipline insc-control" data-archer="{{ aid }}">
             {% for code, label, _m in inscription_disciplines %}
             <option value="{{ code }}" {% if ex.get('discipline', 'salle') == code %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
     </td>
-    <td class="insc-td--stack">
+    {% endif %}
+{% if not hide_staff_detail_cols %}
+    <td class="insc-td-age insc-td--stack"{% if dm == 'simple' %} style="display:none"{% endif %}>
         <select name="age_category_{{ aid }}" class="insc-age-cat insc-control insc-control--narrow" data-archer="{{ aid }}">
             {% for val, label in inscription_age_choices %}
             <option value="{{ val }}" {% if ex.get('age_category', '__fiche__') == val %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
-        <input type="text" name="age_custom_{{ aid }}" class="insc-age-custom insc-control insc-control--narrow" placeholder="Préciser…" value="{{ ex.get('age_custom', '') }}" style="margin-top:6px;display:{% if ex.get('age_category') == '__custom__' %}block{% else %}none{% endif %}">
+        <input type="text" name="age_custom_{{ aid }}" class="insc-age-custom insc-control insc-control--narrow" placeholder="" value="{{ ex.get('age_custom', '') }}" style="margin-top:6px;display:{% if ex.get('age_category') == '__custom__' %}block{% else %}none{% endif %}">
     </td>
-    <td class="insc-td--stack">
+    <td class="insc-td-weapon insc-td--stack"{% if dm == 'simple' %} style="display:none"{% endif %}>
         <select name="weapon_{{ aid }}" class="insc-weapon insc-control insc-control--blason">
             {% for val, label in weapon_choices %}
             <option value="{{ val }}" {% if wsel == val %}selected{% endif %}>{{ label }}{% if val == '__fiche__' and not tpl and a.bow_type %} ({{ a.bow_type }}){% endif %}</option>
             {% endfor %}
         </select>
     </td>
-    <td class="insc-td-blason-pike insc-td--stack">
-        <div class="insc-blason-pike-label">{% if dm == 'pike' %}Piquet{% elif dm == 'both' %}Blason et piquet{% else %}Blason{% endif %}</div>
-        <div class="insc-wrap-blason" style="display:{% if dm == 'distance' or dm == 'both' %}block{% else %}none{% endif %}">
+    <td class="insc-td-blason-distance insc-td-blason-pike insc-td--stack"{% if dm == 'simple' %} style="display:none"{% endif %}>
+        <div class="insc-targets-grid">
+        <div class="insc-blason-pike-label">{% if dm == 'simple' %}{% elif dm == 'pike' %}Piquet{% elif dm == 'both' %}Blason et piquet{% else %}Blason{% endif %}</div>
+        <div class="insc-wrap-blason insc-targets-grid__cell" style="display:{% if dm == 'simple' %}none{% elif dm == 'distance' or dm == 'both' %}block{% else %}none{% endif %}">
             <select name="blason_{{ aid }}" class="insc-blason-sel insc-control insc-control--blason" data-archer="{{ aid }}">
-                {% for val, label in inscription_blason_choices %}
+                {% set bch = ex|inscription_blason_choices_for_row %}
+                {% for val, label in bch %}
                 <option value="{{ val }}" {% if ex.get('blason', '') == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <input type="text" name="blason_custom_{{ aid }}" class="insc-blason-custom insc-control insc-control--blason" placeholder="Préciser blason…" value="{{ ex.get('blason_custom', '') }}" style="margin-top:6px;display:{% if ex.get('blason') == '__custom__' %}block{% else %}none{% endif %}">
+            <input type="text" name="blason_custom_{{ aid }}" class="insc-blason-custom insc-control insc-control--blason" placeholder="{{ 'Préciser blason…' if ex.get('blason') == '__custom__' else '' }}" value="{{ ex.get('blason_custom', '') }}" style="margin-top:6px;display:{% if ex.get('blason') == '__custom__' %}block{% else %}none{% endif %}">
         </div>
-        <div class="insc-wrap-pike" style="display:{% if dm == 'pike' or dm == 'both' %}block{% else %}none{% endif %}">
+        <div class="insc-wrap-pike insc-targets-grid__cell" style="display:{% if dm == 'simple' %}none{% elif dm == 'pike' or dm == 'both' %}block{% else %}none{% endif %}">
             <select name="pike_{{ aid }}" class="insc-pike-sel insc-control insc-control--blason">
                 {% for val, label in inscription_pike_choices %}
                 <option value="{{ val }}" {% if ex.get('pike', '') == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <input type="text" name="pike_custom_{{ aid }}" class="insc-pike-custom insc-control insc-control--blason" placeholder="ex. Piquet / pique…" value="{{ ex.get('pike_custom', '') }}" style="margin-top:6px;display:{% if ex.get('pike') == '__custom__' %}block{% else %}none{% endif %}">
+            <input type="text" name="pike_custom_{{ aid }}" class="insc-pike-custom insc-control insc-control--blason" placeholder="{{ 'ex. Piquet / pique…' if ex.get('pike') == '__custom__' else '' }}" value="{{ ex.get('pike_custom', '') }}" style="margin-top:6px;display:{% if ex.get('pike') == '__custom__' %}block{% else %}none{% endif %}">
         </div>
-        <div class="insc-wrap-distance" style="display:{% if dm == 'distance' or dm == 'both' %}block{% else %}none{% endif %}">
+        <div class="insc-wrap-distance insc-targets-grid__cell" style="display:{% if dm == 'simple' %}none{% elif dm == 'distance' or dm == 'both' %}block{% else %}none{% endif %}">
             <div class="insc-distance-label">Distance</div>
             <select name="distance_{{ aid }}" class="insc-distance-sel insc-control insc-control--xs">
-                {% for val, label in inscription_distance_choices %}
+                {% set dch = ex|inscription_distance_choices_for_row %}
+                {% for val, label in dch %}
                 <option value="{{ val }}" {% if ex.get('distance', '') == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <input type="text" name="distance_custom_{{ aid }}" class="insc-distance-custom insc-control insc-control--xs" placeholder="ex. 33 m" value="{{ ex.get('distance_custom', '') }}" style="margin-top:6px;display:{% if ex.get('distance') == '__custom__' %}block{% else %}none{% endif %}">
+            <input type="text" name="distance_custom_{{ aid }}" class="insc-distance-custom insc-control insc-control--xs" placeholder="{{ 'ex. 33 m' if ex.get('distance') == '__custom__' else '' }}" value="{{ ex.get('distance_custom', '') }}" style="margin-top:6px;display:{% if ex.get('distance') == '__custom__' %}block{% else %}none{% endif %}">
+        </div>
         </div>
     </td>
+{% endif %}
 </tr>
 {%- endmacro %}
 
 <div class="page-inscription-event">
 <header class="insc-hero" role="banner">
     <h1>Inscription événement</h1>
+    {% if current_event %}
+    <p class="insc-hero__event-name">{{ current_event.title }}</p>
+    <p class="insc-hero__lead">Renseignez le message, assignez les archers par départ, enregistrez puis générez le texte ou le PDF.</p>
+    {% elif not events %}
     <p class="insc-hero__lead">Créez un événement, associez les archers par créneau, puis générez le corps du mail ou un PDF au format courrier organisateur.</p>
+    {% else %}
+    <p class="insc-hero__lead">Choisissez un événement dans la liste ou créez-en un nouveau pour préparer le mail et les inscriptions.</p>
+    {% endif %}
 </header>
 
 {% if not events %}
@@ -110,85 +133,125 @@
 {% else %}
   {% if current_event %}
 <div class="insc-toolbar">
-    <a href="{{ url_for('inscription_evenement') }}" class="btn btn-outline insc-toolbar-back">← Tous les événements</a>
-    <form method="get" class="insc-toolbar__field insc-toolbar__switch">
-        <label for="sel_event">Changer d’événement</label>
-        <select id="sel_event" class="insc-toolbar__select" name="event_id" onchange="this.form.submit()">
-            {% for ev in events %}
-            <option value="{{ ev.id }}" {% if ev.id == current_event.id %}selected{% endif %}>{{ ev.title }}</option>
-            {% endfor %}
-        </select>
-    </form>
-    <form method="post" class="insc-toolbar__field" onsubmit="return confirm('Supprimer cet événement et toutes les inscriptions associées ?');">
-        <input type="hidden" name="event_id" value="{{ current_event.id }}">
-        <button type="submit" name="action" value="delete_event" class="btn btn-outline insc-btn-delete-event">Supprimer cet événement</button>
-    </form>
-    <div class="insc-toolbar__spacer" aria-hidden="true"></div>
-    <form method="post" class="insc-toolbar__field">
-        <label for="new_event_title_toolbar">Nouvel événement</label>
-        <input type="text" id="new_event_title_toolbar" name="new_event_title" placeholder="Titre…" style="min-width:200px;max-width:280px">
-        <button type="submit" name="action" value="create_event" class="btn btn-outline">Créer</button>
-    </form>
+    <div class="insc-toolbar__row insc-toolbar__row--primary">
+        <a href="{{ url_for('inscription_evenement') }}" class="btn btn-outline insc-toolbar-back">← Tous les événements</a>
+        <form method="get" class="insc-toolbar__field insc-toolbar__switch">
+            <label for="sel_event">Changer d’événement</label>
+            <select id="sel_event" class="insc-toolbar__select" name="event_id" onchange="this.form.submit()">
+                {% for ev in events %}
+                <option value="{{ ev.id }}" {% if ev.id == current_event.id %}selected{% endif %}>{{ ev.title }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="insc-toolbar__row insc-toolbar__row--secondary">
+        <form method="post" class="insc-toolbar__field insc-toolbar__field--danger" onsubmit="return confirm('Supprimer cet événement et toutes les inscriptions associées ?');">
+            <input type="hidden" name="event_id" value="{{ current_event.id }}">
+            <button type="submit" name="action" value="delete_event" class="btn btn-outline insc-btn-delete-event">Supprimer cet événement</button>
+        </form>
+        <form method="post" class="insc-toolbar__field insc-toolbar__field--create">
+            <label for="new_event_title_toolbar">Nouvel événement</label>
+            <input type="text" id="new_event_title_toolbar" name="new_event_title" placeholder="Titre…" class="insc-toolbar__new-title-input">
+            <button type="submit" name="action" value="create_event" class="btn btn-outline">Créer</button>
+        </form>
+    </div>
 </div>
+<nav class="insc-section-nav" aria-label="Sections de la page">
+    <a href="#insc-section-message">Message</a>
+    <a href="#insc-section-archers">Archers</a>
+    <a href="#insc-section-output">Génération</a>
+</nav>
 <form method="post" id="form-inscription">
     <input type="hidden" name="event_id" value="{{ current_event.id }}">
 
-    <div class="insc-panel">
+    <div class="insc-panel" id="insc-section-message">
         <div class="insc-panel__head">
             <h2 class="insc-panel__title">Contenu du message</h2>
             <p class="insc-panel__hint">Ces champs alimentent le texte généré (mail ou PDF). Le titre interne sert à vous repérer dans la liste des envois.</p>
         </div>
-        <div class="form-group">
-            <label for="title">Titre (interne)</label>
-            <input type="text" id="title" name="title" value="{{ form_values.title }}" placeholder="Référence dans la liste">
-        </div>
-        <div class="insc-mail-grid">
-            <div class="form-group" style="margin-bottom:0">
-                <label for="recipient_name">Destinataire</label>
-                <input type="text" id="recipient_name" name="recipient_name" placeholder="Prénom ou prénom nom — ex. Jean-Marie" value="{{ form_values.recipient_name }}">
+        <div class="insc-subsection">
+            <h3 class="insc-subsection__title">Référence</h3>
+            <div class="form-group">
+                <label for="title">Titre (interne)</label>
+                <input type="text" id="title" name="title" value="{{ form_values.title }}" placeholder="Référence dans la liste">
             </div>
-            <div class="form-group insc-depart-phrases" id="wrap-depart-phrases" style="margin-bottom:0">
-                <label>Départs</label>
-                <p class="small muted" style="margin:0 0 10px;line-height:1.5">Une ligne par créneau. Le libellé du mail s’ajuste automatiquement (un départ ou plusieurs).</p>
-                <div id="depart-phrases-list">
-                    {% for p in form_values.depart_phrases %}
-                    <div class="depart-phrase-row">
-                        <input type="text" name="depart_phrases" value="{{ p }}" placeholder="ex. dimanche 4 — 13h45">
-                        <button type="button" class="btn btn-outline depart-remove">Retirer</button>
-                    </div>
-                    {% endfor %}
+        </div>
+        <div class="insc-subsection">
+            <h3 class="insc-subsection__title">Destinataire et départs</h3>
+            <div class="insc-mail-grid">
+                <div class="form-group" style="margin-bottom:0">
+                    <label for="recipient_name">Destinataire</label>
+                    <input type="text" id="recipient_name" name="recipient_name" placeholder="Prénom ou prénom nom — ex. Jean-Marie" value="{{ form_values.recipient_name }}">
                 </div>
-                <button type="button" class="btn btn-outline" id="btn-depart-add" style="margin-top:6px">+ Ajouter un départ</button>
+                <div class="form-group insc-depart-phrases" id="wrap-depart-phrases" style="margin-bottom:0">
+                    <label>Départs</label>
+                    <p class="small muted insc-subsection__hint">Une ligne par créneau. Le libellé du mail s’ajuste automatiquement (un départ ou plusieurs).</p>
+                    <div id="depart-phrases-list">
+                        {% for p in form_values.depart_phrases %}
+                        <div class="depart-phrase-row">
+                            <input type="text" name="depart_phrases" value="{{ p }}" placeholder="ex. dimanche 4 — 13h45">
+                            <button type="button" class="btn btn-outline depart-remove">Retirer</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline" id="btn-depart-add" style="margin-top:6px">+ Ajouter un départ</button>
+                </div>
             </div>
         </div>
-        <div class="form-group" style="margin-top:20px;margin-bottom:0">
-            <label for="lieu">Lieu <span class="muted" style="font-weight:400">(optionnel)</span></label>
-            <input type="text" id="lieu" name="lieu" placeholder="ex. Salle Jean Moulin" value="{{ form_values.lieu }}">
+        <div class="insc-subsection">
+            <h3 class="insc-subsection__title">Lieu et dates</h3>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lieu">Lieu <span class="muted" style="font-weight:400">(optionnel)</span></label>
+                <input type="text" id="lieu" name="lieu" placeholder="ex. Salle Jean Moulin" value="{{ form_values.lieu }}">
+            </div>
+            <div class="form-row insc-dates-row">
+                <div class="form-group" style="margin-bottom:0;min-width:160px">
+                    <label for="start_date">Date de début <span class="muted" style="font-weight:400">(optionnel)</span></label>
+                    <input type="date" id="start_date" name="start_date" value="{{ form_values.start_date or '' }}">
+                </div>
+                <div class="form-group" style="margin-bottom:0;min-width:160px">
+                    <label for="end_date">Date de fin <span class="muted" style="font-weight:400">(optionnel)</span></label>
+                    <input type="date" id="end_date" name="end_date" value="{{ form_values.end_date or '' }}">
+                </div>
+            </div>
         </div>
+        <details class="insc-advanced-details">
+            <summary class="insc-advanced-details__summary">Options avancées</summary>
+            <div class="insc-advanced-details__body">
+                <div class="form-group" style="margin-top:0;margin-bottom:0;padding-top:16px">
+                    <label style="font-weight:600">Disciplines proposées pour cet événement</label>
+                    <p class="small muted insc-subsection__hint">Cochez les disciplines utiles (ex. concours en salle uniquement). Les listes déroulantes du tableau et l’inscription archer en ligne n’afficheront que celles-ci. Si tout est coché ou si vous n’en cochez aucune à l’enregistrement, <strong>toutes</strong> les disciplines restent disponibles.</p>
+                    <div class="insc-discipline-checkboxes">
+                        {% for code, label, _m in inscription_disciplines_catalog %}
+                        <label class="insc-discipline-check-label">
+                            <input type="checkbox" name="allowed_disciplines" value="{{ code }}" {% if code in form_values.get('allowed_disciplines_selection', []) %}checked{% endif %}>
+                            {{ label }} <span class="muted small">({{ code }})</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+                    <label class="insc-inline-check-label">
+                        <input type="checkbox" name="open_for_archer_registration" value="1" {% if form_values.open_for_archer_registration %}checked{% endif %}>
+                        Inscription en ligne (comptes archers)
+                    </label>
+                    <p class="small muted insc-subsection__hint insc-subsection__hint--indented">Les archers connectés voient l’événement dans leur espace et peuvent saisir départ, discipline, blason, etc.</p>
+                    <div class="form-group" style="margin-top:12px;margin-bottom:0;max-width:280px">
+                        <label for="archer_registration_deadline">Date limite (optionnel)</label>
+                        <input type="date" id="archer_registration_deadline" name="archer_registration_deadline" value="{{ form_values.archer_registration_deadline or '' }}">
+                    </div>
+                </div>
+            </div>
+        </details>
     </div>
     <textarea name="blasons_line" hidden>{{ form_values.blasons_line }}</textarea>
 
     <div class="insc-actions-row">
         <button type="submit" name="action" value="save_event" class="btn btn-primary">Enregistrer</button>
-        <span class="muted small" style="max-width:36ch;line-height:1.45">Enregistrez après avoir modifié les départs ou le tableau des archers.</span>
+        <span class="muted small insc-actions-row__hint">Enregistrez après avoir modifié les départs ou le tableau des archers.</span>
     </div>
 
-    <div class="insc-generate-bar insc-generate-bar--top">
-        <p class="insc-generate-bar__label">Générer la sortie</p>
-        <button type="submit" name="action" value="texte" class="btn btn-primary">Générer le texte</button>
-        <button type="submit" name="action" value="pdf" class="btn btn-outline" formaction="{{ url_for('inscription_evenement_pdf') }}">Télécharger le PDF</button>
-    </div>
-    {% if generated_text is not none %}
-    <section class="insc-mail-output" aria-label="Texte généré pour le mail">
-        <div class="insc-mail-output__head">
-            <h3>Texte pour le mail</h3>
-            <button type="button" class="btn btn-primary" id="btn-copy-inscription">Copier</button>
-        </div>
-        <textarea id="inscription-output" readonly rows="16">{{ generated_text }}</textarea>
-    </section>
-    {% endif %}
-
-    <div class="insc-panel">
+    <div class="insc-panel" id="insc-section-archers">
         <div class="insc-panel__head">
             <h2 class="insc-panel__title">Archers par départ</h2>
             <p class="insc-panel__hint">Chaque bloc correspond à un départ. Ajoutez les archers un par un, puis renseignez discipline, âge, arme et cibles.</p>
@@ -197,6 +260,7 @@
         <p class="insc-empty-state">Aucun archer en base. Ajoutez des fiches depuis la <a href="{{ url_for('archers') }}">liste des archers</a>.</p>
     {% else %}
 
+    <p class="insc-table-scroll-hint muted small">Tableau large sur plusieurs colonnes — faites défiler horizontalement dans chaque bloc si besoin.</p>
     <div id="insc-dep-sections">
         {% for idx, dep_label in inscription_depart_options %}
         <section class="insc-dep-section" data-depart-index="{{ idx }}">
@@ -215,24 +279,28 @@
                 <button type="button" class="btn btn-primary insc-add-archer-btn" data-depart-index="{{ idx }}">Ajouter</button>
             </div>
             <div class="insc-table-wrap">
-                <table class="inscription-table">
+                <table class="inscription-table{% if inscription_disciplines|length == 1 %} inscription-table--one-disc{% endif %}{% if inscription_staff_hide_detail_columns|default(false) %} inscription-table--no-detail{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col"></th>
                             <th scope="col">ID</th>
                             <th scope="col">Nom</th>
                             <th scope="col">Licence</th>
+                            {% if inscription_disciplines|length > 1 %}
                             <th scope="col">Discipline</th>
+                            {% endif %}
+                            {% if not inscription_staff_hide_detail_columns|default(false) %}
                             <th scope="col">Cat. âge</th>
                             <th scope="col">Arme</th>
-                            <th scope="col" class="insc-th-blason-pike">Blason / piquet / distance</th>
+                            <th scope="col" class="insc-th-blason-pike">{{ inscription_blason_column_header|default('Blason / piquet / distance') }}</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody class="insc-dep-tbody" data-depart-index="{{ idx }}">
                         {% set archers_here = archers_by_depart[idx] if archers_by_depart|length > idx else [] %}
                         {% for a in archers_here %}
                         {% set ex = registration_extras.get(a.id, {}) %}
-                        {{ inscription_archer_row(idx, a=a, ex=ex, tpl=False) }}
+                        {{ inscription_archer_row(idx, a=a, ex=ex, tpl=False, hide_staff_detail_cols=(inscription_staff_hide_detail_columns|default(false))) }}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -241,9 +309,31 @@
         {% endfor %}
     </div>
     <template id="inscription-row-template">
-        <table><tbody>{{ inscription_archer_row(0, tpl=True, new_row_extras=inscription_new_row_extras|default({})) }}</tbody></table>
+        <table><tbody>{{ inscription_archer_row(0, tpl=True, new_row_extras=inscription_new_row_extras|default({}), hide_staff_detail_cols=inscription_staff_hide_detail_columns|default(false)) }}</tbody></table>
     </template>
     {% endif %}
+    </div>
+
+    <div class="insc-actions-row insc-actions-row--after-archers">
+        <button type="submit" name="action" value="save_event" class="btn btn-primary">Enregistrer</button>
+        <span class="muted small insc-actions-row__hint">Enregistrez après les changements dans le tableau, avant de générer le texte ou le PDF.</span>
+    </div>
+
+    <div id="insc-section-output" class="insc-output-section">
+        <div class="insc-generate-bar">
+            <p class="insc-generate-bar__label">Générer la sortie</p>
+            <button type="submit" name="action" value="texte" class="btn btn-primary">Générer le texte</button>
+            <button type="submit" name="action" value="pdf" class="btn btn-outline" formaction="{{ url_for('inscription_evenement_pdf') }}">Télécharger le PDF</button>
+        </div>
+        {% if generated_text is not none %}
+        <section class="insc-mail-output" aria-label="Texte généré pour le mail">
+            <div class="insc-mail-output__head">
+                <h3>Texte pour le mail</h3>
+                <button type="button" class="btn btn-primary" id="btn-copy-inscription">Copier</button>
+            </div>
+            <textarea id="inscription-output" readonly rows="16">{{ generated_text }}</textarea>
+        </section>
+        {% endif %}
     </div>
 
 </form>
@@ -260,6 +350,9 @@
         <li>
             <a class="insc-event-card" href="{{ url_for('inscription_evenement', event_id=ev.id) }}">
                 <span class="insc-event-card__title">{{ ev.title }}</span>
+                {% if ev.open_for_archer_registration %}
+                <span class="badge badge-success" style="margin-left:6px;font-size:11px;vertical-align:middle">En ligne archers</span>
+                {% endif %}
                 {% if ev.recipient_name %}
                 <span class="insc-event-card__recipient">{{ ev.recipient_name }}</span>
                 {% endif %}
@@ -342,6 +435,15 @@
   var modes = {{ inscription_discipline_modes | tojson }};
   var targetsByDisc = {{ inscription_cat_weapon_targets | tojson }};
   var campagnePiques = {{ inscription_campagne_piquets | tojson }};
+  var blasonChoicesByDisc = {{ inscription_blason_choices_by_disc_json | tojson }};
+  var distanceChoicesByDisc = {{ inscription_distance_choices_by_disc_json | tojson }};
+  function rowDisciplineCode(row) {
+    if (!row) return 'salle';
+    var sel = row.querySelector('select.insc-discipline');
+    if (sel) return sel.value;
+    var hid = row.querySelector('input.insc-discipline-hidden');
+    return (hid && hid.value) ? hid.value : 'salle';
+  }
   var AGE_VALUE_TO_CAT_SALLE = {
     'U11': 'U11', 'U13': 'U13', 'U15': 'U15', 'U18': 'U18', 'U21': 'U21_SPLUS',
     'S1': 'U21_SPLUS', 'S2': 'U21_SPLUS', 'S3': 'U21_SPLUS',
@@ -411,8 +513,8 @@
   }
   function applyCatWeaponDefaults(row) {
     if (!row) return;
-    var dselDisc = row.querySelector('.insc-discipline');
-    var disc = dselDisc ? dselDisc.value : 'salle';
+    var disc = rowDisciplineCode(row);
+    if (disc === 'inscription_simple') return;
     var cat = resolveCatKey(row, disc);
     var wsel = row.querySelector('.insc-weapon');
     var bow = row.getAttribute('data-bow-type') || '';
@@ -478,12 +580,48 @@
     if (dsel && dcu) toggleCustom(dsel, dcu);
     if (bsel && bcu) toggleCustom(bsel, bcu);
   }
+  function setSelectOptions(selectEl, pairs) {
+    if (!selectEl || !pairs || !pairs.length) return;
+    var cur = selectEl.value;
+    selectEl.innerHTML = '';
+    pairs.forEach(function(p) {
+      var o = document.createElement('option');
+      o.value = p[0];
+      o.textContent = p[1];
+      selectEl.appendChild(o);
+    });
+    var allowed = {};
+    pairs.forEach(function(p) { allowed[p[0]] = true; });
+    if (cur && allowed[cur]) selectEl.value = cur;
+    else if (allowed['']) selectEl.value = '';
+    else selectEl.selectedIndex = 0;
+  }
+  function refillBlasonDistanceOptions(row) {
+    var code = rowDisciplineCode(row);
+    var bch = (blasonChoicesByDisc && blasonChoicesByDisc[code]) || (blasonChoicesByDisc && blasonChoicesByDisc.salle);
+    var dch = (distanceChoicesByDisc && distanceChoicesByDisc[code]) || (distanceChoicesByDisc && distanceChoicesByDisc.salle);
+    setSelectOptions(row.querySelector('.insc-blason-sel'), bch);
+    setSelectOptions(row.querySelector('.insc-distance-sel'), dch);
+  }
   function rowMode(row) {
-    var sel = row.querySelector('.insc-discipline');
-    return (sel && modes[sel.value]) || 'both';
+    var code = rowDisciplineCode(row);
+    return (modes && modes[code]) || 'distance';
   }
   function updateRow(row) {
     var m = rowMode(row);
+    var simple = m === 'simple';
+    var tdAge = row.querySelector('.insc-td-age');
+    var tdWeapon = row.querySelector('.insc-td-weapon');
+    var tdBlason = row.querySelector('.insc-td-blason-distance');
+    function setExtrasDisabled(on) {
+      row.querySelectorAll('.insc-td-age input, .insc-td-age select, .insc-td-weapon input, .insc-td-weapon select, .insc-td-blason-distance input, .insc-td-blason-distance select').forEach(function(el) {
+        el.disabled = !!on;
+      });
+    }
+    if (tdAge) tdAge.style.display = simple ? 'none' : '';
+    if (tdWeapon) tdWeapon.style.display = simple ? 'none' : '';
+    if (tdBlason) tdBlason.style.display = simple ? 'none' : '';
+    setExtrasDisabled(simple);
     var wrapB = row.querySelector('.insc-wrap-blason');
     var wrapP = row.querySelector('.insc-wrap-pike');
     var wrapDist = row.querySelector('.insc-wrap-distance');
@@ -491,6 +629,13 @@
     function dim(el, on) {
       if (!el) return;
       el.style.opacity = on ? '1' : '0.42';
+    }
+    if (simple) {
+      if (wrapB) wrapB.style.display = 'none';
+      if (wrapP) wrapP.style.display = 'none';
+      if (wrapDist) wrapDist.style.display = 'none';
+      if (lbl) lbl.textContent = '';
+      return;
     }
     var showB = m === 'distance' || m === 'both';
     var showP = m === 'pike' || m === 'both';
@@ -515,13 +660,27 @@
   }
   function toggleCustom(select, customEl) {
     if (!select || !customEl) return;
-    customEl.style.display = select.value === '__custom__' ? 'block' : 'none';
+    var on = select.value === '__custom__';
+    customEl.style.display = on ? 'block' : 'none';
+    if (customEl.classList.contains('insc-age-custom')) {
+      customEl.placeholder = '';
+    } else if (customEl.classList.contains('insc-blason-custom')) {
+      customEl.placeholder = on ? 'Préciser blason…' : '';
+    } else if (customEl.classList.contains('insc-distance-custom')) {
+      customEl.placeholder = on ? 'ex. 33 m' : '';
+    } else if (customEl.classList.contains('insc-pike-custom')) {
+      customEl.placeholder = on ? 'ex. Piquet / pique…' : '';
+    }
   }
   function initInscriptionRow(row) {
     if (!row || row.dataset.inscInit === '1') return;
     row.dataset.inscInit = '1';
-    var disc = row.querySelector('.insc-discipline');
-    if (disc) disc.addEventListener('change', function(){ updateRow(row); applyCatWeaponDefaults(row); });
+    var discSel = row.querySelector('select.insc-discipline');
+    if (discSel) discSel.addEventListener('change', function(){
+      refillBlasonDistanceOptions(row);
+      updateRow(row);
+      applyCatWeaponDefaults(row);
+    });
     var age = row.querySelector('.insc-age-cat');
     var ageC = row.querySelector('.insc-age-custom');
     if (age && ageC) {

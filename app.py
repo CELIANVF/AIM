@@ -18,8 +18,9 @@ from models import (
     InscriptionEvent,
     InscriptionEventRegistration,
 )
+from mail import mail, send_archer_credentials, generate_temporary_password
 from datetime import datetime, date, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 from dateutil import parser as date_parser
 import csv
@@ -32,7 +33,7 @@ import click
 
 # Armes proposées pour les textes d'inscription (mail / PDF) — « fiche » = bow_type de l'archer
 REGISTRATION_WEAPON_CHOICES = [
-    ('__fiche__', 'Comme sur la fiche archer'),
+    ('__fiche__', 'Sans type d’arc sur la fiche'),
     ('CL', 'Classique (CL)'),
     ('BB', 'Barebow (BB)'),
     ('Compound', ' poulies'),
@@ -117,6 +118,26 @@ def _registration_weapon_canonical(weapon_choice):
     return REGISTRATION_WEAPON_ALIASES.get(w, w)
 
 
+def _inscription_default_weapon_for_archer(archer):
+    """Code arme pour le select d'inscription : type d'arc fiche, sinon CL."""
+    if archer is None:
+        return 'CL'
+    c = _canonical_archer_bow_type_code(getattr(archer, 'bow_type', None))
+    if c in ARCHER_BOW_TYPE_VALID_CODES:
+        return c
+    return 'CL'
+
+
+def _inscription_weapon_for_event_row(archer, registration):
+    """Arme affichée pour une ligne : valeur enregistrée si explicite, sinon fiche → défaut."""
+    if registration and _inscription_is_simple_discipline(getattr(registration, 'discipline', None)):
+        return '__fiche__'
+    if registration and registration.weapon_choice:
+        w = _registration_weapon_canonical(registration.weapon_choice)
+        if w != '__fiche__':
+            return w
+    return _inscription_default_weapon_for_archer(archer)
+
 
 # (code, libellé affiché, mode distance/pique pour le formulaire et le texte)
 INSCRIPTION_DISCIPLINES = [
@@ -128,6 +149,7 @@ INSCRIPTION_DISCIPLINES = [
     ('campagne', 'Campagne', 'pike'),
     ('beursault', 'Beursault', 'distance'),
     ('autre', 'Autre', 'both'),
+    ('inscription_simple', 'Inscription simple', 'simple'),
 ]
 DEFAULT_INSCRIPTION_DISCIPLINE = 'salle'
 
@@ -147,8 +169,73 @@ def _inscription_discipline_canonical(code):
     valid = {x[0] for x in INSCRIPTION_DISCIPLINES}
     return c if c in valid else DEFAULT_INSCRIPTION_DISCIPLINE
 
+
+def _inscription_is_simple_discipline(code):
+    return _inscription_discipline_canonical(code) == 'inscription_simple'
+
+
+def _inscription_event_allowed_disciplines(ev):
+    """Tuples (code, libellé, mode) autorisés pour l'événement. Non configuré = toutes."""
+    if not ev:
+        return list(INSCRIPTION_DISCIPLINES)
+    raw = getattr(ev, 'allowed_disciplines_json', None)
+    if raw is None or not str(raw).strip():
+        return list(INSCRIPTION_DISCIPLINES)
+    try:
+        codes = json.loads(raw)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return list(INSCRIPTION_DISCIPLINES)
+    if not isinstance(codes, list) or len(codes) == 0:
+        return list(INSCRIPTION_DISCIPLINES)
+    by_code = {x[0]: x for x in INSCRIPTION_DISCIPLINES}
+    out = [by_code[c] for c in codes if c in by_code]
+    return out if out else list(INSCRIPTION_DISCIPLINES)
+
+
+def _inscription_table_blason_column_header(disc_list):
+    """En-tête du tableau : pas de « piquet » si aucune discipline autorisée n’utilise de piquet."""
+    has_pike = any(m in ('pike', 'both') for _c, _l, m in disc_list)
+    has_dist = any(m in ('distance', 'both') for _c, _l, m in disc_list)
+    if not has_pike and not has_dist:
+        return '—'
+    return 'Blason / piquet / distance' if has_pike else 'Blason / distance'
+
+
+def _inscription_staff_hide_archer_detail_columns(disc_list):
+    """Masquer colonnes catégorie / arme / blason si seule l’inscription simple est proposée."""
+    return bool(disc_list) and all(m == 'simple' for _c, _l, m in disc_list)
+
+
+def _inscription_discipline_for_event(raw_code, ev):
+    """Code discipline canonique restreint aux choix de l'événement."""
+    allowed_tuples = _inscription_event_allowed_disciplines(ev)
+    allowed_codes = {t[0] for t in allowed_tuples}
+    c = _inscription_discipline_canonical(raw_code)
+    if c in allowed_codes:
+        return c
+    return allowed_tuples[0][0] if allowed_tuples else DEFAULT_INSCRIPTION_DISCIPLINE
+
+
+def _inscription_allowed_disciplines_selection_for_form(ev):
+    """Codes à cocher dans le back-office (toutes les cases si pas de filtre en base)."""
+    if not ev:
+        return [x[0] for x in INSCRIPTION_DISCIPLINES]
+    raw = getattr(ev, 'allowed_disciplines_json', None)
+    if raw is None or not str(raw).strip():
+        return [x[0] for x in INSCRIPTION_DISCIPLINES]
+    try:
+        codes = json.loads(raw)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return [x[0] for x in INSCRIPTION_DISCIPLINES]
+    if not isinstance(codes, list) or len(codes) == 0:
+        return [x[0] for x in INSCRIPTION_DISCIPLINES]
+    valid = {x[0] for x in INSCRIPTION_DISCIPLINES}
+    sel = [c for c in codes if c in valid]
+    return sel if sel else [x[0] for x in INSCRIPTION_DISCIPLINES]
+
+
 INSCRIPTION_AGE_CATEGORY_CHOICES = [
-    ('__fiche__', 'Comme sur la fiche'),
+    ('__fiche__', 'Sans catégorie sur la fiche'),
     ('U11', 'U11'),
     ('U13', 'U13'),
     ('U15', 'U15'),
@@ -174,6 +261,7 @@ INSCRIPTION_BLASON_CHOICES = [
     ('80 cm (1-X)', '80 cm (1-X)'),
     ('80 cm (5-X)', '80 cm (5-X)'),
     (INSCRIPTION_BEURSAULT_BLASON_LINE, INSCRIPTION_BEURSAULT_BLASON_LINE),
+    ('__custom__', 'Autre…'),
 ]
 
 # Anciennes valeurs enregistrées → codes actuels (liste réduite)
@@ -361,6 +449,135 @@ INSCRIPTION_PIKE_CHOICES = [
 ]
 
 
+def _iter_inscription_target_tuples(table):
+    for _cat, weapons in table.items():
+        for _g, t in weapons.items():
+            if t is not None:
+                yield t
+
+
+def _ordered_unique_distances_from_table(table):
+    out = []
+    seen = set()
+    for t in _iter_inscription_target_tuples(table):
+        d = t[0]
+        if d and d not in seen:
+            seen.add(d)
+            out.append(d)
+    return out
+
+
+def _ordered_unique_blasons_from_table(table):
+    out = []
+    seen = set()
+    for t in _iter_inscription_target_tuples(table):
+        if len(t) < 2:
+            continue
+        b = t[1]
+        if b and b not in seen:
+            seen.add(b)
+            out.append(b)
+    return out
+
+
+def _union_distances_all_target_tables():
+    seen = set()
+    out = []
+    for tbl in INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE.values():
+        for d in _ordered_unique_distances_from_table(tbl):
+            if d not in seen:
+                seen.add(d)
+                out.append(d)
+    return out
+
+
+def _union_blasons_all_target_tables():
+    seen = set()
+    out = []
+    for tbl in INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE.values():
+        for b in _ordered_unique_blasons_from_table(tbl):
+            if b not in seen:
+                seen.add(b)
+                out.append(b)
+    return out
+
+
+def _inscription_distance_choices_for_discipline(discipline_code, current_distance=''):
+    """Distances affichables : celles du tableau pour la discipline (+ valeur courante si hors liste + Autre)."""
+    disc = _inscription_discipline_canonical(discipline_code)
+    label_map = dict(INSCRIPTION_DISTANCE_CHOICES)
+    if disc in INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE:
+        dists = _ordered_unique_distances_from_table(INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE[disc])
+    elif disc == 'autre':
+        dists = _union_distances_all_target_tables()
+    else:
+        dists = []
+    rows = [('', '—')]
+    allowed = {''}
+    for d in dists:
+        rows.append((d, label_map.get(d, d)))
+        allowed.add(d)
+    cur = (current_distance or '').strip()
+    if cur and cur not in ('__custom__',) and cur not in allowed:
+        rows.insert(-1, (cur, label_map.get(cur, cur)))
+    rows.append(('__custom__', 'Autre…'))
+    return rows
+
+
+def _inscription_blason_choices_for_discipline(discipline_code, current_blason=''):
+    """Blasons affichables : ceux du tableau pour la discipline (+ valeur courante si hors liste + Autre)."""
+    disc = _inscription_discipline_canonical(discipline_code)
+    label_map = dict(INSCRIPTION_BLASON_CHOICES)
+    if disc in INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE:
+        bls = _ordered_unique_blasons_from_table(INSCRIPTION_TARGET_TABLES_BY_DISCIPLINE[disc])
+    elif disc == 'autre':
+        bls = _union_blasons_all_target_tables()
+    else:
+        bls = []
+    rows = [('', '—')]
+    allowed = {''}
+    for b in bls:
+        rows.append((b, label_map.get(b, b)))
+        allowed.add(b)
+    cur = (current_blason or '').strip()
+    if cur and cur not in ('__custom__',) and cur not in allowed:
+        rows.insert(-1, (cur, label_map.get(cur, cur)))
+    rows.append(('__custom__', 'Autre…'))
+    return rows
+
+
+def _inscription_blason_distance_choices_json():
+    """Pour le JS : listes par code discipline (sans valeur orpheline)."""
+    bl = {}
+    di = {}
+    for code, _lbl, _m in INSCRIPTION_DISCIPLINES:
+        bl[code] = [
+            [v, lbl] for v, lbl in _inscription_blason_choices_for_discipline(code, '')
+        ]
+        di[code] = [
+            [v, lbl] for v, lbl in _inscription_distance_choices_for_discipline(code, '')
+        ]
+    return bl, di
+
+
+def _tpl_inscription_blason_choices_for_row(ex):
+    if not ex:
+        ex = {}
+    return _inscription_blason_choices_for_discipline(
+        ex.get('discipline', DEFAULT_INSCRIPTION_DISCIPLINE),
+        ex.get('blason', ''),
+    )
+
+
+def _tpl_inscription_distance_choices_for_row(ex):
+    if not ex:
+        ex = {}
+    return _inscription_distance_choices_for_discipline(
+        ex.get('discipline', DEFAULT_INSCRIPTION_DISCIPLINE),
+        ex.get('distance', ''),
+    )
+
+
 def _inscription_weapon_group(weapon_choice, bow_type):
     """CL / CO / BB / LD (arc droit / longbow) pour les tableaux distances-blasons."""
     w = _registration_weapon_canonical(weapon_choice)
@@ -449,6 +666,79 @@ def _normalize_inscription_category_key_exterieur_di(raw):
     if re.match(r'^S[12]$', s.strip()):
         return 'U21_S12'
     return None
+
+
+_INSCRIPTION_AGE_SELECT_PRESETS = frozenset(
+    c for c, _ in INSCRIPTION_AGE_CATEGORY_CHOICES if c not in ('__fiche__', '__custom__')
+)
+
+
+def _inscription_age_code_from_categorie_for_discipline(raw, discipline_code):
+    """
+    Déduit le code du select « catégorie d'âge » (U11…S3, U21) depuis le libellé fiche archer.
+    Tient compte de la discipline (extérieur DI/DN vs salle et autres).
+    """
+    if raw is None or not str(raw).strip():
+        return None
+    s = str(raw).strip()
+    su = s.upper().replace('É', 'E').replace('È', 'E')
+    disc = _inscription_discipline_canonical(discipline_code)
+
+    def _senior_n(n):
+        if re.search(rf'SENIOR\s*{n}\b|SNR\s*{n}\b', su, re.I):
+            return True
+        t = re.sub(r'\s+', '', su)
+        return bool(re.match(rf'^S{n}$', t, re.I))
+
+    if _senior_n(3) or re.match(r'^S3(\b|\s|$)', s, re.I):
+        return 'S3'
+    if _senior_n(2) or re.match(r'^S2(\b|\s|$)', s, re.I):
+        return 'S2'
+    if _senior_n(1) or re.match(r'^S1(\b|\s|$)', s, re.I):
+        return 'S1'
+
+    if disc in ('exterieur_di', 'exterieur_dn'):
+        k = _normalize_inscription_category_key_exterieur_di(raw)
+        if k == 'U11':
+            return 'U11'
+        if k == 'U13':
+            return 'U13'
+        if k == 'U15':
+            return 'U15'
+        if k == 'U18':
+            return 'U18'
+        if k == 'U21_S12':
+            return 'U21'
+        if k == 'S3':
+            return 'S3'
+        return None
+
+    k = _normalize_inscription_category_key(raw)
+    if k == 'U11':
+        return 'U11'
+    if k == 'U13':
+        return 'U13'
+    if k == 'U15':
+        return 'U15'
+    if k == 'U18':
+        return 'U18'
+    if k == 'U21_SPLUS':
+        return 'U21'
+    return None
+
+
+def _inscription_default_age_category_for_archer(archer, discipline_code=None):
+    """
+    (age_category, age_custom) pour préremplir le formulaire d'inscription.
+    Remplace « comme sur la fiche » par U11…U21 / S1–S3 quand le libellé fiche est reconnu.
+    """
+    raw = (archer.categorie or '').strip()
+    if not raw:
+        return '__fiche__', ''
+    code = _inscription_age_code_from_categorie_for_discipline(raw, discipline_code)
+    if code and code in _INSCRIPTION_AGE_SELECT_PRESETS:
+        return code, ''
+    return '__custom__', raw
 
 
 def _inscription_effective_category_label(archer, age_code, age_custom):
@@ -557,6 +847,8 @@ def _inscription_default_distance_blason_fields(
 ):
     """Remplissage auto distance + blason (ou piquet campagne) selon discipline, catégorie et arme."""
     disc = _inscription_discipline_canonical(discipline_code)
+    if _inscription_is_simple_discipline(disc):
+        return {}
     if disc == 'campagne':
         return _inscription_campagne_auto_fields(archer, age_code, age_custom, weapon_choice)
     eff = _inscription_effective_category_label(archer, age_code, age_custom)
@@ -605,7 +897,7 @@ def _inscription_discipline_mode(code):
     for c, _lbl, mode in INSCRIPTION_DISCIPLINES:
         if c == code:
             return mode
-    return 'both'
+    return 'distance'
 
 
 def _inscription_discipline_label(code):
@@ -654,6 +946,8 @@ def _inscription_dist_pike_summary(disc_code, distance_str, pike_str):
     mode = _inscription_discipline_mode(disc_code)
     d = (distance_str or '').strip()
     p = (pike_str or '').strip()
+    if mode == 'simple':
+        return ''
     if mode == 'distance':
         return d or '—'
     if mode == 'pike':
@@ -666,10 +960,35 @@ def _inscription_dist_pike_summary(disc_code, distance_str, pike_str):
     return ' — '.join(bits) if bits else '—'
 
 
-def _inscription_parse_row(archer):
+def _inscription_omit_discipline_in_generated_line(ev, discipline_code):
+    """Courrier / PDF : pas de libellé discipline si seule option à l’événement ou inscription simple."""
+    if _inscription_is_simple_discipline(discipline_code):
+        return True
+    if not ev:
+        return False
+    allowed = _inscription_event_allowed_disciplines(ev)
+    return len(allowed) <= 1
+
+
+def _inscription_parse_row(archer, ev=None):
     """Lit le POST pour une ligne archer (tous champs d'inscription)."""
     aid = archer.id
-    disc = _inscription_discipline_canonical(request.form.get(f'discipline_{aid}', ''))
+    disc = _inscription_discipline_for_event(request.form.get(f'discipline_{aid}', ''), ev)
+    if _inscription_is_simple_discipline(disc):
+        return {
+            'discipline_code': disc,
+            'discipline_label': _inscription_discipline_label(disc),
+            'omit_discipline_in_line': True,
+            'weapon_choice': None,
+            'weapon_label': '—',
+            'age_code': '__fiche__',
+            'age_label': '—',
+            'blason_label': '—',
+            'distance_stored': '',
+            'pike_stored': '',
+            'dist_pike_label': '—',
+            'depart_index': _inscription_parse_depart_index(aid),
+        }
     age_code = (request.form.get(f'age_category_{aid}', '') or '').strip() or '__fiche__'
     w = _registration_weapon_canonical(request.form.get(f'weapon_{aid}', '__fiche__'))
     blason_sel = request.form.get(f'blason_{aid}', '')
@@ -685,6 +1004,7 @@ def _inscription_parse_row(archer):
     return {
         'discipline_code': disc,
         'discipline_label': _inscription_discipline_label(disc),
+        'omit_discipline_in_line': _inscription_omit_discipline_in_generated_line(ev, disc),
         'weapon_choice': w,
         'weapon_label': weapon_label,
         'age_code': age_code,
@@ -725,14 +1045,20 @@ def _preset_match(stored, choices):
     return '__custom__', stored
 
 
-def _inscription_row_form_state(archer, reg=None, depart_option_count=1):
+def _inscription_row_form_state(archer, reg=None, depart_option_count=1, allowed_disciplines=None):
     """État formulaire pour un archer (depuis DB ou défauts)."""
+    allowed = allowed_disciplines if allowed_disciplines is not None else INSCRIPTION_DISCIPLINES
+    allowed_codes = [x[0] for x in allowed]
+    default_disc = allowed_codes[0] if allowed_codes else DEFAULT_INSCRIPTION_DISCIPLINE
     dc = max(1, int(depart_option_count or 1))
     if reg is None:
+        ac, acust = _inscription_default_age_category_for_archer(archer, default_disc)
+        if _inscription_is_simple_discipline(default_disc):
+            ac, acust = '__fiche__', ''
         st = {
-            'discipline': DEFAULT_INSCRIPTION_DISCIPLINE,
-            'age_category': '__fiche__',
-            'age_custom': '',
+            'discipline': default_disc,
+            'age_category': ac,
+            'age_custom': acust,
             'blason': '',
             'blason_custom': '',
             'distance': '',
@@ -741,21 +1067,15 @@ def _inscription_row_form_state(archer, reg=None, depart_option_count=1):
             'pike_custom': '',
             'depart_index': 0,
         }
+        wdef = _inscription_default_weapon_for_archer(archer)
         auto = _inscription_default_distance_blason_fields(
-            archer, '__fiche__', '', '__fiche__', st['discipline']
+            archer, ac, acust, wdef, st['discipline']
         )
         st.update(auto)
         return st
     disc = _inscription_discipline_canonical(reg.discipline)
-    if reg.age_category is None or (reg.age_category or '').strip() == '':
-        age_cat, age_cust = '__fiche__', ''
-    else:
-        age_cat, age_cust = _preset_match(reg.age_category, INSCRIPTION_AGE_CATEGORY_CHOICES)
-    blason, blason_cust = _preset_match(
-        _inscription_blason_canonical(reg.blason or ''), INSCRIPTION_BLASON_CHOICES
-    )
-    dist, dist_cust = _preset_match(reg.distance_label or '', INSCRIPTION_DISTANCE_CHOICES)
-    pike, pike_cust = _preset_match(reg.pike_label or '', INSCRIPTION_PIKE_CHOICES)
+    if disc not in allowed_codes:
+        disc = default_disc
     di = 0
     if reg.depart_index is not None:
         try:
@@ -763,6 +1083,28 @@ def _inscription_row_form_state(archer, reg=None, depart_option_count=1):
         except (TypeError, ValueError):
             di = 0
     di = _inscription_clamp_depart_index(di, dc)
+    if _inscription_is_simple_discipline(disc):
+        return {
+            'discipline': disc,
+            'age_category': '__fiche__',
+            'age_custom': '',
+            'blason': '',
+            'blason_custom': '',
+            'distance': '',
+            'distance_custom': '',
+            'pike': '',
+            'pike_custom': '',
+            'depart_index': di,
+        }
+    if reg.age_category is None or (reg.age_category or '').strip() == '':
+        age_cat, age_cust = _inscription_default_age_category_for_archer(archer, disc)
+    else:
+        age_cat, age_cust = _preset_match(reg.age_category, INSCRIPTION_AGE_CATEGORY_CHOICES)
+    blason, blason_cust = _preset_match(
+        _inscription_blason_canonical(reg.blason or ''), INSCRIPTION_BLASON_CHOICES
+    )
+    dist, dist_cust = _preset_match(reg.distance_label or '', INSCRIPTION_DISTANCE_CHOICES)
+    pike, pike_cust = _preset_match(reg.pike_label or '', INSCRIPTION_PIKE_CHOICES)
     return {
         'discipline': disc,
         'age_category': age_cat or '__fiche__',
@@ -780,19 +1122,72 @@ def _inscription_row_form_state(archer, reg=None, depart_option_count=1):
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = 'your-secret-key-change-this'  # À changer en production
+
 db.init_app(app)
 migrate = Migrate(app, db)
 
-# Initialiser Flask-Login
+# Initialiser Flask-Login et Flask-Mail
 login_manager = LoginManager()
 login_manager.init_app(app)
+mail.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Vous devez vous connecter pour accéder à cette page.'
 login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    if not user_id:
+        return None
+    if isinstance(user_id, str) and user_id.startswith('archer:'):
+        try:
+            aid = int(user_id.split(':', 1)[1])
+        except (ValueError, IndexError):
+            return None
+        return db.session.get(Archer, aid)
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    return db.session.get(User, uid)
+
+
+@app.template_filter('inscription_blason_choices_for_row')
+def _fl_inscription_blason_choices_for_row(ex):
+    return _tpl_inscription_blason_choices_for_row(ex)
+
+
+@app.template_filter('inscription_distance_choices_for_row')
+def _fl_inscription_distance_choices_for_row(ex):
+    return _tpl_inscription_distance_choices_for_row(ex)
+
+
+_ARCHER_ALLOWED_ENDPOINTS = frozenset({
+    'static',
+    'login',
+    'logout',
+    'index',
+    'archer_portal',
+    'archer_my_bow',
+    'archer_my_courses',
+    'archer_events',
+    'archer_event_signup',
+    'archer_event_cancel_registration',
+})
+
+
+@app.before_request
+def _restrict_archer_to_allowed_routes():
+    if not request.endpoint:
+        return
+    if not current_user.is_authenticated:
+        return
+    if getattr(current_user, 'role', None) != 'archer':
+        return
+    if request.endpoint in _ARCHER_ALLOWED_ENDPOINTS:
+        return
+    flash('Cette section est réservée au staff du club.', 'info')
+    return redirect(url_for('archer_portal'))
+
 
 # Décorateurs de permission
 def require_permission(permission_type):
@@ -815,6 +1210,10 @@ def require_permission(permission_type):
             
             elif permission_type == 'edit' and not current_user.can_edit():
                 flash('Vous n\'avez pas la permission pour modifier cette donnée.', 'error')
+                return redirect(url_for('index'))
+            
+            elif permission_type == 'create_archer_account' and not current_user.can_create_archer_account():
+                flash('Vous n\'avez pas la permission pour créer un compte archer.', 'error')
                 return redirect(url_for('index'))
             
             elif permission_type == 'manage_courses' and not current_user.can_manage_courses():
@@ -893,16 +1292,35 @@ def login():
         uname_audit = (username[:80] if username else None)
 
         user = User.query.filter_by(username=username).first() if username else None
-        if user and user.check_password(password):
-            login_user(user)
-            _record_login_event(user_id=user.id, attempted_username=None, success=True)
+        if user:
+            if user.check_password(password):
+                login_user(user)
+                _record_login_event(user_id=user.id, attempted_username=None, success=True)
+                return redirect(url_for('index'))
+            _record_login_event(user_id=user.id, attempted_username=None, success=False)
+            return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
+
+        # Compte archer : identifiant = adresse e-mail (insensible à la casse)
+        archer = None
+        if username and '@' in username:
+            archer = Archer.query.filter(
+                Archer.email.isnot(None),
+                func.lower(Archer.email) == username.lower(),
+            ).first()
+        if archer and archer.has_account and archer.check_password(password):
+            login_user(archer)
+            _record_login_event(user_id=None, attempted_username=uname_audit, success=True)
             return redirect(url_for('index'))
+
         _record_login_event(
-            user_id=(user.id if user else None),
-            attempted_username=(None if user else uname_audit),
+            user_id=None,
+            attempted_username=uname_audit,
             success=False,
         )
-        return render_template('login.html', error='Nom d\'utilisateur ou mot de passe incorrect')
+        return render_template(
+            'login.html',
+            error='Nom d\'utilisateur ou mot de passe incorrect',
+        )
     return render_template('login.html')
 
 @app.route('/logout')
@@ -1187,6 +1605,8 @@ def log_history(event_type, entity_type, entity_id, summary, details=None):
 @app.route('/')
 @login_required
 def index():
+    if getattr(current_user, 'role', None) == 'archer':
+        return redirect(url_for('archer_portal'))
     products_count = Product.query.count()
     archers_count = Archer.query.count()
     composites_count = CompositeProduct.query.count()
@@ -2027,6 +2447,12 @@ def _inscription_parse_depart_index(aid):
     return _inscription_clamp_depart_index(request.form.get(f'depart_index_{aid}', '0'), len(opts))
 
 
+def _inscription_parse_depart_index_for_event(aid, event):
+    deps = _inscription_depart_phrases_from_event(event)
+    opts = _inscription_depart_select_options(deps)
+    return _inscription_clamp_depart_index(request.form.get(f'depart_index_{aid}', '0'), len(opts))
+
+
 def _inscription_store_depart_phrases_on_event(ev, phrases):
     clean = [p.strip() for p in (phrases or []) if p and str(p).strip()]
     if clean:
@@ -2052,6 +2478,8 @@ def _parse_inscription_evenement_form():
     depart_phrases : liste de chaînes.
     rows : liste de tuples (Archer, meta dict pour _format_inscription_archer_line).
     """
+    eid = request.form.get('event_id', type=int)
+    ev = InscriptionEvent.query.get(eid) if eid else None
     recipient = request.form.get('recipient_name', '').strip()
     depart_phrases = _inscription_depart_phrases_from_form()
     lieu = request.form.get('lieu', '').strip()
@@ -2072,7 +2500,7 @@ def _parse_inscription_evenement_form():
         arch = Archer.query.get(aid)
         if not arch:
             continue
-        rows.append((arch, _inscription_parse_row(arch)))
+        rows.append((arch, _inscription_parse_row(arch, ev)))
     if not rows:
         return None, 'Aucun archer valide sélectionné.'
     return (recipient, depart_phrases, lieu, blasons_line, rows), None
@@ -2080,13 +2508,20 @@ def _parse_inscription_evenement_form():
 
 def _format_inscription_archer_line(archer, meta):
     lic = (archer.license_number or '').strip() or '—'
+    if meta.get('discipline_code') == 'inscription_simple':
+        return f'- {archer.name} — Licence : {lic}'
     bits = [
         f'- {archer.name}',
         f'Licence : {lic}',
-        meta['discipline_label'],
-        f"Cat. : {meta['age_label']}",
-        f"Arme : {meta['weapon_label']}",
     ]
+    if not meta.get('omit_discipline_in_line'):
+        bits.append(meta['discipline_label'])
+    bits.extend(
+        [
+            f"Cat. : {meta['age_label']}",
+            f"Arme : {meta['weapon_label']}",
+        ]
+    )
     b = (meta.get('blason_label') or '').strip()
     if b and b != '—':
         bits.append(f'Blason : {b}')
@@ -2096,7 +2531,37 @@ def _format_inscription_archer_line(archer, meta):
     return ' — '.join(bits)
 
 
-def _build_inscription_evenement_body(recipient, depart_phrases, lieu, blasons_line, rows):
+def _inscription_event_dates_lines_for_mail(start_raw, end_raw):
+    """Dates événement (ISO ou date) → phrases pour le courrier (fr)."""
+    lines = []
+
+    def _fmt(raw):
+        if raw is None:
+            return None
+        if hasattr(raw, 'strftime'):
+            return raw.strftime('%d/%m/%Y')
+        s = str(raw).strip()[:10]
+        if len(s) != 10 or s[4] != '-':
+            return None
+        try:
+            return date.fromisoformat(s).strftime('%d/%m/%Y')
+        except ValueError:
+            return None
+
+    fs = _fmt(start_raw)
+    fe = _fmt(end_raw)
+    if fs and fe:
+        lines.append(f'Du {fs} au {fe}.')
+    elif fs:
+        lines.append(f'Date de début : {fs}.')
+    elif fe:
+        lines.append(f'Date de fin : {fe}.')
+    return lines
+
+
+def _build_inscription_evenement_body(
+    recipient, depart_phrases, lieu, blasons_line, rows, start_date=None, end_date=None
+):
     """Texte type courrier / mail pour l’organisateur."""
     from collections import defaultdict
 
@@ -2110,6 +2575,8 @@ def _build_inscription_evenement_body(recipient, depart_phrases, lieu, blasons_l
     ]
     if (lieu or '').strip():
         lines.append(f'Lieu : {lieu.strip()}.')
+    for ln in _inscription_event_dates_lines_for_mail(start_date, end_date):
+        lines.append(ln)
     lines.append('')
 
     if len(parts) <= 1:
@@ -2141,17 +2608,30 @@ def _build_inscription_evenement_body(recipient, depart_phrases, lieu, blasons_l
 
 def _inscription_form_snapshot(archers_list):
     """Reconstitue l’état formulaire après un POST (texte / PDF)."""
+    eid_snap = request.form.get('event_id', type=int)
+    ev_snap = InscriptionEvent.query.get(eid_snap) if eid_snap else None
     deps = _inscription_depart_phrases_from_form()
     if not deps:
         deps = ['']
     dep_opts = _inscription_depart_select_options(deps)
     dep_n = len(dep_opts)
+    allowed_sel = request.form.getlist('allowed_disciplines')
+    valid_disc = {x[0] for x in INSCRIPTION_DISCIPLINES}
+    if allowed_sel:
+        disc_sel = [c for c in allowed_sel if c in valid_disc]
+    else:
+        disc_sel = [x[0] for x in INSCRIPTION_DISCIPLINES]
     form_values = {
         'title': request.form.get('title', ''),
         'recipient_name': request.form.get('recipient_name', ''),
         'depart_phrases': deps,
         'lieu': request.form.get('lieu', ''),
         'blasons_line': request.form.get('blasons_line', ''),
+        'start_date': (request.form.get('start_date') or '').strip(),
+        'end_date': (request.form.get('end_date') or '').strip(),
+        'open_for_archer_registration': 'open_for_archer_registration' in request.form,
+        'archer_registration_deadline': (request.form.get('archer_registration_deadline') or '').strip(),
+        'allowed_disciplines_selection': disc_sel,
     }
     selected_ids = set()
     for sid in request.form.getlist('archer_id'):
@@ -2169,8 +2649,8 @@ def _inscription_form_snapshot(archers_list):
             request.form.get(f'weapon_{aid}', '__fiche__')
         )
         registration_extras[a.id] = {
-            'discipline': _inscription_discipline_canonical(
-                request.form.get(f'discipline_{aid}', '')
+            'discipline': _inscription_discipline_for_event(
+                request.form.get(f'discipline_{aid}', ''), ev_snap
             ),
             'age_category': (request.form.get(f'age_category_{aid}', '') or '').strip() or '__fiche__',
             'age_custom': request.form.get(f'age_custom_{aid}', '') or '',
@@ -2237,6 +2717,12 @@ def inscription_evenement():
         'recipient_name': '',
         'depart_phrases': [''],
         'lieu': '',
+        'blasons_line': '',
+        'start_date': '',
+        'end_date': '',
+        'open_for_archer_registration': False,
+        'archer_registration_deadline': '',
+        'allowed_disciplines_selection': [x[0] for x in INSCRIPTION_DISCIPLINES],
     }
     selected_ids = set()
     weapon_saved = {}
@@ -2268,6 +2754,46 @@ def inscription_evenement():
             )
             ev.lieu = (request.form.get('lieu') or '').strip() or None
             ev.blasons_line = (request.form.get('blasons_line') or '').strip() or None
+            sd_raw = (request.form.get('start_date') or '').strip()
+            ed_raw = (request.form.get('end_date') or '').strip()
+            if sd_raw:
+                try:
+                    ev.start_date = date.fromisoformat(sd_raw)
+                except ValueError:
+                    flash('Date de début invalide (ignorée).', 'warning')
+                    ev.start_date = None
+            else:
+                ev.start_date = None
+            if ed_raw:
+                try:
+                    ev.end_date = date.fromisoformat(ed_raw)
+                except ValueError:
+                    flash('Date de fin invalide (ignorée).', 'warning')
+                    ev.end_date = None
+            else:
+                ev.end_date = None
+            ev.open_for_archer_registration = 'open_for_archer_registration' in request.form
+            dl_raw = (request.form.get('archer_registration_deadline') or '').strip()
+            if dl_raw:
+                try:
+                    ev.archer_registration_deadline = date.fromisoformat(dl_raw)
+                except ValueError:
+                    flash('Date limite d\'inscription archer invalide (ignorée).', 'warning')
+            else:
+                ev.archer_registration_deadline = None
+            allowed_post = request.form.getlist('allowed_disciplines')
+            valid_dc = {x[0] for x in INSCRIPTION_DISCIPLINES}
+            if allowed_post:
+                clean_dc = []
+                for c in allowed_post:
+                    c = (c or '').strip()
+                    if c in valid_dc and c not in clean_dc:
+                        clean_dc.append(c)
+                ev.allowed_disciplines_json = (
+                    json.dumps(clean_dc, ensure_ascii=False) if clean_dc else None
+                )
+            else:
+                ev.allowed_disciplines_json = None
             InscriptionEventRegistration.query.filter_by(event_id=ev.id).delete()
             seen = set()
             for sid in request.form.getlist('archer_id'):
@@ -2281,12 +2807,27 @@ def inscription_evenement():
                 arch = Archer.query.get(aid)
                 if not arch:
                     continue
-                w = _registration_weapon_canonical(request.form.get(f'weapon_{aid}', '__fiche__'))
-                disc = _inscription_discipline_canonical(request.form.get(f'discipline_{aid}', ''))
-                age_db = _inscription_age_for_db(arch, request.form.get(f'age_category_{aid}', '__fiche__'))
-                blason_db = _inscription_blason_for_db(aid, request.form.get(f'blason_{aid}', ''))
-                dist = _inscription_distance_value(aid) or None
-                pike = _inscription_pike_value(aid) or None
+                disc = _inscription_discipline_for_event(
+                    request.form.get(f'discipline_{aid}', ''), ev
+                )
+                if _inscription_is_simple_discipline(disc):
+                    w = None
+                    age_db = None
+                    blason_db = None
+                    dist = None
+                    pike = None
+                else:
+                    w = _registration_weapon_canonical(
+                        request.form.get(f'weapon_{aid}', '__fiche__')
+                    )
+                    age_db = _inscription_age_for_db(
+                        arch, request.form.get(f'age_category_{aid}', '__fiche__')
+                    )
+                    blason_db = _inscription_blason_for_db(
+                        aid, request.form.get(f'blason_{aid}', '')
+                    )
+                    dist = _inscription_distance_value(aid) or None
+                    pike = _inscription_pike_value(aid) or None
                 db.session.add(
                     InscriptionEventRegistration(
                         event_id=ev.id,
@@ -2326,7 +2867,13 @@ def inscription_evenement():
             else:
                 recipient, depart_phrases, lieu, blasons_line, rows = parsed
                 generated_text = _build_inscription_evenement_body(
-                    recipient, depart_phrases, lieu, blasons_line, rows
+                    recipient,
+                    depart_phrases,
+                    lieu,
+                    blasons_line,
+                    rows,
+                    start_date=form_values.get('start_date') or None,
+                    end_date=form_values.get('end_date') or None,
                 )
             peid = request.form.get('event_id', type=int)
             if peid:
@@ -2346,23 +2893,55 @@ def inscription_evenement():
                 'recipient_name': current_event.recipient_name or '',
                 'depart_phrases': deps if deps else [''],
                 'lieu': current_event.lieu or '',
-                'blasons_line': (current_event.blasons_line or '').strip()
+                'blasons_line': (current_event.blasons_line or '').strip(),
+                'start_date': (
+                    current_event.start_date.isoformat()
+                    if getattr(current_event, 'start_date', None)
+                    else ''
+                ),
+                'end_date': (
+                    current_event.end_date.isoformat()
+                    if getattr(current_event, 'end_date', None)
+                    else ''
+                ),
+                'open_for_archer_registration': bool(
+                    getattr(current_event, 'open_for_archer_registration', False)
+                ),
+                'archer_registration_deadline': (
+                    current_event.archer_registration_deadline.isoformat()
+                    if getattr(current_event, 'archer_registration_deadline', None)
+                    else ''
+                ),
+                'allowed_disciplines_selection': _inscription_allowed_disciplines_selection_for_form(
+                    current_event
+                ),
             }
             selected_ids = {r.archer_id for r in current_event.registrations}
-            weapon_saved = {
-                r.archer_id: _registration_weapon_canonical(r.weapon_choice or '__fiche__')
-                for r in current_event.registrations
-            }
             reg_by_archer = {r.archer_id: r for r in current_event.registrations}
+            weapon_saved = {
+                aid: _inscription_weapon_for_event_row(
+                    next((x for x in archers_list if x.id == aid), None),
+                    reg_by_archer.get(aid),
+                )
+                for aid in selected_ids
+            }
             dep_opts = _inscription_depart_select_options(deps if deps else [''])
             dep_n = len(dep_opts)
+            evt_disciplines = _inscription_event_allowed_disciplines(current_event)
             registration_extras = {
-                a.id: _inscription_row_form_state(a, reg_by_archer.get(a.id), dep_n)
+                a.id: _inscription_row_form_state(
+                    a, reg_by_archer.get(a.id), dep_n, allowed_disciplines=evt_disciplines
+                )
                 for a in archers_list
                 if a.id in selected_ids
             }
 
-    inscription_discipline_modes = {c: m for c, _lbl, m in INSCRIPTION_DISCIPLINES}
+    evt_disciplines_view = (
+        _inscription_event_allowed_disciplines(current_event)
+        if current_event
+        else list(INSCRIPTION_DISCIPLINES)
+    )
+    inscription_discipline_modes = {c: m for c, _lbl, m in evt_disciplines_view}
     inscription_archer_cat_keys = {
         a.id: (_normalize_inscription_category_key((a.categorie or '').strip()) or '')
         for a in archers_list
@@ -2387,8 +2966,17 @@ def inscription_evenement():
         archers_list, inscription_archer_cat_keys, inscription_archer_cat_keys_di
     )
     inscription_new_row_extras = (
-        _inscription_row_form_state(archers_list[0], None, dep_n) if archers_list else {}
+        _inscription_row_form_state(
+            archers_list[0],
+            None,
+            dep_n,
+            allowed_disciplines=evt_disciplines_view,
+        )
+        if archers_list
+        else {}
     )
+
+    _blason_disc_json, _distance_disc_json = _inscription_blason_distance_choices_json()
 
     return render_template(
         'inscription_evenement.html',
@@ -2400,11 +2988,12 @@ def inscription_evenement():
         registration_extras=registration_extras,
         events=events,
         current_event=current_event,
-        inscription_disciplines=INSCRIPTION_DISCIPLINES,
+        inscription_disciplines=evt_disciplines_view,
+        inscription_disciplines_catalog=INSCRIPTION_DISCIPLINES,
         inscription_discipline_modes=inscription_discipline_modes,
         inscription_age_choices=INSCRIPTION_AGE_CATEGORY_CHOICES,
-        inscription_blason_choices=INSCRIPTION_BLASON_CHOICES,
-        inscription_distance_choices=INSCRIPTION_DISTANCE_CHOICES,
+        inscription_blason_choices_by_disc_json=_blason_disc_json,
+        inscription_distance_choices_by_disc_json=_distance_disc_json,
         inscription_pike_choices=INSCRIPTION_PIKE_CHOICES,
         inscription_archer_cat_keys=inscription_archer_cat_keys,
         inscription_archer_cat_keys_di=inscription_archer_cat_keys_di,
@@ -2415,6 +3004,17 @@ def inscription_evenement():
         inscription_archers_picker=inscription_archers_picker,
         has_archers=bool(archers_list),
         inscription_new_row_extras=inscription_new_row_extras,
+        inscription_new_row_weapon_default=_inscription_default_weapon_for_archer(
+            archers_list[0]
+        )
+        if archers_list
+        else 'CL',
+        inscription_blason_column_header=_inscription_table_blason_column_header(
+            evt_disciplines_view
+        ),
+        inscription_staff_hide_detail_columns=_inscription_staff_hide_archer_detail_columns(
+            evt_disciplines_view
+        ),
     )
 
 
@@ -2430,7 +3030,13 @@ def inscription_evenement_pdf():
         )
     recipient, depart_phrases, lieu, blasons_line, rows = parsed
     body = _build_inscription_evenement_body(
-        recipient, depart_phrases, lieu, blasons_line, rows
+        recipient,
+        depart_phrases,
+        lieu,
+        blasons_line,
+        rows,
+        start_date=(request.form.get('start_date') or '').strip() or None,
+        end_date=(request.form.get('end_date') or '').strip() or None,
     )
     try:
         from io import BytesIO
@@ -3874,6 +4480,303 @@ def delete_user(user_id):
     db.session.commit()
     flash(f'Utilisateur "{username}" supprimé avec succès.', 'success')
     return redirect(url_for('users'))
+
+
+# =============================================================================
+# Routes Admin - Création de compte Archer
+# =============================================================================
+
+def _create_and_email_archer_account(archer):
+    """
+    Génère un mot de passe provisoire, enregistre le hash et envoie l'e-mail.
+    Commit + historique en cas de succès ; rollback si l'envoi échoue.
+
+    Returns:
+        tuple (success: bool, message: str)
+    """
+    if archer.has_account:
+        return False, f'Cet archer a déjà un compte ({archer.email or "…"}).'
+
+    email = (archer.email or '').strip()
+    if not email:
+        return False, 'Impossible de créer le compte : aucune adresse e-mail renseignée pour cet archer.'
+
+    temp_password = generate_temporary_password()
+    archer.set_password(temp_password)
+    email_sent = send_archer_credentials(archer, temp_password)
+
+    if email_sent:
+        db.session.commit()
+        log_history(
+            event_type='archer_account_created',
+            entity_type='archer',
+            entity_id=archer.id,
+            summary=f"Compte archer créé: {archer.name} ({archer.email})",
+            details={
+                'archer_id': archer.id,
+                'archer_name': archer.name,
+                'email': archer.email
+            }
+        )
+        db.session.commit()
+        return True, f'Compte créé avec succès pour {archer.name}. Les identifiants ont été envoyés à {archer.email}.'
+    db.session.rollback()
+    return False, 'Erreur lors de l\'envoi de l\'e-mail. Le compte n\'a pas été créé.'
+
+
+@app.route('/admin/archer/<int:archer_id>/create_account', methods=['POST'])
+@login_required
+@require_permission('create_archer_account')
+def create_archer_account_row(archer_id):
+    archer = Archer.query.get_or_404(archer_id)
+    ok, msg = _create_and_email_archer_account(archer)
+    flash(msg, 'success' if ok else 'error')
+    return redirect(url_for('archers'))
+
+
+@app.route('/admin/create_archer_account', methods=['GET', 'POST'])
+@login_required
+@require_permission('create_archer_account')
+def create_archer_account():
+    """
+    Route de gestion des archers pour créer un compte Archer avec identifiants par e-mail.
+
+    GET: Display form to enter archer's email.
+    POST: Create account, generate temp password, send email with credentials.
+    """
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+
+        if not email:
+            flash('Veuillez entrer une adresse e-mail.', 'error')
+            return redirect(url_for('create_archer_account'))
+
+        archer = Archer.query.filter_by(email=email).first()
+
+        if not archer:
+            flash(f'Aucun archer trouvé avec l\'adresse e-mail "{email}".', 'error')
+            return redirect(url_for('create_archer_account'))
+
+        ok, msg = _create_and_email_archer_account(archer)
+        flash(msg, 'success' if ok else 'error')
+        return redirect(url_for('archers'))
+
+    return render_template('create_archer_account.html')
+
+
+def _event_open_for_archer_signup(ev):
+    if not ev or not getattr(ev, 'open_for_archer_registration', False):
+        return False
+    dl = getattr(ev, 'archer_registration_deadline', None)
+    if dl and dl < date.today():
+        return False
+    return True
+
+
+def _archer_self_registration_events_query():
+    today = date.today()
+    return (
+        InscriptionEvent.query.filter(
+            InscriptionEvent.open_for_archer_registration.is_(True),
+            or_(
+                InscriptionEvent.archer_registration_deadline.is_(None),
+                InscriptionEvent.archer_registration_deadline >= today,
+            ),
+        )
+        .options(selectinload(InscriptionEvent.registrations))
+        .order_by(InscriptionEvent.created_at.desc())
+        .all()
+    )
+
+
+@app.route('/espace-archer')
+@login_required
+def archer_portal():
+    if getattr(current_user, 'role', None) != 'archer':
+        return redirect(url_for('index'))
+    archer = current_user
+    assign = archer.current_assignment
+    courses = [c for c in archer.courses if c.active]
+    open_events = _archer_self_registration_events_query()
+    registered_ids = {r.event_id for r in archer.inscription_event_registrations}
+    return render_template(
+        'archer/portal.html',
+        archer=archer,
+        assignment=assign,
+        courses=courses,
+        open_events=open_events,
+        registered_event_ids=registered_ids,
+    )
+
+
+@app.route('/espace-archer/mon-arc')
+@login_required
+def archer_my_bow():
+    if getattr(current_user, 'role', None) != 'archer':
+        return redirect(url_for('index'))
+    archer = current_user
+    assign = archer.current_assignment
+    comp = assign.composite if assign else None
+    products = list(comp.components) if comp else []
+    return render_template(
+        'archer/mon_arc.html',
+        archer=archer,
+        assignment=assign,
+        composite=comp,
+        products=products,
+    )
+
+
+@app.route('/espace-archer/mes-cours')
+@login_required
+def archer_my_courses():
+    if getattr(current_user, 'role', None) != 'archer':
+        return redirect(url_for('index'))
+    archer = current_user
+    days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+    courses_list = sorted(
+        [c for c in archer.courses if c.active],
+        key=lambda c: (c.day_of_week, c.start_time or ''),
+    )
+    return render_template(
+        'archer/mes_cours.html',
+        archer=archer,
+        courses=courses_list,
+        days_names=days_names,
+    )
+
+
+@app.route('/espace-archer/evenements')
+@login_required
+def archer_events():
+    if getattr(current_user, 'role', None) != 'archer':
+        return redirect(url_for('index'))
+    archer = current_user
+    events = _archer_self_registration_events_query()
+    reg_by_event = {r.event_id: r for r in archer.inscription_event_registrations}
+    return render_template(
+        'archer/evenements.html',
+        archer=archer,
+        events=events,
+        reg_by_event=reg_by_event,
+    )
+
+
+@app.route('/espace-archer/evenements/<int:event_id>/desinscription', methods=['POST'])
+@login_required
+def archer_event_cancel_registration(event_id):
+    if getattr(current_user, 'role', None) != 'archer':
+        return redirect(url_for('index'))
+    archer = current_user
+    ev = InscriptionEvent.query.get_or_404(event_id)
+    if not _event_open_for_archer_signup(ev):
+        flash(
+            'Impossible d’annuler : les inscriptions en ligne ne sont plus ouvertes pour cet événement.',
+            'error',
+        )
+        return redirect(url_for('archer_events'))
+    reg = InscriptionEventRegistration.query.filter_by(
+        event_id=ev.id, archer_id=archer.id
+    ).first()
+    if not reg:
+        flash('Vous n’êtes pas inscrit à cet événement.', 'error')
+        return redirect(url_for('archer_events'))
+    db.session.delete(reg)
+    db.session.commit()
+    log_history(
+        event_type='archer_self_cancel_inscription_event',
+        entity_type='inscription_event',
+        entity_id=ev.id,
+        summary=f'Désinscription archer: {archer.name} ← {ev.title}',
+        details={'archer_id': archer.id, 'event_id': ev.id},
+    )
+    db.session.commit()
+    flash('Votre inscription a été annulée.', 'success')
+    return redirect(url_for('archer_events'))
+
+
+@app.route('/espace-archer/evenements/<int:event_id>/inscription', methods=['GET', 'POST'])
+@login_required
+def archer_event_signup(event_id):
+    if getattr(current_user, 'role', None) != 'archer':
+        return redirect(url_for('index'))
+    archer = current_user
+    ev = InscriptionEvent.query.options(selectinload(InscriptionEvent.registrations)).get_or_404(event_id)
+    if not _event_open_for_archer_signup(ev):
+        flash('Les inscriptions en ligne ne sont pas ouvertes pour cet événement.', 'error')
+        return redirect(url_for('archer_events'))
+    reg = InscriptionEventRegistration.query.filter_by(event_id=ev.id, archer_id=archer.id).first()
+    deps = _inscription_depart_phrases_from_event(ev)
+    dep_opts = _inscription_depart_select_options(deps)
+    dep_n = len(dep_opts)
+
+    if request.method == 'POST':
+        disc = _inscription_discipline_for_event(
+            request.form.get(f'discipline_{archer.id}', ''), ev
+        )
+        di = _inscription_parse_depart_index_for_event(archer.id, ev)
+        if not reg:
+            reg = InscriptionEventRegistration(event_id=ev.id, archer_id=archer.id)
+            db.session.add(reg)
+        if _inscription_is_simple_discipline(disc):
+            reg.weapon_choice = None
+            reg.age_category = None
+            reg.blason = None
+            reg.distance_label = None
+            reg.pike_label = None
+        else:
+            w = _registration_weapon_canonical(
+                request.form.get(f'weapon_{archer.id}', '__fiche__')
+            )
+            age_db = _inscription_age_for_db(
+                archer, request.form.get(f'age_category_{archer.id}', '__fiche__')
+            )
+            blason_db = _inscription_blason_for_db(
+                archer.id, request.form.get(f'blason_{archer.id}', '')
+            )
+            dist = _inscription_distance_value(archer.id) or None
+            pike = _inscription_pike_value(archer.id) or None
+            reg.weapon_choice = w
+            reg.age_category = age_db
+            reg.blason = blason_db
+            reg.distance_label = dist
+            reg.pike_label = pike
+        reg.discipline = disc
+        reg.depart_index = di
+        db.session.commit()
+        log_history(
+            event_type='archer_self_inscription_event',
+            entity_type='inscription_event',
+            entity_id=ev.id,
+            summary=f'Inscription archer: {archer.name} → {ev.title}',
+            details={'archer_id': archer.id, 'event_id': ev.id},
+        )
+        db.session.commit()
+        flash('Votre inscription a été enregistrée.', 'success')
+        return redirect(url_for('archer_events'))
+
+    archer_evt_disc = _inscription_event_allowed_disciplines(ev)
+    form_ex = _inscription_row_form_state(
+        archer, reg, dep_n, allowed_disciplines=archer_evt_disc
+    )
+    weapon_val = _inscription_weapon_for_event_row(archer, reg)
+    _blason_disc_json, _distance_disc_json = _inscription_blason_distance_choices_json()
+    return render_template(
+        'archer/evenement_inscription.html',
+        archer=archer,
+        event=ev,
+        archer_has_saved_registration=reg is not None,
+        dep_opts=dep_opts,
+        form_ex=form_ex,
+        weapon_saved_val=weapon_val,
+        inscription_disciplines=archer_evt_disc,
+        inscription_discipline_modes={c: m for c, _lbl, m in archer_evt_disc},
+        inscription_age_choices=INSCRIPTION_AGE_CATEGORY_CHOICES,
+        inscription_blason_choices_by_disc_json=_blason_disc_json,
+        inscription_distance_choices_by_disc_json=_distance_disc_json,
+        inscription_pike_choices=INSCRIPTION_PIKE_CHOICES,
+        weapon_choices=REGISTRATION_WEAPON_CHOICES,
+    )
 
 
 @app.cli.command('reset-admin-password')

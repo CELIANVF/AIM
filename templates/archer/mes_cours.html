@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+
+{% block title %}Mes cours{% endblock %}
+
+{% block content %}
+<div class="header-with-actions">
+    <div>
+        <h1>📚 Mes cours</h1>
+        <p class="muted">Cours auxquels vous êtes inscrit(e)</p>
+    </div>
+    <a class="btn btn-outline" href="{{ url_for('archer_portal') }}">← Mon espace</a>
+</div>
+
+{% if not courses %}
+<div class="card" style="padding:40px 24px;text-align:center">
+    <p class="muted">Aucun cours actif ne vous est associé pour le moment.</p>
+</div>
+{% else %}
+<div class="table-responsive">
+    <table class="table" style="margin:0">
+        <thead>
+            <tr>
+                <th>Cours</th>
+                <th>Jour</th>
+                <th>Horaire</th>
+                <th>Niveau</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in courses %}
+            <tr>
+                <td>
+                    <strong>{{ c.name }}</strong>
+                    {% if c.notes %}<div class="small muted" style="margin-top:4px">{{ c.notes }}</div>{% endif %}
+                </td>
+                <td>{{ days_names[c.day_of_week] if c.day_of_week is not none else '—' }}</td>
+                <td class="small">{{ c.start_time or '—' }} – {{ c.end_time or '—' }}</td>
+                <td class="small">{{ c.level or '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
