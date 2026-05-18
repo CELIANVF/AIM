@@ -19,26 +19,24 @@
     </div>
 </div>
 
-<div style="margin-bottom: 20px; padding: 12px; background-color: var(--bg-light); border-radius: 8px;">
-    <p style="margin: 0 0 10px 0; font-weight: 600; font-size: 0.9rem;">Trier par:</p>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <a href="/composites?sort=name" class="btn {% if current_sort == 'name' %}btn-primary{% else %}btn-outline{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">📝 Nom</a>
-        <a href="/composites?sort=type" class="btn {% if current_sort == 'type' %}btn-primary{% else %}btn-outline{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">🏷️ Type</a>
-        <a href="/composites?sort=status" class="btn {% if current_sort == 'status' %}btn-primary{% else %}btn-outline{% endif %}" style="padding: 6px 12px; font-size: 0.85rem;">📍 Statut</a>
-    </div>
+<div class="sort-toolbar">
+    <span class="sort-toolbar__label">Trier par</span>
+    <a href="/composites?sort=name" class="btn btn-sm {% if current_sort == 'name' %}btn-primary{% else %}btn-outline{% endif %}">📝 Nom</a>
+    <a href="/composites?sort=type" class="btn btn-sm {% if current_sort == 'type' %}btn-primary{% else %}btn-outline{% endif %}">🏷️ Type</a>
+    <a href="/composites?sort=status" class="btn btn-sm {% if current_sort == 'status' %}btn-primary{% else %}btn-outline{% endif %}">📍 Statut</a>
 </div>
 
 {% if composites %}
 <div class="table-responsive">
-    <table class="table table-sortable" style="margin:0;min-width:720px">
+    <table class="table table-sortable table--flush u-min-w-720">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th class="th-id" data-sort="number">ID</th>
                 <th>Nom</th>
                 <th>Type</th>
                 <th>Statut</th>
                 <th>Caractéristiques</th>
-                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
+                <th class="th-actions" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -80,14 +78,14 @@
                         <span class="muted">—</span>
                     {% endif %}
                 </td>
-                <td style="text-align:right">
+                <td class="td-actions">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_composite/{{ c.id }}" style="padding:6px 10px;font-size:13px">✏️ Modifier</a>
+                        <a class="btn btn-outline btn-sm" href="/edit_composite/{{ c.id }}">✏️ Modifier</a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_composite/{{ c.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet arc ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer">🗑️</button>
+                        <form method="POST" action="/delete_composite/{{ c.id }}" class="form-inline" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet arc ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer cet arc">🗑️</button>
                         </form>
                         {% endif %}
                     </div>
@@ -98,10 +96,10 @@
     </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center;padding:48px 24px">
+<div class="card empty-state">
     <p class="muted">Aucun arc enregistré pour le moment</p>
     {% if current_user.can_edit() %}
-    <a href="/add_composite" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier arc</a>
+    <a href="/add_composite" class="btn btn-primary">➕ Ajouter le premier arc</a>
     {% endif %}
 </div>
 {% endif %}

@@ -20,27 +20,27 @@
 
 {% if assignments %}
 <div class="table-responsive">
-    <table class="table table-sortable" style="margin:0;min-width:560px">
+    <table class="table table-sortable table--flush u-min-w-560 table--cards-mobile">
         <thead>
             <tr>
-                <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                <th class="th-id" data-sort="number">ID</th>
                 <th>Arc</th>
                 <th>Archer</th>
                 <th data-sort="date">Date d'assignation</th>
-                <th style="text-align:right;white-space:nowrap" data-sort="disable">Actions</th>
+                <th class="th-actions" data-sort="disable">Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for ass in assignments %}
             <tr>
-                <td class="small muted td-tabular">{{ ass.id }}</td>
-                <td><strong>{{ er.ref_composite(ass.composite_id, ass.composite.name) }}</strong></td>
-                <td>{{ er.ref_archer(ass.archer_id, ass.archer.name) }}</td>
-                <td class="small">{{ ass.date_assigned.strftime('%d/%m/%Y') }}</td>
-                <td style="text-align:right">
+                <td class="small muted td-tabular" data-label="ID">{{ ass.id }}</td>
+                <td data-label="Arc"><strong>{{ er.ref_composite(ass.composite_id, ass.composite.name) }}</strong></td>
+                <td data-label="Archer">{{ er.ref_archer(ass.archer_id, ass.archer.name) }}</td>
+                <td class="small" data-label="Date d'assignation">{{ ass.date_assigned.strftime('%d/%m/%Y') }}</td>
+                <td class="td-actions" data-label="Actions">
                     {% if current_user.can_manage_assignments_for_coach() %}
-                    <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" style="display:inline;margin:0">
-                        <button class="btn btn-outline" type="submit" style="padding:6px 10px;font-size:13px;cursor:pointer">Retourner</button>
+                    <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" class="form-inline">
+                        <button class="btn btn-outline btn-sm" type="submit">↩️ Retourner</button>
                     </form>
                     {% else %}
                     <span class="muted">—</span>
@@ -52,10 +52,10 @@
     </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center;padding:48px 24px">
+<div class="card empty-state">
     <p class="muted">Aucune assignation en cours</p>
     {% if current_user.can_manage_assignments_for_coach() %}
-    <a href="/assign" class="btn btn-primary" style="margin-top:16px">Nouvelle assignation</a>
+    <a href="/assign" class="btn btn-primary">🎯 Nouvelle assignation</a>
     {% endif %}
 </div>
 {% endif %}

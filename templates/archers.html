@@ -23,48 +23,74 @@
     </div>
 </div>
 
-<div class="filter-panel">
-    <span class="filter-panel__label">📊 Filtrer et trier</span>
-    <div class="filter-panel__row">
-        <form method="GET" action="/archers" class="filter-panel__form">
-            <input type="text" name="q" placeholder="Recherche (nom/prénom)" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}">
-            <select name="course_id" onchange="this.form.submit()">
+{% set _active_filters = [] %}
+{% if current_filters.q %}{% set _ = _active_filters.append({'k':'q','label':'Recherche : « ' ~ current_filters.q ~ ' »'}) %}{% endif %}
+{% if current_filters.course_id %}
+    {% for course in courses %}{% if course.id == current_filters.course_id|int %}
+        {% set _ = _active_filters.append({'k':'course_id','label':'Cours : ' ~ course.name}) %}
+    {% endif %}{% endfor %}
+{% endif %}
+{% if current_filters.has_arc == 'yes' %}{% set _ = _active_filters.append({'k':'has_arc','label':'Avec arc assigné'}) %}{% endif %}
+{% if current_filters.has_arc == 'no' %}{% set _ = _active_filters.append({'k':'has_arc','label':'Sans arc assigné'}) %}{% endif %}
+{% if current_filters.category %}{% set _ = _active_filters.append({'k':'category','label':'Catégorie : ' ~ current_filters.category}) %}{% endif %}
+{% if current_filters.min_age %}{% set _ = _active_filters.append({'k':'min_age','label':'Âge ≥ ' ~ current_filters.min_age}) %}{% endif %}
+{% if current_filters.max_age %}{% set _ = _active_filters.append({'k':'max_age','label':'Âge ≤ ' ~ current_filters.max_age}) %}{% endif %}
+
+<details class="filter-panel" {% if _active_filters %}open{% endif %}>
+    <summary class="filter-panel__label">📊 Filtrer et trier
+        {% if _active_filters %}<span class="badge badge-primary badge--inline-sm">{{ _active_filters|length }}</span>{% endif %}
+    </summary>
+    <div class="filter-panel__row mt-2">
+        <form method="GET" action="/archers" class="filter-panel__form" data-no-loading>
+            <input type="text" name="q" placeholder="🔍 Recherche (nom/prénom)" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}" aria-label="Recherche">
+            <select name="course_id" onchange="this.form.submit()" aria-label="Cours">
                 <option value="">Tous les cours</option>
                 {% for course in courses %}
                 <option value="{{ course.id }}" {% if current_filters.course_id and (current_filters.course_id|int) == course.id %}selected{% endif %}>{{ course.name }}</option>
                 {% endfor %}
             </select>
-            <select name="has_arc" onchange="this.form.submit()">
-                <option value="">Arc</option>
-                <option value="yes" {% if current_filters.has_arc == 'yes' %}selected{% endif %}>Assigné</option>
-                <option value="no" {% if current_filters.has_arc == 'no' %}selected{% endif %}>Non assigné</option>
+            <select name="has_arc" onchange="this.form.submit()" aria-label="Statut d'arc">
+                <option value="">Arc (tous)</option>
+                <option value="yes" {% if current_filters.has_arc == 'yes' %}selected{% endif %}>✅ Assigné</option>
+                <option value="no" {% if current_filters.has_arc == 'no' %}selected{% endif %}>❌ Non assigné</option>
             </select>
-            <select name="category" onchange="this.form.submit()">
+            <select name="category" onchange="this.form.submit()" aria-label="Catégorie">
                 <option value="">Toutes catégories</option>
                 {% for cat in categories %}
                 <option value="{{ cat }}" {% if current_filters.category == cat %}selected{% endif %}>{{ cat }}</option>
                 {% endfor %}
             </select>
-            <input type="number" name="min_age" class="input-age" placeholder="Min âge" value="{% if current_filters.min_age %}{{ current_filters.min_age }}{% endif %}">
-            <input type="number" name="max_age" class="input-age" placeholder="Max âge" value="{% if current_filters.max_age %}{{ current_filters.max_age }}{% endif %}">
-            <select name="sort_by" onchange="this.form.submit()">
-                <option value="nom" {% if current_sort.by == 'nom' %}selected{% endif %}>Nom</option>
-                <option value="prenom" {% if current_sort.by == 'prenom' %}selected{% endif %}>Prénom</option>
-                <option value="age" {% if current_sort.by == 'age' %}selected{% endif %}>Âge</option>
-                <option value="licence" {% if current_sort.by == 'licence' %}selected{% endif %}>Numéro de licence</option>
-                <option value="categorie" {% if current_sort.by == 'categorie' %}selected{% endif %}>Catégorie</option>
-                <option value="arc" {% if current_sort.by == 'arc' %}selected{% endif %}>Arc assigné</option>
-                <option value="course" {% if current_sort.by == 'course' %}selected{% endif %}>Cours assigné</option>
+            <input type="number" name="min_age" class="input-age" placeholder="Min âge" value="{% if current_filters.min_age %}{{ current_filters.min_age }}{% endif %}" aria-label="Âge minimum">
+            <input type="number" name="max_age" class="input-age" placeholder="Max âge" value="{% if current_filters.max_age %}{{ current_filters.max_age }}{% endif %}" aria-label="Âge maximum">
+            <select name="sort_by" onchange="this.form.submit()" aria-label="Trier par">
+                <option value="nom" {% if current_sort.by == 'nom' %}selected{% endif %}>Trier : Nom</option>
+                <option value="prenom" {% if current_sort.by == 'prenom' %}selected{% endif %}>Trier : Prénom</option>
+                <option value="age" {% if current_sort.by == 'age' %}selected{% endif %}>Trier : Âge</option>
+                <option value="licence" {% if current_sort.by == 'licence' %}selected{% endif %}>Trier : Licence</option>
+                <option value="categorie" {% if current_sort.by == 'categorie' %}selected{% endif %}>Trier : Catégorie</option>
+                <option value="arc" {% if current_sort.by == 'arc' %}selected{% endif %}>Trier : Arc</option>
+                <option value="course" {% if current_sort.by == 'course' %}selected{% endif %}>Trier : Cours</option>
             </select>
-            <select name="sort_order" onchange="this.form.submit()">
+            <select name="sort_order" onchange="this.form.submit()" aria-label="Ordre de tri">
                 <option value="asc" {% if current_sort.order == 'asc' %}selected{% endif %}>↑ Croissant</option>
                 <option value="desc" {% if current_sort.order == 'desc' %}selected{% endif %}>↓ Décroissant</option>
             </select>
+            <button type="submit" class="btn btn-primary btn-sm">Appliquer</button>
+            {% if _active_filters %}
             <a href="/archers" class="btn btn-outline btn-sm">↻ Réinitialiser</a>
-            <button type="submit" class="btn btn-primary">Appliquer</button>
+            {% endif %}
         </form>
     </div>
-</div>
+    {% if _active_filters %}
+    <div class="filter-active-chips">
+        {% for f in _active_filters %}
+            {% set kept = {} %}
+            {% for k, v in current_filters.items() %}{% if v and k != f.k %}{% set _ = kept.update({k:v}) %}{% endif %}{% endfor %}
+            <a class="filter-chip" href="{{ url_for('archers', **kept) }}" title="Supprimer ce filtre">{{ f.label }} <span class="filter-chip__close">×</span></a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</details>
 
 {% if archers %}
 <div class="table-responsive">
