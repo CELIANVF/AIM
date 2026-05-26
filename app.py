@@ -3919,12 +3919,26 @@ def inventaire_etiquettes():
     padded = ([None] * skip) + expanded
     _enrich_label_items_code_images(padded, code_mode, layout)
 
+    per_page = layout['cols'] * layout['rows']
+    item_pages = []
+    for i in range(0, len(padded), per_page):
+        chunk = list(padded[i:i + per_page])
+        if len(chunk) < per_page:
+            chunk.extend([None] * (per_page - len(chunk)))
+        item_pages.append(chunk)
+
     base_url = (request.host_url or '').rstrip('/')
     qr_mm = _qr_size_mm_for_layout(layout)
     bc_size = _barcode_size_mm_for_layout(layout)
+    template_name = (
+        'print_labels_bare.html'
+        if request.args.get('bare') == '1'
+        else 'print_labels.html'
+    )
     return render_template(
-        'print_labels.html',
+        template_name,
         items=padded,
+        item_pages=item_pages,
         layout=layout,
         layout_key=layout_key,
         layouts=LABEL_LAYOUTS,

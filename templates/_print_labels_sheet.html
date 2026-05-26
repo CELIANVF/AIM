@@ -1,0 +1,61 @@
+{% if item_count == 0 %}
+<div class="label-empty no-print">
+    Aucun matériel à étiqueter pour cette sélection.
+</div>
+{% else %}
+{% for page_items in item_pages %}
+<div class="labels-page">
+    <div class="labels-sheet">
+        <div class="labels-grid">
+            {% for it in page_items %}
+            <div class="label-cell">
+                <span class="cut-mark cut-mark--tl" aria-hidden="true"></span>
+                <span class="cut-mark cut-mark--tr" aria-hidden="true"></span>
+                <span class="cut-mark cut-mark--bl" aria-hidden="true"></span>
+                <span class="cut-mark cut-mark--br" aria-hidden="true"></span>
+                {% if it is none %}
+                    <div class="label label--empty"></div>
+                {% else %}
+                    <div class="label label--layout-{{ layout_key }}{% if code_mode == 'none' %} label--no-code{% elif code_mode == 'barcode' %} label--code-barcode{% else %} label--code-qr{% endif %}">
+                        <div class="label__brand">
+                            <div class="label__brand-spin">
+                                <img src="{{ url_for('static', filename='logo.png') }}" alt="ANC93">
+                                <span class="label__brand-text">ANC93</span>
+                            </div>
+                        </div>
+                        {% if code_mode == 'barcode' %}
+                        <div class="label__main">
+                            <div class="label__tag-row">
+                                <span class="label__tag">{{ it.tag }}</span>
+                                {% if it.position %}<span class="label__position">{{ it.position }}</span>{% endif %}
+                            </div>
+                            {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
+                        </div>
+                        {% if it.code_img_url %}
+                        <div class="label__code label__code--barcode">
+                            <img src="{{ it.code_img_url }}" alt="">
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        {% if code_mode == 'qr' and it.code_img_url %}
+                        <div class="label__code label__code--qr">
+                            <img src="{{ it.code_img_url }}" alt="">
+                        </div>
+                        {% endif %}
+                        <div class="label__main">
+                            <div class="label__tag-row">
+                                <span class="label__tag">{{ it.tag }}</span>
+                                {% if it.position %}<span class="label__position">{{ it.position }}</span>{% endif %}
+                            </div>
+                            {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

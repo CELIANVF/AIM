@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            color: #111;
+        }
+        .label-empty {
+            text-align: center;
+            padding: 36px 20px;
+            color: #6b7280;
+        }
+        {% include '_print_labels_styles.html' %}
+        .labels-sheet {
+            box-shadow: none;
+            border-radius: 0;
+            margin: 0;
+            max-width: none;
+        }
+        @media print {
+            @page { size: A4; margin: 0; }
+            .label { border: 0.1mm dotted #e5e7eb; }
+            .cut-mark { border-color: #000; }
+        }
+    </style>
+</head>
+<body class="labels-print-bare">
+{% include '_print_labels_sheet.html' %}
+{% if item_count > 0 %}
+<script>
+window.addEventListener('load', function() { window.print(); });
+</script>
+{% endif %}
+</body>
+</html>

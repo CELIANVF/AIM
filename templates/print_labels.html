@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block body_class %}page-print-labels{% endblock %}
-{% block title %}Étiquettes — {{ item_count }} matériel(s){% endblock %}
+{% block title %}Étiquettes{% endblock %}
 
 {% block content %}
 <style>
@@ -119,248 +119,7 @@
         border-radius: 12px;
     }
 
-    :root {
-        --label-width: {{ layout.width }}mm;
-        --label-height: {{ layout.height }}mm;
-        --label-cols: {{ layout.cols }};
-        --code-size: {{ qr_mm }}mm;
-        --barcode-w: {{ barcode_w_mm }}mm;
-        --barcode-h: {{ barcode_h_mm }}mm;
-        --label-logo-h: {% if layout_key == 'avery65' %}3.5mm{% elif layout_key == 'avery24' %}4mm{% elif layout_key == 'avery21' %}4.5mm{% else %}6mm{% endif %};
-        --label-brand-fs: {% if layout_key == 'avery65' %}2mm{% elif layout_key == 'avery24' %}2.3mm{% elif layout_key == 'avery21' %}2.6mm{% else %}3.2mm{% endif %};
-        --brand-strip-w: {% if layout_key == 'avery65' %}6.5mm{% elif layout_key == 'avery24' %}7mm{% elif layout_key == 'avery21' %}7.5mm{% else %}9mm{% endif %};
-        --cut-len: 2.5mm;
-        --cut-thick: 0.05mm;
-        --cut-out: 0.5mm;
-    }
-    .labels-sheet {
-        background: #fff;
-        color: #111;
-        padding: 8mm 6mm;
-        margin: 0 auto 12px;
-        border-radius: 8px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-        max-width: calc(var(--label-width) * var(--label-cols) + 16mm);
-    }
-    .labels-grid {
-        display: grid;
-        grid-template-columns: repeat(var(--label-cols), var(--label-width));
-        gap: 2mm;
-        justify-content: center;
-    }
-    .label-cell {
-        position: relative;
-        width: var(--label-width);
-        height: var(--label-height);
-        box-sizing: border-box;
-        overflow: visible;
-    }
-    .cut-mark {
-        position: absolute;
-        width: calc(var(--cut-len) + var(--cut-out));
-        height: calc(var(--cut-len) + var(--cut-out));
-        pointer-events: none;
-        z-index: 3;
-        box-sizing: border-box;
-        border-color: #6b7280;
-        border-style: solid;
-        border-width: 0;
-    }
-    .cut-mark--tl {
-        top: calc(-1 * var(--cut-out));
-        left: calc(-1 * var(--cut-out));
-        border-top-width: var(--cut-thick);
-        border-left-width: var(--cut-thick);
-    }
-    .cut-mark--tr {
-        top: calc(-1 * var(--cut-out));
-        right: calc(-1 * var(--cut-out));
-        border-top-width: var(--cut-thick);
-        border-right-width: var(--cut-thick);
-    }
-    .cut-mark--bl {
-        bottom: calc(-1 * var(--cut-out));
-        left: calc(-1 * var(--cut-out));
-        border-bottom-width: var(--cut-thick);
-        border-left-width: var(--cut-thick);
-    }
-    .cut-mark--br {
-        bottom: calc(-1 * var(--cut-out));
-        right: calc(-1 * var(--cut-out));
-        border-bottom-width: var(--cut-thick);
-        border-right-width: var(--cut-thick);
-    }
-    .label {
-        position: relative;
-        z-index: 1;
-        width: 100%;
-        height: 100%;
-        padding: 1.2mm 1.5mm 1.2mm 0.8mm;
-        border: 0.1mm dashed #d1d5db;
-        border-radius: 1mm;
-        display: grid;
-        align-items: stretch;
-        background: #fff;
-        page-break-inside: avoid;
-        break-inside: avoid;
-        box-sizing: border-box;
-        overflow: hidden;
-        column-gap: 1mm;
-        row-gap: 0.5mm;
-    }
-    .label.label--empty { border-color: transparent; }
-    .label--code-qr {
-        grid-template-columns: var(--brand-strip-w) var(--code-size) 1fr;
-        grid-template-rows: 1fr;
-    }
-    .label--code-barcode {
-        grid-template-columns: var(--brand-strip-w) 1fr;
-        grid-template-rows: minmax(0, 1fr) auto;
-        padding-right: 0.35mm;
-    }
-    .label--no-code {
-        grid-template-columns: var(--brand-strip-w) 1fr;
-        grid-template-rows: 1fr;
-    }
-    .label__brand {
-        grid-column: 1;
-        grid-row: 1 / -1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 0;
-        overflow: hidden;
-        border-right: 0.12mm solid #e5e7eb;
-        padding: 0 0.3mm;
-    }
-    .label__brand-spin {
-        display: inline-flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 1.2mm;
-        transform: rotate(-90deg);
-        transform-origin: center center;
-        white-space: nowrap;
-    }
-    .label__brand-spin img {
-        height: var(--label-logo-h);
-        width: auto;
-        max-width: 14mm;
-        object-fit: contain;
-        flex-shrink: 0;
-        display: block;
-    }
-    .label__brand-text {
-        font-weight: 700;
-        font-size: var(--label-brand-fs);
-        line-height: 1;
-        letter-spacing: 0.06em;
-        color: #111;
-        white-space: nowrap;
-    }
-    .label__code {
-        align-self: center;
-        overflow: hidden;
-        background: #fff;
-    }
-    .label--code-qr .label__code {
-        grid-row: 1;
-        grid-column: 2;
-    }
-    .label__code--qr {
-        width: var(--code-size);
-        height: var(--code-size);
-        min-width: var(--code-size);
-        min-height: var(--code-size);
-    }
-    .label__code--barcode {
-        width: calc(100% + 1mm);
-        margin-left: -0.35mm;
-        margin-right: -0.65mm;
-        height: var(--barcode-h);
-        min-height: 0;
-        display: flex;
-        align-items: flex-end;
-        justify-content: stretch;
-    }
-    .label--code-barcode .label__main {
-        grid-row: 1;
-        grid-column: 2;
-        justify-content: center;
-        align-self: center;
-    }
-    .label--code-barcode .label__code--barcode {
-        grid-row: 2;
-        grid-column: 2;
-        align-self: end;
-    }
-    .label--code-qr .label__main {
-        grid-row: 1;
-        grid-column: 3;
-    }
-    .label--no-code .label__main {
-        grid-row: 1;
-        grid-column: 2;
-    }
-    .label--layout-avery65 .label__tag { font-size: 3.8mm; }
-    .label--layout-avery65 .label__title { font-size: 2.4mm; }
-    .label--layout-avery24 .label__tag { font-size: 4.2mm; }
-    .label--layout-avery24 .label__title { font-size: 2.6mm; }
-    .label__code--qr img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: fill;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
-    }
-    .label__code--barcode img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        max-height: 100%;
-        object-fit: fill;
-    }
-    .label__main {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 0.8mm;
-        min-width: 0;
-        overflow: hidden;
-    }
-    .label__tag-row {
-        display: flex;
-        align-items: center;
-        gap: 1.5mm;
-        flex-wrap: nowrap;
-    }
-    .label__tag {
-        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-        font-weight: 700;
-        font-size: 5mm;
-        line-height: 1;
-        letter-spacing: 0.03em;
-        color: #111;
-    }
-    .label__position {
-        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-        font-weight: 700;
-        font-size: 3.5mm;
-        color: #111;
-        border: 0.4mm solid #111;
-        padding: 0.2mm 1mm;
-        line-height: 1.2;
-    }
-    .label__title {
-        font-size: 3mm;
-        font-weight: 500;
-        line-height: 1.15;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: #333;
-    }
+    {% include '_print_labels_styles.html' %}
 
     @media print {
         /* Masquer toute l'enveloppe de l'app (barre du haut, menu, messages). */
@@ -369,6 +128,7 @@
         body.page-print-labels .skip-link,
         body.page-print-labels .menu-toggle,
         body.page-print-labels .flash,
+        body.page-print-labels .header-with-actions,
         body.page-print-labels .no-print {
             display: none !important;
             visibility: hidden !important;
@@ -398,19 +158,11 @@
             max-width: none !important;
             background: #fff !important;
         }
-        body.page-print-labels .labels-sheet {
-            box-shadow: none;
-            padding: 0;
-            margin: 0;
-            max-width: none;
-            border-radius: 0;
-        }
-        body.page-print-labels .labels-grid { gap: 1mm; }
         body.page-print-labels .label { border: 0.1mm dotted #e5e7eb; }
         body.page-print-labels .cut-mark { border-color: #000; }
         @page {
             size: A4;
-            margin: 8mm 6mm;
+            margin: 0;
         }
     }
 
@@ -429,7 +181,7 @@
     </div>
     <div class="action-group">
         <a class="btn btn-outline" href="{{ url_for('inventaire') }}">Retour</a>
-        <button class="btn btn-primary" type="button" onclick="window.print()">Imprimer</button>
+        <button class="btn btn-primary" type="button" id="labels-print-btn">Imprimer</button>
     </div>
 </div>
 
@@ -504,73 +256,27 @@
     </form>
 </div>
 
-{% if item_count == 0 %}
-<div class="label-empty no-print">
-    Aucun matériel à étiqueter pour cette sélection.
-</div>
-{% else %}
-<div class="labels-sheet">
-    <div class="labels-grid">
-        {% for it in items %}
-        <div class="label-cell">
-            <span class="cut-mark cut-mark--tl" aria-hidden="true"></span>
-            <span class="cut-mark cut-mark--tr" aria-hidden="true"></span>
-            <span class="cut-mark cut-mark--bl" aria-hidden="true"></span>
-            <span class="cut-mark cut-mark--br" aria-hidden="true"></span>
-            {% if it is none %}
-                <div class="label label--empty"></div>
-            {% else %}
-                <div class="label label--layout-{{ layout_key }}{% if code_mode == 'none' %} label--no-code{% elif code_mode == 'barcode' %} label--code-barcode{% else %} label--code-qr{% endif %}">
-                    <div class="label__brand">
-                        <div class="label__brand-spin">
-                            <img src="{{ url_for('static', filename='logo.png') }}" alt="ANC93">
-                            <span class="label__brand-text">ANC93</span>
-                        </div>
-                    </div>
-                    {% if code_mode == 'barcode' %}
-                    <div class="label__main">
-                        <div class="label__tag-row">
-                            <span class="label__tag">{{ it.tag }}</span>
-                            {% if it.position %}<span class="label__position">{{ it.position }}</span>{% endif %}
-                        </div>
-                        {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
-                    </div>
-                    {% if it.code_img_url %}
-                    <div class="label__code label__code--barcode">
-                        <img src="{{ it.code_img_url }}" alt="">
-                    </div>
-                    {% endif %}
-                    {% else %}
-                    {% if code_mode == 'qr' and it.code_img_url %}
-                    <div class="label__code label__code--qr">
-                        <img src="{{ it.code_img_url }}" alt="">
-                    </div>
-                    {% endif %}
-                    <div class="label__main">
-                        <div class="label__tag-row">
-                            <span class="label__tag">{{ it.tag }}</span>
-                            {% if it.position %}<span class="label__position">{{ it.position }}</span>{% endif %}
-                        </div>
-                        {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
-                    </div>
-                    {% endif %}
-                </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
+{% include '_print_labels_sheet.html' %}
 
 <p class="no-print muted small" style="margin:18px 0">
-    À l'impression : décochez « En-têtes et pieds de page » dans la boîte de dialogue du navigateur
-    (sinon l'URL et la date apparaissent sur le PDF). Échelle 100 %, format A4.
+    « Imprimer » ouvre une fenêtre avec les étiquettes seules (sans titre de page).
+    Dans la boîte de dialogue, décochez « En-têtes et pieds de page » si l’URL ou la date apparaissent encore.
+    Échelle 100 %, format A4.
 </p>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function(){
+    var printBtn = document.getElementById('labels-print-btn');
+    if (printBtn) {
+        printBtn.addEventListener('click', function() {
+            var url = new URL(window.location.href);
+            url.searchParams.set('bare', '1');
+            window.open(url.toString(), '_blank', 'noopener');
+        });
+    }
+
     var form = document.getElementById('labels-filter-form');
     if (!form) return;
     var allBtn = document.getElementById('cat-select-all');
