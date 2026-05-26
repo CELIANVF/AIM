@@ -77,12 +77,10 @@
                                 <div class="component-slot__chip-meta small">
                                     {% if current.state == 'broken' %}
                                         <span class="badge badge-danger">Cassé</span>
-                                    {% elif current.state == 'loan' %}
+                                    {% elif composite.status == 'loan' %}
                                         <span class="badge badge-warning">En prêt</span>
-                                    {% elif current.state == 'stock' %}
-                                        <span class="badge badge-primary">Monté</span>
                                     {% else %}
-                                        <span class="badge badge-secondary">{{ current.state }}</span>
+                                        <span class="badge badge-primary">Monté</span>
                                     {% endif %}
                                     {% if current.location %}
                                         <span class="muted">📍 {% if current.location == 'club' %}Au club{% elif current.location == 'loan' %}En prêt{% else %}{{ current.location }}{% endif %}</span>
@@ -197,6 +195,9 @@
 
     const slotsContainer = document.getElementById('component-slots');
     const form = document.getElementById('edit-composite-form');
+    const statusSelect = form.querySelector('select[name="status"]');
+
+    function compositeStatus(){ return statusSelect ? statusSelect.value : 'club'; }
 
     // ---- Modal handling ----
     const backdrop = document.getElementById('picker-backdrop');
@@ -231,12 +232,23 @@
         return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    function stateBadgeHtml(state, isMounted){
+    // Build the status badge for a product, in context.
+    // ctx = { mountedHere, mountedOn: [{status}] }
+    // Priority: broken (product physical state) > on-loan (any host bow is on loan) > mounted > available
+    function stateBadgeHtml(state, ctx){
         if (state === 'broken') return '<span class="badge badge-danger">Cassé</span>';
-        if (state === 'loan')   return '<span class="badge badge-warning">En prêt</span>';
-        if (state === 'stock')  return isMounted
-            ? '<span class="badge badge-primary">Monté</span>'
-            : '<span class="badge badge-success">Disponible</span>';
+        ctx = ctx || {};
+        const allHosts = (ctx.mountedOn || []).slice();
+        if (ctx.mountedHere) allHosts.push({ status: compositeStatus() });
+        if (allHosts.length){
+            // "En prêt" only if the product has at least one loaned host; otherwise just "Monté"
+            const anyLoan = allHosts.some(h => h.status === 'loan');
+            if (anyLoan) return '<span class="badge badge-warning">En prêt</span>';
+            return '<span class="badge badge-primary">Monté</span>';
+        }
+        // Not mounted anywhere: fall back to the product's own state
+        if (state === 'loan')  return '<span class="badge badge-warning">En prêt</span>';
+        if (state === 'stock') return '<span class="badge badge-success">Disponible</span>';
         return '<span class="badge badge-secondary">' + escapeHtml(state || '—') + '</span>';
     }
 
@@ -272,11 +284,7 @@
 
         const html = filtered.map(p => {
             const isSelected = currentSelectedId === p.id;
-            // A product is considered "mounted" if it sits in any non-loan composite
-            // (including the current one, for which we have the explicit "Actuellement monté" badge).
-            const isMountedHere = isSelected;
-            const mountedElsewhere = (p.mounted_on || []).some(o => o.status !== 'loan');
-            const isMounted = isMountedHere || mountedElsewhere;
+            const badgeCtx = { mountedHere: isSelected, mountedOn: p.mounted_on || [] };
             const mountedBadges = (p.mounted_on || [])
                 .filter(o => o.status !== 'loan')
                 .map(o => '<span class="badge badge-secondary">Monté sur ' + escapeHtml(o.name) + '</span>')
@@ -290,7 +298,7 @@
                 + '<button type="button" class="picker-item' + (isSelected ? ' picker-item--selected' : '') + '" data-pid="' + p.id + '">'
                 +   '<div class="picker-item__head">'
                 +     '<strong class="picker-item__title">' + title + '</strong>'
-                +     stateBadgeHtml(p.state, isMounted)
+                +     stateBadgeHtml(p.state, badgeCtx)
                 +     (isSelected ? '<span class="badge badge-primary">Actuellement monté</span>' : '')
                 +   '</div>'
                 +   (sizePower ? '<div class="small muted">' + sizePower + '</div>' : '')
@@ -343,11 +351,10 @@
 
         if (p){
             const sizePower = [p.size, p.power].filter(Boolean).map(escapeHtml).join(' • ');
-            // In the slot the product is by definition mounted on this bow → "Monté" instead of "Disponible"
-            const stateText = p.state === 'broken' ? 'Cassé' : (p.state === 'loan' ? 'En prêt' : (p.state === 'stock' ? 'Monté' : (p.state || '—')));
-            const stateCls = p.state === 'broken' ? 'badge-danger' : (p.state === 'loan' ? 'badge-warning' : (p.state === 'stock' ? 'badge-primary' : 'badge-secondary'));
             const locText = p.location === 'club' ? 'Au club' : (p.location === 'loan' ? 'En prêt' : (p.location || ''));
             const title = escapeHtml((p.brand || '') + (p.model ? ' ' + p.model : '')) || '<em>(sans nom)</em>';
+            // In the slot the product is by definition mounted on THIS bow
+            const badge = stateBadgeHtml(p.state, { mountedHere: true, mountedOn: [] });
             currentEl.innerHTML = ''
                 + '<div class="component-slot__chip" data-product-id="' + p.id + '">'
                 +   '<div class="component-slot__chip-main">'
@@ -355,7 +362,7 @@
                 +     (sizePower ? '<span class="muted small">' + sizePower + '</span>' : '')
                 +   '</div>'
                 +   '<div class="component-slot__chip-meta small">'
-                +     '<span class="badge ' + stateCls + '">' + escapeHtml(stateText) + '</span>'
+                +     badge
                 +     (locText ? '<span class="muted">📍 ' + escapeHtml(locText) + '</span>' : '')
                 +   '</div>'
                 +   (p.comments ? '<div class="component-slot__chip-comment small">💬 ' + escapeHtml(p.comments) + '</div>' : '')
@@ -373,7 +380,13 @@
         }
     }
 
-    // Delegate clicks on slot actions
+    // Live re-render when the bow's status changes: a mounted piece's badge depends on it.
+    if (statusSelect){
+        statusSelect.addEventListener('change', function(){
+            Object.keys(selection).forEach(catId => renderSlot(catId));
+        });
+    }
+
     slotsContainer.addEventListener('click', function(e){
         const btn = e.target.closest('button[data-action]');
         if (!btn) return;
