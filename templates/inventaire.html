@@ -159,23 +159,11 @@
     </a>
     <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='products') }}">
         <h3 class="inv-card__title">Produits</h3>
-        <p class="inv-card__desc">{{ products_total }} produit(s)</p>
+        <p class="inv-card__desc">{{ products_total }} produit(s) — choix des catégories sur la page</p>
     </a>
     <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='mixed') }}">
-        <h3 class="inv-card__title">Tout</h3>
-        <p class="inv-card__desc">{{ products_total + composites_total }} étiquette(s)</p>
+        <h3 class="inv-card__title">Produits + arcs</h3>
+        <p class="inv-card__desc">Sélection des catégories produits + tous les arcs</p>
     </a>
-</div>
-
-<div class="inv-section-title">Par catégorie</div>
-<div class="inv-cards-grid">
-    {% for cat in categories %}
-    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='products', category_id=cat.id) }}">
-        <h3 class="inv-card__title">{{ cat.name }}</h3>
-        <p class="inv-card__desc">{{ cat.products|length }} produit(s)</p>
-    </a>
-    {% else %}
-    <p class="muted">Aucune catégorie.</p>
-    {% endfor %}
 </div>
 {% endblock %}

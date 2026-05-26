@@ -41,7 +41,7 @@
     </script>
 </head>
 {% set shell_minimal = (request.endpoint == 'login') %}
-<body{% if shell_minimal %} class="shell-minimal"{% endif %}>
+<body class="{% if shell_minimal %}shell-minimal {% endif %}{% block body_class %}{% endblock %}">
     <a href="#main-content" class="skip-link">Aller au contenu principal</a>
     <div class="top-bar">
         <div class="container">

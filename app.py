@@ -3660,7 +3660,46 @@ LABEL_LAYOUTS = {
 DEFAULT_LABEL_LAYOUT = 'avery21'
 
 
-def _collect_label_items(kind, ids_csv, category_id, status, regenerate_missing=True):
+def _label_count_for_category(cat):
+    """Nombre d'étiquettes à imprimer pour une catégorie (branches = 2 par produit)."""
+    n = Product.query.filter_by(category_id=cat.id).count()
+    if n and _is_branches_category(cat):
+        return n * 2
+    return n
+
+
+def _categories_for_label_print():
+    """Catégories avec compteurs, pour le menu à cocher sur la page d'étiquettes."""
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
+    out = []
+    for cat in cats:
+        out.append({
+            'id': cat.id,
+            'name': cat.name,
+            'prefix': _tag_prefix_for_category(cat),
+            'product_count': Product.query.filter_by(category_id=cat.id).count(),
+            'label_count': _label_count_for_category(cat),
+        })
+    return out
+
+
+def _selected_category_ids_from_request(all_category_ids):
+    """IDs cochés dans le formulaire ; si pas encore soumis, toutes les catégories."""
+    if request.args.get('cat_filter') == '1':
+        return [int(x) for x in request.args.getlist('category_ids') if str(x).strip().isdigit()]
+    return list(all_category_ids)
+
+
+def _collect_label_items(
+    kind,
+    ids_csv,
+    category_id,
+    status,
+    *,
+    category_ids=None,
+    category_filter_active=False,
+    regenerate_missing=True,
+):
     """Construit la liste { kind, tag, title, subtitle, qr_data_url } pour l'impression."""
     items = []
 
@@ -3711,13 +3750,21 @@ def _collect_label_items(kind, ids_csv, category_id, status, regenerate_missing=
 
     ids = [int(x) for x in (ids_csv or '').split(',') if x.strip().isdigit()]
 
+    def _apply_product_category_filter(q):
+        if ids:
+            return q.filter(Product.id.in_(ids))
+        if category_id:
+            return q.filter(Product.category_id == int(category_id))
+        if category_filter_active:
+            if not category_ids:
+                return q.filter(Product.id < 0)  # aucune catégorie cochée
+            return q.filter(Product.category_id.in_(category_ids))
+        return q
+
     if kind == 'products':
         q = Product.query
-        if ids:
-            q = q.filter(Product.id.in_(ids))
-        else:
-            if category_id:
-                q = q.filter(Product.category_id == int(category_id))
+        q = _apply_product_category_filter(q)
+        if not ids and not category_filter_active and not category_id:
             if status == 'broken':
                 q = q.filter(Product.state == 'broken')
             elif status == 'stock':
@@ -3738,10 +3785,20 @@ def _collect_label_items(kind, ids_csv, category_id, status, regenerate_missing=
         for c in comps:
             _push_composite(c)
     elif kind == 'mixed':
-        # Tout le matériel inventoriable, sans doublon.
-        for p in Product.query.join(Category).order_by(Category.position.asc(), Category.name.asc(), Product.brand.asc()).all():
+        q = Product.query
+        q = _apply_product_category_filter(q)
+        q = q.join(Category).order_by(Category.position.asc(), Category.name.asc(), Product.brand.asc())
+        for p in q.all():
             _push_product(p)
-        for c in sorted(CompositeProduct.query.all(), key=lambda x: natural_sort_key(x.name)):
+        cq = CompositeProduct.query
+        if ids:
+            cq = cq.filter(CompositeProduct.id.in_(ids))
+        else:
+            if status == 'club':
+                cq = cq.filter(CompositeProduct.status == 'club')
+            elif status == 'loan':
+                cq = cq.filter(CompositeProduct.status == 'loan')
+        for c in sorted(cq.all(), key=lambda x: natural_sort_key(x.name)):
             _push_composite(c)
     return items
 
@@ -3766,7 +3823,22 @@ def inventaire_etiquettes():
     category_id = request.args.get('category_id') or None
     status = (request.args.get('status') or '').lower()
 
-    raw_items = _collect_label_items(kind, ids_csv, category_id, status)
+    categories_for_labels = _categories_for_label_print()
+    all_cat_ids = [c['id'] for c in categories_for_labels]
+    selected_category_ids = _selected_category_ids_from_request(all_cat_ids)
+    category_filter_active = kind in ('products', 'mixed')
+    filter_category_ids = selected_category_ids
+    if category_id and request.args.get('cat_filter') != '1':
+        filter_category_ids = [int(category_id)]
+
+    raw_items = _collect_label_items(
+        kind,
+        ids_csv,
+        None,
+        status,
+        category_ids=filter_category_ids,
+        category_filter_active=category_filter_active,
+    )
     expanded = []
     for it in raw_items:
         for _ in range(copies):
@@ -3792,6 +3864,9 @@ def inventaire_etiquettes():
         status=status,
         base_url=base_url,
         qr_mm=qr_mm,
+        categories_for_labels=categories_for_labels,
+        selected_category_ids=selected_category_ids,
+        show_category_filter=(kind in ('products', 'mixed')),
         item_count=len([x for x in padded if x is not None]),
     )
 
