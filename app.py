@@ -3485,7 +3485,7 @@ def _barcode_img_data_url(payload, *, module_height=14, module_width=0.28):
             'write_text': False,
             'module_height': module_height,
             'module_width': module_width,
-            'quiet_zone': 2,
+            'quiet_zone': 1,
         },
     )
     b64 = base64.b64encode(buf.getvalue()).decode('ascii')
