@@ -9,5 +9,6 @@ Werkzeug==3.0.1
 reportlab==4.0.7
 WeasyPrint
 segno>=1.6.0
+python-barcode[images]>=0.15.1
 python-dateutil==2.8.2
 gunicorn>=21.0.0

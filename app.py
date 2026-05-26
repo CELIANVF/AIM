@@ -3441,6 +3441,9 @@ def delete_composite(comp_id):
 # Inventaire : étiquettes imprimables & recherche par code (« tag »)
 # =============================================================================
 
+LABEL_CODE_MODES = ('qr', 'barcode', 'none')
+
+
 def _qr_img_data_url(payload, *, border=2, scale=12):
     """QR en PNG (data URL) pour un rendu fiable à l'écran et à l'impression.
 
@@ -3454,11 +3457,51 @@ def _qr_img_data_url(payload, *, border=2, scale=12):
         return ''
     import base64
     from io import BytesIO
+    if not payload:
+        return ''
     qr = segno.make(payload, error='M', micro=False)
     buf = BytesIO()
     qr.save(buf, kind='png', scale=scale, border=border, dark='#000000', light='#ffffff')
     b64 = base64.b64encode(buf.getvalue()).decode('ascii')
     return f'data:image/png;base64,{b64}'
+
+
+def _barcode_img_data_url(payload, *, module_height=14, module_width=0.28):
+    """Code-barres Code 128 en PNG (data URL), sans texte sous les barres."""
+    if not payload:
+        return ''
+    try:
+        import barcode
+        from barcode.writer import ImageWriter
+    except ImportError:
+        return ''
+    import base64
+    from io import BytesIO
+    code_cls = barcode.get_barcode_class('code128')
+    buf = BytesIO()
+    code_cls(str(payload), writer=ImageWriter()).write(
+        buf,
+        options={
+            'write_text': False,
+            'module_height': module_height,
+            'module_width': module_width,
+            'quiet_zone': 2,
+        },
+    )
+    b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+    return f'data:image/png;base64,{b64}'
+
+
+def _label_code_mode_from_request():
+    """Mode d'encodage sur l'étiquette : qr, barcode ou none (?code=…, rétro ?qr=0/1)."""
+    code = (request.args.get('code') or '').strip().lower()
+    if code in LABEL_CODE_MODES:
+        return code
+    if request.args.get('qr') == '0':
+        return 'none'
+    if request.args.get('qr') == '1':
+        return 'qr'
+    return 'qr'
 
 
 def _qr_size_mm_for_layout(layout):
@@ -3468,6 +3511,37 @@ def _qr_size_mm_for_layout(layout):
     h = float(layout.get('height', 38))
     w = float(layout.get('width', 63))
     return round(max(10.0, min(h * 0.55, w * 0.45)), 1)
+
+
+def _barcode_size_mm_for_layout(layout):
+    """Zone code-barres (mm) sous le texte : pleine largeur, hauteur modérée."""
+    w = float(layout.get('width', 63))
+    h = float(layout.get('height', 38))
+    return {
+        'width': round(max(14.0, w - 5), 1),
+        'height': round(max(4.5, min(h * 0.30, 10)), 1),
+    }
+
+
+def _enrich_label_items_code_images(items, code_mode, layout):
+    """Ajoute code_img_url sur chaque étiquette selon le mode choisi."""
+    if code_mode == 'none':
+        return items
+    bc_dims = _barcode_size_mm_for_layout(layout)
+    # Barres un peu plus fines sur les petites étiquettes.
+    bc_h = 10 if bc_dims['height'] < 8 else 14
+    bc_w = 0.22 if bc_dims['width'] < 22 else 0.28
+    for it in items:
+        if not it:
+            continue
+        payload = it.get('code_payload') or it.get('tag')
+        if code_mode == 'qr':
+            it['code_img_url'] = _qr_img_data_url(payload)
+        elif code_mode == 'barcode':
+            it['code_img_url'] = _barcode_img_data_url(
+                payload, module_height=bc_h, module_width=bc_w,
+            )
+    return items
 
 
 def _label_description_for_product(p):
@@ -3700,7 +3774,7 @@ def _collect_label_items(
     category_filter_active=False,
     regenerate_missing=True,
 ):
-    """Construit la liste { kind, tag, title, subtitle, qr_data_url } pour l'impression."""
+    """Construit la liste { kind, tag, title, code_payload, … } pour l'impression."""
     items = []
 
     def _push_product(p):
@@ -3717,20 +3791,18 @@ def _collect_label_items(
                     'kind': 'product',
                     'tag': p.tag,
                     'position': pos['label'],          # affiché en gros sur l'étiquette
-                    'qr_payload': f"{p.tag}-{pos['suffix']}",  # encodé dans le QR
+                    'code_payload': f"{p.tag}-{pos['suffix']}",
                     'title': base_title,
                     'subtitle': base_subtitle,
-                    'qr_data_url': _qr_img_data_url(f"{p.tag}-{pos['suffix']}"),
                 })
             return
         items.append({
             'kind': 'product',
             'tag': p.tag,
             'position': None,
-            'qr_payload': p.tag,
+            'code_payload': p.tag,
             'title': base_title,
             'subtitle': base_subtitle,
-            'qr_data_url': _qr_img_data_url(p.tag),
         })
 
     def _push_composite(c):
@@ -3742,10 +3814,9 @@ def _collect_label_items(
             'kind': 'composite',
             'tag': c.tag,
             'position': None,
-            'qr_payload': c.tag,
+            'code_payload': c.tag,
             'title': c.name,
             'subtitle': _label_description_for_composite(c),
-            'qr_data_url': _qr_img_data_url(c.tag),
         })
 
     ids = [int(x) for x in (ids_csv or '').split(',') if x.strip().isdigit()]
@@ -3817,7 +3888,7 @@ def inventaire_etiquettes():
     layout = LABEL_LAYOUTS[layout_key]
     copies = max(1, min(int(request.args.get('copies') or 1), 20))
     skip = max(0, min(int(request.args.get('skip') or 0), layout['cols'] * layout['rows'] - 1))
-    show_qr = (request.args.get('qr', '1') != '0')
+    code_mode = _label_code_mode_from_request()
 
     ids_csv = request.args.get('ids') or ''
     category_id = request.args.get('category_id') or None
@@ -3846,9 +3917,11 @@ def inventaire_etiquettes():
 
     # Cases vides en début de page (utile sur planche déjà entamée).
     padded = ([None] * skip) + expanded
+    _enrich_label_items_code_images(padded, code_mode, layout)
 
     base_url = (request.host_url or '').rstrip('/')
     qr_mm = _qr_size_mm_for_layout(layout)
+    bc_size = _barcode_size_mm_for_layout(layout)
     return render_template(
         'print_labels.html',
         items=padded,
@@ -3856,7 +3929,7 @@ def inventaire_etiquettes():
         layout_key=layout_key,
         layouts=LABEL_LAYOUTS,
         kind=kind,
-        show_qr=show_qr,
+        code_mode=code_mode,
         copies=copies,
         skip=skip,
         ids_csv=ids_csv,
@@ -3864,6 +3937,8 @@ def inventaire_etiquettes():
         status=status,
         base_url=base_url,
         qr_mm=qr_mm,
+        barcode_w_mm=bc_size['width'],
+        barcode_h_mm=bc_size['height'],
         categories_for_labels=categories_for_labels,
         selected_category_ids=selected_category_ids,
         show_category_filter=(kind in ('products', 'mixed')),

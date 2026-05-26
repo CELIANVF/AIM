@@ -123,7 +123,9 @@
         --label-width: {{ layout.width }}mm;
         --label-height: {{ layout.height }}mm;
         --label-cols: {{ layout.cols }};
-        --qr-size: {{ qr_mm }}mm;
+        --code-size: {{ qr_mm }}mm;
+        --barcode-w: {{ barcode_w_mm }}mm;
+        --barcode-h: {{ barcode_h_mm }}mm;
         --label-logo-h: {% if layout_key == 'avery65' %}3.5mm{% elif layout_key == 'avery24' %}4mm{% elif layout_key == 'avery21' %}4.5mm{% else %}6mm{% endif %};
         --label-brand-fs: {% if layout_key == 'avery65' %}2mm{% elif layout_key == 'avery24' %}2.3mm{% elif layout_key == 'avery21' %}2.6mm{% else %}3.2mm{% endif %};
     }
@@ -150,7 +152,7 @@
         border-radius: 1mm;
         display: grid;
         grid-template-rows: auto 1fr;
-        grid-template-columns: var(--qr-size) 1fr;
+        grid-template-columns: var(--code-size) 1fr;
         column-gap: 1.5mm;
         row-gap: 0.6mm;
         align-items: stretch;
@@ -161,7 +163,13 @@
         overflow: hidden;
     }
     .label.label--empty { border-color: transparent; }
-    .label--no-qr { grid-template-columns: 1fr; }
+    .label--code-qr { grid-template-columns: var(--code-size) 1fr; }
+    .label--code-barcode {
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-columns: 1fr;
+        column-gap: 0;
+    }
+    .label--no-code { grid-template-columns: 1fr; }
     .label__brand {
         grid-column: 1 / -1;
         display: flex;
@@ -188,35 +196,72 @@
         color: #111;
         white-space: nowrap;
     }
-    .label__qr {
+    .label__code {
         grid-row: 2;
         grid-column: 1;
         align-self: center;
-        width: var(--qr-size);
-        height: var(--qr-size);
-        min-width: var(--qr-size);
-        min-height: var(--qr-size);
         overflow: hidden;
         background: #fff;
+    }
+    .label__code--qr {
+        width: var(--code-size);
+        height: var(--code-size);
+        min-width: var(--code-size);
+        min-height: var(--code-size);
+    }
+    .label__code--barcode {
+        width: 100%;
+        height: var(--barcode-h);
+        min-height: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    .label--code-barcode .label__brand {
+        grid-row: 1;
+        grid-column: 1;
+    }
+    .label--code-barcode .label__main {
+        grid-row: 2;
+        grid-column: 1;
+        justify-content: center;
+        align-self: center;
+    }
+    .label--code-barcode .label__code--barcode {
+        grid-row: 3;
+        grid-column: 1;
+        align-self: end;
     }
     .label__main {
         grid-row: 2;
         grid-column: 2;
     }
-    .label--no-qr .label__main {
+    .label--code-qr .label__main {
+        grid-row: 2;
+        grid-column: 2;
+    }
+    .label--no-code .label__main {
         grid-column: 1 / -1;
+        grid-row: 2;
     }
     .label--layout-avery65 .label__tag { font-size: 3.8mm; }
     .label--layout-avery65 .label__title { font-size: 2.4mm; }
     .label--layout-avery24 .label__tag { font-size: 4.2mm; }
     .label--layout-avery24 .label__title { font-size: 2.6mm; }
-    .label__qr img {
+    .label__code--qr img {
         display: block;
         width: 100%;
         height: 100%;
         object-fit: fill;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
+    }
+    .label__code--barcode img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 100%;
+        object-fit: contain;
     }
     .label__main {
         display: flex;
@@ -361,10 +406,11 @@
                 <input type="number" name="skip" min="0" max="{{ layout.cols * layout.rows - 1 }}" value="{{ skip }}">
             </label>
             <label>
-                QR code
-                <select name="qr">
-                    <option value="1" {% if show_qr %}selected{% endif %}>Oui</option>
-                    <option value="0" {% if not show_qr %}selected{% endif %}>Non</option>
+                Code
+                <select name="code">
+                    <option value="qr" {% if code_mode == 'qr' %}selected{% endif %}>QR code</option>
+                    <option value="barcode" {% if code_mode == 'barcode' %}selected{% endif %}>Code-barres</option>
+                    <option value="none" {% if code_mode == 'none' %}selected{% endif %}>Aucun</option>
                 </select>
             </label>
             <div class="toolbar-actions">
@@ -410,14 +456,28 @@
             {% if it is none %}
                 <div class="label label--empty"></div>
             {% else %}
-                <div class="label label--layout-{{ layout_key }}{% if not show_qr %} label--no-qr{% endif %}">
+                <div class="label label--layout-{{ layout_key }}{% if code_mode == 'none' %} label--no-code{% elif code_mode == 'barcode' %} label--code-barcode{% else %} label--code-qr{% endif %}">
                     <div class="label__brand">
                         <img src="{{ url_for('static', filename='logo.png') }}" alt="ANC93">
                         <span class="label__brand-text">ANC93</span>
                     </div>
-                    {% if show_qr and it.qr_data_url %}
-                    <div class="label__qr">
-                        <img src="{{ it.qr_data_url }}" alt="">
+                    {% if code_mode == 'barcode' %}
+                    <div class="label__main">
+                        <div class="label__tag-row">
+                            <span class="label__tag">{{ it.tag }}</span>
+                            {% if it.position %}<span class="label__position">{{ it.position }}</span>{% endif %}
+                        </div>
+                        {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
+                    </div>
+                    {% if it.code_img_url %}
+                    <div class="label__code label__code--barcode">
+                        <img src="{{ it.code_img_url }}" alt="">
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    {% if code_mode == 'qr' and it.code_img_url %}
+                    <div class="label__code label__code--qr">
+                        <img src="{{ it.code_img_url }}" alt="">
                     </div>
                     {% endif %}
                     <div class="label__main">
@@ -427,6 +487,7 @@
                         </div>
                         {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
                     </div>
+                    {% endif %}
                 </div>
             {% endif %}
         {% endfor %}
