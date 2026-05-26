@@ -18,7 +18,12 @@
                 <label>Catégorie *</label>
                 <select name="category_id" id="category_select" required>
                     {% for c in categories %}
-                    <option value="{{ c.id }}" data-has-size="{{ c.has_size|lower }}" data-has-power="{{ c.has_power|lower }}" data-has-model="{{ c.has_model|lower }}" data-custom-fields="{{ c.custom_fields or '' }}">{{ c.name }}</option>
+                    <option value="{{ c.id }}"
+                        data-tag-prefix="{{ tag_prefix_by_name.get(c.name, 'X') }}"
+                        data-has-size="{{ c.has_size|lower }}"
+                        data-has-power="{{ c.has_power|lower }}"
+                        data-has-model="{{ c.has_model|lower }}"
+                        data-custom-fields="{{ c.custom_fields or '' }}">{{ c.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -26,6 +31,18 @@
                 <label>Marque</label>
                 <input type="text" name="brand" placeholder="Ex: Hoyt, Samick...">
             </div>
+        </div>
+
+        <div class="form-group">
+            <label>Code (étiquette)</label>
+            <input type="text" name="tag" id="tag_input" value="{{ prefill.tag if prefill else '' }}"
+                placeholder="Laisser vide : code auto selon la catégorie"
+                style="text-transform:uppercase;font-family:ui-monospace,monospace;letter-spacing:0.02em">
+            <small class="muted" id="tag_hint">
+                Préfixes :
+                {% for item in tag_prefix_legend %}<code>{{ item.prefix }}</code> {{ item.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                — arcs : <code>A</code>.
+            </small>
         </div>
 
         <div class="form-group">

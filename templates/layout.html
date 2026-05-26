@@ -102,6 +102,7 @@
                     {% endif %}
                     {{ nav_link('/products', '📦', 'Produits', request.path.startswith('/products')) }}
                     {{ nav_link('/composites', '🎯', 'Arcs', request.path.startswith('/composites')) }}
+                    {{ nav_link(url_for('inventaire'), 'Inv', 'Inventaire', request.path.startswith('/inventaire')) }}
                     {% if current_user.role not in ('lecteur', 'archer') %}
                     {{ nav_link('/archers', '👥', 'Archers', request.path.startswith('/archers')) }}
                     {{ nav_link('/inscription_evenement', '📧', 'Inscription (mail)', request.path.startswith('/inscription_evenement')) }}

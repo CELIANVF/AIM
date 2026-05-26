@@ -5,6 +5,10 @@
 {% block content %}
 <h1>Modifier un produit unitaire</h1>
 <form method="post">
+    <label>Code (étiquette):
+        <input type="text" name="tag" value="{{ product.tag or '' }}" placeholder="Ex. P-007" style="text-transform:uppercase;font-family:ui-monospace,monospace;letter-spacing:0.02em">
+        <span class="muted small" style="display:block">Imprimé sur l'étiquette physique. Laissez vide pour conserver le code actuel ou en générer un automatiquement.</span>
+    </label><br>
     <label>Catégorie:
         <select name="category_id" id="category_select" required>
             {% for c in categories %}
@@ -41,6 +45,12 @@
     </div>
     <button class="btn" type="submit">Modifier</button>
 </form>
+{% if product.tag %}
+<p class="muted small" style="margin:8px 0 0">
+    Imprimer une étiquette pour ce produit :
+    <a class="ref-link" href="{{ url_for('inventaire_etiquettes', kind='products', ids=product.id) }}">Étiquette {{ product.tag }}</a>
+</p>
+{% endif %}
 <p><a href="/products">Retour</a></p>
 
 <script>

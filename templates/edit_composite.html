@@ -22,6 +22,11 @@
                 <input type="text" name="name" required value="{{ composite.name|e }}">
             </label>
             <label>
+                <span class="muted small">Code</span>
+                <input type="text" name="tag" value="{{ composite.tag or '' }}" placeholder="Ex. A-007"
+                    style="text-transform:uppercase;font-family:ui-monospace,monospace;letter-spacing:0.02em">
+            </label>
+            <label>
                 <span class="muted small">Type</span>
                 <select name="type">
                     <option value="BB" {% if composite.type == 'BB' %}selected{% endif %}>BB (Bare Bow)</option>
@@ -36,6 +41,14 @@
                 </select>
             </label>
         </div>
+        {% if composite.tag %}
+        <p class="muted small" style="margin:6px 0 0">
+            Imprimer une étiquette pour cet arc :
+            <a class="ref-link" href="{{ url_for('inventaire_etiquettes', kind='composites', ids=composite.id) }}">Étiquette {{ composite.tag }}</a>
+        </p>
+        {% else %}
+        <p class="muted small" style="margin:6px 0 0">Laissez vide pour générer automatiquement un code <code>A-…</code>.</p>
+        {% endif %}
     </div>
 
     <div class="card" style="margin-bottom:20px">

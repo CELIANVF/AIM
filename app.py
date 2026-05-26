@@ -1827,6 +1827,135 @@ def reorder_categories():
     db.session.commit()
     return ('', 204)
 
+# =============================================================================
+# Numéro d'identification physique (tag) — étiquettes & inventaire
+# =============================================================================
+
+# Préfixe des arcs composés (toujours « A »). Les produits unitaires utilisent
+# un préfixe selon la catégorie (voir CATEGORY_TAG_PREFIX_BY_NAME).
+COMPOSITE_TAG_PREFIX = 'A'
+DEFAULT_PRODUCT_TAG_PREFIX = 'X'  # catégorie inconnue
+TAG_NUMBER_REGEX = re.compile(r'^([A-Z]+)[-_]?(\d+)$', re.IGNORECASE)
+
+# Lettre(s) par nom de catégorie (comparaison sans accents, minuscules).
+CATEGORY_TAG_PREFIX_BY_NAME = {
+    'poignees': 'P',
+    'branches': 'B',
+    'viseurs': 'V',
+    'stabilisateurs': 'S',
+    'poids': 'D',
+    'repose fleches': 'F',
+    'berger': 'G',
+    'sacs': 'C',
+}
+
+
+def _normalize_tag(raw):
+    """Nettoie un tag saisi à la main : majuscules, sans espaces, max 32 chars."""
+    if raw is None:
+        return None
+    s = str(raw).strip().upper()
+    if not s:
+        return None
+    s = re.sub(r'\s+', '', s)
+    return s[:32]
+
+
+def _next_tag_number(prefix, existing_tags):
+    """Plus grand suffixe numérique observé pour ce préfixe, + 1 (sinon 1)."""
+    pref = (prefix or '').upper()
+    best = 0
+    for t in existing_tags:
+        if not t:
+            continue
+        m = TAG_NUMBER_REGEX.match(t)
+        if not m:
+            continue
+        if m.group(1).upper() != pref:
+            continue
+        try:
+            n = int(m.group(2))
+        except (TypeError, ValueError):
+            continue
+        if n > best:
+            best = n
+    return best + 1
+
+
+def _format_tag(prefix, number, width=3):
+    return f"{prefix.upper()}-{int(number):0{width}d}"
+
+
+def _normalize_category_key(name):
+    """Clé de recherche pour CATEGORY_TAG_PREFIX_BY_NAME."""
+    if not name:
+        return ''
+    s = unicodedata.normalize('NFKD', str(name))
+    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+    return re.sub(r'\s+', ' ', s).strip().lower()
+
+
+def _tag_prefix_for_category(category):
+    """Lettre(s) de préfixe pour une catégorie produit (ex. Poignées → P)."""
+    if not category:
+        return DEFAULT_PRODUCT_TAG_PREFIX
+    key = _normalize_category_key(category.name)
+    if key in CATEGORY_TAG_PREFIX_BY_NAME:
+        return CATEGORY_TAG_PREFIX_BY_NAME[key]
+    for ch in (category.name or '').upper():
+        if ch.isalpha():
+            return ch
+    return DEFAULT_PRODUCT_TAG_PREFIX
+
+
+def _category_tag_prefix_legend():
+    """Liste {name, prefix} pour l'aide dans les écrans inventaire / formulaires."""
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
+    return [{'name': c.name, 'prefix': _tag_prefix_for_category(c)} for c in cats]
+
+
+def _generate_product_tag(*, category=None, category_id=None):
+    """Prochain code libre pour la catégorie (ex. V-012 pour un viseur)."""
+    if category is None and category_id is not None:
+        category = db.session.get(Category, category_id)
+    prefix = _tag_prefix_for_category(category)
+    existing = [t for (t,) in db.session.query(Product.tag).filter(Product.tag.isnot(None)).all()]
+    n = _next_tag_number(prefix, existing)
+    width = max(3, len(str(n)))
+    candidate = _format_tag(prefix, n, width)
+    while Product.query.filter_by(tag=candidate).first() is not None:
+        n += 1
+        candidate = _format_tag(prefix, n, width)
+    return candidate
+
+
+def _generate_composite_tag():
+    """Premier tag disponible « A-001 » (ou +1 sur le plus grand existant)."""
+    existing = [t for (t,) in db.session.query(CompositeProduct.tag).filter(CompositeProduct.tag.isnot(None)).all()]
+    n = _next_tag_number(COMPOSITE_TAG_PREFIX, existing)
+    width = max(3, len(str(max(n, CompositeProduct.query.count() + 1))))
+    candidate = _format_tag(COMPOSITE_TAG_PREFIX, n, width)
+    while CompositeProduct.query.filter_by(tag=candidate).first() is not None:
+        n += 1
+        candidate = _format_tag(COMPOSITE_TAG_PREFIX, n, width)
+    return candidate
+
+
+def _is_tag_taken(tag, *, exclude_product_id=None, exclude_composite_id=None):
+    """Tag déjà utilisé (sur produit ou arc) hors entité courante ?"""
+    if not tag:
+        return False
+    q = Product.query.filter(Product.tag == tag)
+    if exclude_product_id is not None:
+        q = q.filter(Product.id != exclude_product_id)
+    if q.first() is not None:
+        return True
+    q = CompositeProduct.query.filter(CompositeProduct.tag == tag)
+    if exclude_composite_id is not None:
+        q = q.filter(CompositeProduct.id != exclude_composite_id)
+    return q.first() is not None
+
+
 @app.route('/products')
 @login_required
 @require_permission('view_equipment')
@@ -1858,13 +1987,28 @@ def add_product():
         size = request.form.get('size')
         power = request.form.get('power')
         model = request.form.get('model')
-        # Collect custom fields
+        tag = _normalize_tag(request.form.get('tag'))
+        # Tag manuel : on vérifie qu'il n'est pas déjà pris ; sinon auto-génération.
+        if tag:
+            if _is_tag_taken(tag):
+                flash(f"Le code « {tag} » est déjà utilisé. Choisissez-en un autre ou laissez vide pour l'auto-générer.", 'error')
+                cats = Category.query.all()
+                legend = _category_tag_prefix_legend()
+                return render_template(
+                    'add_product.html',
+                    categories=cats,
+                    prefill=request.form,
+                    tag_prefix_legend=legend,
+                    tag_prefix_by_name={item['name']: item['prefix'] for item in legend},
+                )
+        else:
+            tag = _generate_product_tag(category_id=cat_id)
         custom_values = {}
         for key, value in request.form.items():
             if key.startswith('custom_'):
                 field_name = key[7:].replace('_', ' ')  # remove 'custom_' and replace _ with space
                 custom_values[field_name] = value
-        prod = Product(category_id=cat_id, brand=brand, state=state, location=location, comments=comments, size=size, power=power, model=model, custom_values=custom_values if custom_values else None)
+        prod = Product(category_id=cat_id, brand=brand, state=state, location=location, comments=comments, size=size, power=power, model=model, custom_values=custom_values if custom_values else None, tag=tag)
         db.session.add(prod)
         db.session.commit()
         category = Category.query.get(cat_id)
@@ -1872,7 +2016,7 @@ def add_product():
             event_type='product_created',
             entity_type='product',
             entity_id=prod.id,
-            summary=f"Produit créé: {brand} ({category.name if category else 'Catégorie inconnue'})",
+            summary=f"Produit créé: {brand} ({category.name if category else 'Catégorie inconnue'}) [{tag}]",
             details={
                 'category': category.name if category else None,
                 'brand': brand,
@@ -1880,13 +2024,20 @@ def add_product():
                 'location': location,
                 'size': size,
                 'power': power,
-                'model': model
+                'model': model,
+                'tag': tag,
             }
         )
         db.session.commit()
         return redirect(url_for('products'))
-    cats = Category.query.all()
-    return render_template('add_product.html', categories=cats)
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
+    legend = _category_tag_prefix_legend()
+    return render_template(
+        'add_product.html',
+        categories=cats,
+        tag_prefix_legend=legend,
+        tag_prefix_by_name={item['name']: item['prefix'] for item in legend},
+    )
 
 @app.route('/edit_product/<int:prod_id>', methods=['GET', 'POST'])
 @login_required
@@ -1903,8 +2054,17 @@ def edit_product(prod_id):
             'Taille': prod.size,
             'Puissance': prod.power,
             'Modèle': prod.model,
-            'Commentaires': prod.comments
+            'Commentaires': prod.comments,
+            'Code': prod.tag,
         }
+        new_tag = _normalize_tag(request.form.get('tag'))
+        if new_tag and new_tag != prod.tag and _is_tag_taken(new_tag, exclude_product_id=prod.id):
+            flash(f"Le code « {new_tag} » est déjà utilisé. Modification du code annulée.", 'error')
+            cats = Category.query.all()
+            return render_template('edit_product.html', product=prod, categories=cats)
+        if not new_tag:
+            new_tag = prod.tag or _generate_product_tag(category=prod.category)
+        prod.tag = new_tag
         prod.category_id = request.form.get('category_id')
         prod.brand = request.form.get('brand', '')
         prod.state = request.form.get('state', 'stock')
@@ -1913,7 +2073,6 @@ def edit_product(prod_id):
         prod.size = request.form.get('size')
         prod.power = request.form.get('power')
         prod.model = request.form.get('model')
-        # Collect custom fields
         custom_values = {}
         for key, value in request.form.items():
             if key.startswith('custom_'):
@@ -1929,7 +2088,8 @@ def edit_product(prod_id):
             'Taille': prod.size,
             'Puissance': prod.power,
             'Modèle': prod.model,
-            'Commentaires': prod.comments
+            'Commentaires': prod.comments,
+            'Code': prod.tag,
         }
         changes = {}
         for key in old_data:
@@ -1953,7 +2113,6 @@ def edit_product(prod_id):
 @require_permission('edit')
 def duplicate_product(prod_id):
     original = Product.query.get_or_404(prod_id)
-    # Create a new product with the same attributes
     new_prod = Product(
         category_id=original.category_id,
         brand=original.brand,
@@ -1963,7 +2122,8 @@ def duplicate_product(prod_id):
         size=original.size,
         power=original.power,
         model=original.model,
-        custom_values=original.custom_values
+        custom_values=original.custom_values,
+        tag=_generate_product_tag(category=original.category),
     )
     db.session.add(new_prod)
     db.session.commit()
@@ -2102,7 +2262,16 @@ def add_composite():
         name = request.form['name']
         type = request.form['type']
         status = request.form['status']
-        comp = CompositeProduct(name=name, type=type, status=status)
+        tag = _normalize_tag(request.form.get('tag'))
+        if tag:
+            if _is_tag_taken(tag):
+                flash(f"Le code « {tag} » est déjà utilisé. Choisissez-en un autre ou laissez vide pour l'auto-générer.", 'error')
+                cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
+                cats_with_available = [{'id': c.id, 'name': c.name, 'products': list(c.products)} for c in cats]
+                return render_template('add_composite.html', categories=cats_with_available, suggested_tag=tag)
+        else:
+            tag = _generate_composite_tag()
+        comp = CompositeProduct(name=name, type=type, status=status, tag=tag)
         db.session.add(comp)
         db.session.commit()  # need comp.id to exist for relationship handling
 
@@ -2137,8 +2306,8 @@ def add_composite():
             event_type='composite_created',
             entity_type='composite',
             entity_id=comp.id,
-            summary=f"Arc créé: {comp.name}",
-            details={'components': components, 'type': comp.type, 'status': comp.status}
+            summary=f"Arc créé: {comp.name} [{tag}]",
+            details={'components': components, 'type': comp.type, 'status': comp.status, 'tag': tag}
         )
         db.session.commit()
         return redirect(url_for('composites'))
@@ -2157,7 +2326,7 @@ def add_composite():
                 if any(other.status != 'loan' for other in p.composites):
                     available.append(p)
         cats_with_available.append({'id': c.id, 'name': c.name, 'products': available})
-    return render_template('add_composite.html', categories=cats_with_available)
+    return render_template('add_composite.html', categories=cats_with_available, suggested_tag=_generate_composite_tag())
 
 @app.route('/edit_composite/<int:comp_id>', methods=['GET', 'POST'])
 @login_required
@@ -2170,6 +2339,14 @@ def edit_composite(comp_id):
         old_components = [f"{p.brand} ({p.category.name})" for p in comp.components]
         old_by_cat = {p.category.id: p for p in comp.components if p.category}
 
+        new_tag = _normalize_tag(request.form.get('tag'))
+        if new_tag and new_tag != comp.tag and _is_tag_taken(new_tag, exclude_composite_id=comp.id):
+            flash(f"Le code « {new_tag} » est déjà utilisé. Modification du code annulée.", 'error')
+            # Conserve les valeurs déjà soumises côté UI en redirigeant proprement.
+            return redirect(url_for('edit_composite', comp_id=comp.id))
+        if not new_tag:
+            new_tag = comp.tag or _generate_composite_tag()
+        comp.tag = new_tag
         comp.name = request.form['name']
         comp.type = request.form['type']
         comp.status = request.form['status']
@@ -3149,8 +3326,18 @@ def search():
 
     term = f"%{q}%"
 
+    # Recherche exacte par code d'identification (tag) : raccourci scanner / saisie rapide.
+    normalized_tag = _normalize_tag(q)
+    if normalized_tag:
+        tagged_product = Product.query.filter(Product.tag == normalized_tag).first()
+        if tagged_product:
+            return redirect(url_for('edit_product', prod_id=tagged_product.id))
+        tagged_composite = CompositeProduct.query.filter(CompositeProduct.tag == normalized_tag).first()
+        if tagged_composite:
+            return redirect(url_for('edit_composite', comp_id=tagged_composite.id))
+
     products = Product.query.filter(
-        db.or_(Product.brand.ilike(term), Product.model.ilike(term), Product.comments.ilike(term))
+        db.or_(Product.brand.ilike(term), Product.model.ilike(term), Product.comments.ilike(term), Product.tag.ilike(term))
     ).order_by(Product.brand).limit(200).all()
 
     archers = Archer.query.filter(
@@ -3165,7 +3352,9 @@ def search():
 
     categories = Category.query.filter(Category.name.ilike(term)).all()
 
-    composites = CompositeProduct.query.filter(CompositeProduct.name.ilike(term)).all()
+    composites = CompositeProduct.query.filter(
+        db.or_(CompositeProduct.name.ilike(term), CompositeProduct.tag.ilike(term))
+    ).all()
 
     users = User.query.filter(User.username.ilike(term)).all()
 
@@ -3246,6 +3435,365 @@ def delete_composite(comp_id):
     db.session.delete(comp)
     db.session.commit()
     return redirect(url_for('composites'))
+
+
+# =============================================================================
+# Inventaire : étiquettes imprimables & recherche par code (« tag »)
+# =============================================================================
+
+def _qr_img_data_url(payload, *, border=2, scale=12):
+    """QR en PNG (data URL) pour un rendu fiable à l'écran et à l'impression.
+
+    Les SVG segno (25×25 px + tracés stroke) se redimensionnent mal en CSS et
+    paraissent minuscules ou tronqués. Un raster haute résolution remplit
+    correctement la zone mm de l'étiquette.
+    """
+    try:
+        import segno
+    except ImportError:
+        return ''
+    import base64
+    from io import BytesIO
+    qr = segno.make(payload, error='M', micro=False)
+    buf = BytesIO()
+    qr.save(buf, kind='png', scale=scale, border=border, dark='#000000', light='#ffffff')
+    b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+    return f'data:image/png;base64,{b64}'
+
+
+def _qr_size_mm_for_layout(layout):
+    """Taille physique du QR sur l'étiquette (mm), selon le format de planche."""
+    if layout.get('qr_mm'):
+        return float(layout['qr_mm'])
+    h = float(layout.get('height', 38))
+    w = float(layout.get('width', 63))
+    return round(max(10.0, min(h * 0.55, w * 0.45)), 1)
+
+
+def _label_description_for_product(p):
+    """Texte secondaire imprimé sous le code (catégorie + marque + modèle + taille/puissance)."""
+    parts = []
+    if p.category and p.category.name:
+        parts.append(p.category.name)
+    bm = ' '.join(x for x in [p.brand or '', p.model or ''] if x).strip()
+    if bm:
+        parts.append(bm)
+    sp = ' '.join(x for x in [p.size or '', p.power or ''] if x).strip()
+    if sp:
+        parts.append(sp)
+    return ' · '.join(parts) if parts else '—'
+
+
+def _is_branches_category(cat):
+    """Vrai pour une catégorie « Branches » (pluriel : haut + bas) — case-insensible."""
+    if not cat:
+        return False
+    n = (getattr(cat, 'name', '') or '').lower()
+    return ('branche' in n) or ('branch' in n) or ('limb' in n)
+
+
+# Positions imprimées pour les paires (branches). Le suffixe est ajouté au QR
+# pour permettre de tracer une seule pièce (ex. casse de la branche du bas).
+BRANCH_LABEL_POSITIONS = [
+    {'suffix': 'H', 'label': 'H'},
+    {'suffix': 'B', 'label': 'B'},
+]
+
+
+def _label_description_for_composite(c):
+    """Texte secondaire imprimé sous le code (type + nombre de composants)."""
+    parts = []
+    if c.type:
+        parts.append(c.type)
+    n = len(c.components) if c.components is not None else 0
+    parts.append(f"{n} composant{'s' if n > 1 else ''}")
+    return ' · '.join(parts) if parts else '—'
+
+
+def _ensure_tag_for_product(p):
+    """Génère & persiste un tag manquant (utile pour les anciens produits)."""
+    if not p.tag:
+        p.tag = _generate_product_tag(category=p.category)
+        db.session.add(p)
+        db.session.commit()
+    return p.tag
+
+
+def _ensure_tag_for_composite(c):
+    if not c.tag:
+        c.tag = _generate_composite_tag()
+        db.session.add(c)
+        db.session.commit()
+    return c.tag
+
+
+@app.route('/inventaire')
+@login_required
+@require_permission('view_equipment')
+def inventaire():
+    """Centre d'inventaire : recherche par code + accès aux étiquettes."""
+    products_total = Product.query.count()
+    composites_total = CompositeProduct.query.count()
+    products_without_tag = Product.query.filter(or_(Product.tag.is_(None), Product.tag == '')).count()
+    composites_without_tag = CompositeProduct.query.filter(or_(CompositeProduct.tag.is_(None), CompositeProduct.tag == '')).count()
+    cats = Category.query.order_by(Category.position.asc(), Category.name.asc()).all()
+    return render_template(
+        'inventaire.html',
+        products_total=products_total,
+        composites_total=composites_total,
+        products_without_tag=products_without_tag,
+        composites_without_tag=composites_without_tag,
+        categories=cats,
+        tag_prefix_legend=_category_tag_prefix_legend(),
+    )
+
+
+def _strip_branch_suffix(tag):
+    """`P-042-H` ou `P-042-B` → `P-042`. Sinon renvoie le tag tel quel.
+
+    Permet de scanner une étiquette de branche (haut/bas) et tomber sur la
+    fiche produit unique.
+    """
+    if not tag:
+        return tag, None
+    m = re.match(r'^(.+?)-([HB])$', tag, re.IGNORECASE)
+    if not m:
+        return tag, None
+    return m.group(1), m.group(2).upper()
+
+
+@app.route('/inventaire/lookup')
+@login_required
+@require_permission('view_equipment')
+def inventaire_lookup():
+    """Renvoie le code saisi vers la fiche correspondante (sinon recherche libre)."""
+    raw = request.args.get('q', '').strip()
+    if not raw:
+        return redirect(url_for('inventaire'))
+    tag = _normalize_tag(raw)
+    if tag:
+        # 1) recherche stricte
+        p = Product.query.filter(Product.tag == tag).first()
+        if p:
+            return redirect(url_for('edit_product', prod_id=p.id))
+        c = CompositeProduct.query.filter(CompositeProduct.tag == tag).first()
+        if c:
+            return redirect(url_for('edit_composite', comp_id=c.id))
+        # 2) suffixe « -H » / « -B » des étiquettes de branches → fiche produit unique
+        base_tag, position = _strip_branch_suffix(tag)
+        if position:
+            p = Product.query.filter(Product.tag == base_tag).first()
+            if p:
+                flash(f"Branche « {position} » ouverte ({base_tag}).", 'info')
+                return redirect(url_for('edit_product', prod_id=p.id))
+        flash(f"Aucun matériel trouvé avec le code « {tag} ». Recherche libre relancée.", 'info')
+    return redirect(url_for('search', q=raw))
+
+
+@app.route('/inventaire/regenerer_tags', methods=['POST'])
+@login_required
+@require_permission('edit')
+def inventaire_regenerer_tags():
+    """Attribue un code à chaque produit / arc qui n'en a pas encore."""
+    target = request.form.get('target', 'all')
+    created = {'products': 0, 'composites': 0}
+    if target in ('all', 'products'):
+        for p in Product.query.filter(or_(Product.tag.is_(None), Product.tag == '')).order_by(Product.id.asc()).all():
+            p.tag = _generate_product_tag(category=p.category)
+            db.session.add(p)
+            db.session.flush()  # tag visible aux générations suivantes
+            created['products'] += 1
+    if target in ('all', 'composites'):
+        for c in CompositeProduct.query.filter(or_(CompositeProduct.tag.is_(None), CompositeProduct.tag == '')).order_by(CompositeProduct.id.asc()).all():
+            c.tag = _generate_composite_tag()
+            db.session.add(c)
+            db.session.flush()
+            created['composites'] += 1
+    db.session.commit()
+    msg_parts = []
+    if created['products']:
+        msg_parts.append(f"{created['products']} produit(s)")
+    if created['composites']:
+        msg_parts.append(f"{created['composites']} arc(s)")
+    if msg_parts:
+        flash(f"Codes générés pour {' et '.join(msg_parts)}.", 'success')
+    else:
+        flash("Tous les codes sont déjà présents — rien à générer.", 'info')
+    return redirect(url_for('inventaire'))
+
+
+@app.route('/inventaire/recoder_par_categorie', methods=['POST'])
+@login_required
+@require_permission('edit')
+def inventaire_recoder_par_categorie():
+    """Réattribue tous les codes produits selon leur catégorie (P, V, B, …).
+
+    Les arcs (A-…) ne sont pas modifiés. À utiliser après changement du schéma
+    de préfixes : réimprimez les étiquettes concernées.
+    """
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for p in Product.query.order_by(Product.id.asc()).all():
+        pref = _tag_prefix_for_category(p.category)
+        groups[pref].append(p)
+    for pref, products in groups.items():
+        width = max(3, len(str(len(products))))
+        for idx, p in enumerate(products, start=1):
+            p.tag = _format_tag(pref, idx, width)
+            db.session.add(p)
+    db.session.commit()
+    flash(
+        f"Codes produits recodés ({sum(len(v) for v in groups.values())} pièce(s), "
+        f"{len(groups)} préfixe(s)). Les arcs (A-…) sont inchangés.",
+        'success',
+    )
+    return redirect(url_for('inventaire'))
+
+
+# Tailles d'étiquettes (en mm) — proches des formats Avery courants.
+LABEL_LAYOUTS = {
+    'a7':     {'label': 'Grandes (A7 ~ 105×74 mm)',  'cols': 2, 'rows': 4,  'width': 99,   'height': 67,  'qr_mm': 32},
+    'avery21':{'label': 'Standard (Avery L7160 — 21 par page)', 'cols': 3, 'rows': 7,  'width': 63.5, 'height': 38.1, 'qr_mm': 20},
+    'avery24':{'label': 'Standard (Avery 3475 — 24 par page)',  'cols': 3, 'rows': 8,  'width': 64,   'height': 33.9, 'qr_mm': 17},
+    'avery65':{'label': 'Petites (Avery L7651 — 65 par page)',  'cols': 5, 'rows': 13, 'width': 38.1, 'height': 21.2, 'qr_mm': 11},
+}
+DEFAULT_LABEL_LAYOUT = 'avery21'
+
+
+def _collect_label_items(kind, ids_csv, category_id, status, regenerate_missing=True):
+    """Construit la liste { kind, tag, title, subtitle, qr_data_url } pour l'impression."""
+    items = []
+
+    def _push_product(p):
+        if regenerate_missing and not p.tag:
+            _ensure_tag_for_product(p)
+        if not p.tag:
+            return
+        base_title = f"{p.brand or ''} {p.model or ''}".strip() or (p.category.name if p.category else 'Produit')
+        base_subtitle = _label_description_for_product(p)
+        # Branches : on émet 2 étiquettes (HAUT / BAS), chacune avec son propre QR.
+        if _is_branches_category(p.category):
+            for pos in BRANCH_LABEL_POSITIONS:
+                items.append({
+                    'kind': 'product',
+                    'tag': p.tag,
+                    'position': pos['label'],          # affiché en gros sur l'étiquette
+                    'qr_payload': f"{p.tag}-{pos['suffix']}",  # encodé dans le QR
+                    'title': base_title,
+                    'subtitle': base_subtitle,
+                    'qr_data_url': _qr_img_data_url(f"{p.tag}-{pos['suffix']}"),
+                })
+            return
+        items.append({
+            'kind': 'product',
+            'tag': p.tag,
+            'position': None,
+            'qr_payload': p.tag,
+            'title': base_title,
+            'subtitle': base_subtitle,
+            'qr_data_url': _qr_img_data_url(p.tag),
+        })
+
+    def _push_composite(c):
+        if regenerate_missing and not c.tag:
+            _ensure_tag_for_composite(c)
+        if not c.tag:
+            return
+        items.append({
+            'kind': 'composite',
+            'tag': c.tag,
+            'position': None,
+            'qr_payload': c.tag,
+            'title': c.name,
+            'subtitle': _label_description_for_composite(c),
+            'qr_data_url': _qr_img_data_url(c.tag),
+        })
+
+    ids = [int(x) for x in (ids_csv or '').split(',') if x.strip().isdigit()]
+
+    if kind == 'products':
+        q = Product.query
+        if ids:
+            q = q.filter(Product.id.in_(ids))
+        else:
+            if category_id:
+                q = q.filter(Product.category_id == int(category_id))
+            if status == 'broken':
+                q = q.filter(Product.state == 'broken')
+            elif status == 'stock':
+                q = q.filter(Product.state == 'stock')
+        q = q.join(Category).order_by(Category.position.asc(), Category.name.asc(), Product.brand.asc())
+        for p in q.all():
+            _push_product(p)
+    elif kind == 'composites':
+        q = CompositeProduct.query
+        if ids:
+            q = q.filter(CompositeProduct.id.in_(ids))
+        else:
+            if status == 'club':
+                q = q.filter(CompositeProduct.status == 'club')
+            elif status == 'loan':
+                q = q.filter(CompositeProduct.status == 'loan')
+        comps = sorted(q.all(), key=lambda x: natural_sort_key(x.name))
+        for c in comps:
+            _push_composite(c)
+    elif kind == 'mixed':
+        # Tout le matériel inventoriable, sans doublon.
+        for p in Product.query.join(Category).order_by(Category.position.asc(), Category.name.asc(), Product.brand.asc()).all():
+            _push_product(p)
+        for c in sorted(CompositeProduct.query.all(), key=lambda x: natural_sort_key(x.name)):
+            _push_composite(c)
+    return items
+
+
+@app.route('/inventaire/etiquettes')
+@login_required
+@require_permission('view_equipment')
+def inventaire_etiquettes():
+    """Page d'aperçu / impression des étiquettes (HTML + CSS print)."""
+    kind = (request.args.get('kind') or 'mixed').lower()
+    if kind not in ('products', 'composites', 'mixed'):
+        kind = 'mixed'
+    layout_key = (request.args.get('layout') or DEFAULT_LABEL_LAYOUT).lower()
+    if layout_key not in LABEL_LAYOUTS:
+        layout_key = DEFAULT_LABEL_LAYOUT
+    layout = LABEL_LAYOUTS[layout_key]
+    copies = max(1, min(int(request.args.get('copies') or 1), 20))
+    skip = max(0, min(int(request.args.get('skip') or 0), layout['cols'] * layout['rows'] - 1))
+    show_qr = (request.args.get('qr', '1') != '0')
+
+    ids_csv = request.args.get('ids') or ''
+    category_id = request.args.get('category_id') or None
+    status = (request.args.get('status') or '').lower()
+
+    raw_items = _collect_label_items(kind, ids_csv, category_id, status)
+    expanded = []
+    for it in raw_items:
+        for _ in range(copies):
+            expanded.append(it)
+
+    # Cases vides en début de page (utile sur planche déjà entamée).
+    padded = ([None] * skip) + expanded
+
+    base_url = (request.host_url or '').rstrip('/')
+    qr_mm = _qr_size_mm_for_layout(layout)
+    return render_template(
+        'print_labels.html',
+        items=padded,
+        layout=layout,
+        layout_key=layout_key,
+        layouts=LABEL_LAYOUTS,
+        kind=kind,
+        show_qr=show_qr,
+        copies=copies,
+        skip=skip,
+        ids_csv=ids_csv,
+        category_id=category_id,
+        status=status,
+        base_url=base_url,
+        qr_mm=qr_mm,
+        item_count=len([x for x in padded if x is not None]),
+    )
 
 @app.route('/assign', methods=['GET', 'POST'])
 @login_required

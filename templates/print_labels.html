@@ -1,0 +1,258 @@
+{% extends "layout.html" %}
+
+{% block title %}Étiquettes — {{ item_count }} matériel(s){% endblock %}
+
+{% block content %}
+<style>
+    .labels-toolbar {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-bottom: 20px;
+    }
+    .labels-toolbar form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px 16px;
+        align-items: end;
+    }
+    .labels-toolbar label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.9rem;
+        color: var(--muted, #6b7280);
+    }
+    .labels-toolbar select,
+    .labels-toolbar input[type="number"] {
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--background);
+        color: var(--text, inherit);
+        font-size: 0.95rem;
+    }
+    .labels-toolbar .toolbar-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .label-empty {
+        text-align: center;
+        padding: 36px 20px;
+        color: var(--muted, #6b7280);
+        background: var(--card);
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+    }
+
+    :root {
+        --label-width: {{ layout.width }}mm;
+        --label-height: {{ layout.height }}mm;
+        --label-cols: {{ layout.cols }};
+        --qr-size: {{ qr_mm }}mm;
+    }
+    .labels-sheet {
+        background: #fff;
+        color: #111;
+        padding: 8mm 6mm;
+        margin: 0 auto 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        max-width: calc(var(--label-width) * var(--label-cols) + 16mm);
+    }
+    .labels-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--label-cols), var(--label-width));
+        gap: 2mm;
+        justify-content: center;
+    }
+    .label {
+        width: var(--label-width);
+        height: var(--label-height);
+        padding: 2mm 2.5mm;
+        border: 1px dashed #d1d5db;
+        border-radius: 1mm;
+        display: grid;
+        grid-template-columns: var(--qr-size) 1fr;
+        column-gap: 2mm;
+        align-items: center;
+        background: #fff;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    .label.label--empty { border-color: transparent; }
+    .label--no-qr { grid-template-columns: 1fr; }
+    .label__qr {
+        width: var(--qr-size);
+        height: var(--qr-size);
+        min-width: var(--qr-size);
+        min-height: var(--qr-size);
+        overflow: hidden;
+        background: #fff;
+    }
+    .label__qr img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+    }
+    .label__main {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.8mm;
+        min-width: 0;
+        overflow: hidden;
+    }
+    .label__tag-row {
+        display: flex;
+        align-items: center;
+        gap: 1.5mm;
+        flex-wrap: nowrap;
+    }
+    .label__tag {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-weight: 700;
+        font-size: 5mm;
+        line-height: 1;
+        letter-spacing: 0.03em;
+        color: #111;
+    }
+    .label__position {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-weight: 700;
+        font-size: 3.5mm;
+        color: #111;
+        border: 0.4mm solid #111;
+        padding: 0.2mm 1mm;
+        line-height: 1.2;
+    }
+    .label__title {
+        font-size: 3mm;
+        font-weight: 500;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #333;
+    }
+
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; padding: 0 !important; }
+        .main-layout, .sidebar, .top-bar, main { background: #fff !important; }
+        main.content { padding: 0 !important; margin: 0 !important; }
+        .labels-sheet {
+            box-shadow: none;
+            padding: 0;
+            margin: 0;
+            max-width: none;
+        }
+        .labels-grid { gap: 1mm; }
+        .label { border: 1px dotted #e5e7eb; }
+        @page { size: A4; margin: 8mm 6mm; }
+    }
+
+    @media (max-width: 700px) {
+        .labels-sheet { padding: 4mm 2mm; }
+    }
+</style>
+
+<div class="header-with-actions no-print">
+    <div>
+        <h1>Étiquettes</h1>
+        <p class="muted">
+            {{ item_count }} étiquette(s) — {{ layout.label }}.
+            Impression : Ctrl/Cmd + P, papier A4.
+        </p>
+    </div>
+    <div class="action-group">
+        <a class="btn btn-outline" href="{{ url_for('inventaire') }}">Retour</a>
+        <button class="btn btn-primary" type="button" onclick="window.print()">Imprimer</button>
+    </div>
+</div>
+
+<div class="labels-toolbar no-print">
+    <form method="get" action="{{ url_for('inventaire_etiquettes') }}">
+        <label>
+            Contenu
+            <select name="kind">
+                <option value="mixed"      {% if kind == 'mixed' %}selected{% endif %}>Tout</option>
+                <option value="products"   {% if kind == 'products' %}selected{% endif %}>Produits</option>
+                <option value="composites" {% if kind == 'composites' %}selected{% endif %}>Arcs</option>
+            </select>
+        </label>
+        <label>
+            Format
+            <select name="layout">
+                {% for key, lyt in layouts.items() %}
+                <option value="{{ key }}" {% if key == layout_key %}selected{% endif %}>{{ lyt.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Copies
+            <input type="number" name="copies" min="1" max="20" value="{{ copies }}">
+        </label>
+        <label>
+            Cases vides
+            <input type="number" name="skip" min="0" max="{{ layout.cols * layout.rows - 1 }}" value="{{ skip }}">
+        </label>
+        <label>
+            QR code
+            <select name="qr">
+                <option value="1" {% if show_qr %}selected{% endif %}>Oui</option>
+                <option value="0" {% if not show_qr %}selected{% endif %}>Non</option>
+            </select>
+        </label>
+        {% if category_id %}<input type="hidden" name="category_id" value="{{ category_id }}">{% endif %}
+        {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        {% if ids_csv %}<input type="hidden" name="ids" value="{{ ids_csv }}">{% endif %}
+        <div class="toolbar-actions">
+            <button class="btn btn-primary" type="submit">Actualiser</button>
+        </div>
+    </form>
+</div>
+
+{% if item_count == 0 %}
+<div class="label-empty no-print">
+    Aucun matériel à étiqueter pour cette sélection.
+</div>
+{% else %}
+<div class="labels-sheet">
+    <div class="labels-grid">
+        {% for it in items %}
+            {% if it is none %}
+                <div class="label label--empty"></div>
+            {% else %}
+                <div class="label{% if not show_qr %} label--no-qr{% endif %}">
+                    {% if show_qr and it.qr_data_url %}
+                    <div class="label__qr">
+                        <img src="{{ it.qr_data_url }}" alt="">
+                    </div>
+                    {% endif %}
+                    <div class="label__main">
+                        <div class="label__tag-row">
+                            <span class="label__tag">{{ it.tag }}</span>
+                            {% if it.position %}<span class="label__position">{{ it.position }}</span>{% endif %}
+                        </div>
+                        {% if it.title %}<div class="label__title">{{ it.title }}</div>{% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<p class="no-print muted small" style="margin:18px 0">
+    Désactivez les en-têtes et pieds de page du navigateur avant d'imprimer. Échelle 100 %, format A4.
+</p>
+{% endblock %}

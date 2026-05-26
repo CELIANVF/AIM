@@ -14,6 +14,7 @@
         <a class="btn btn-primary" href="/add_composite">➕ Nouvel arc</a>
         <a class="btn btn-outline" href="{{ url_for('import_composites') }}">📥 Importer CSV</a>
         {% endif %}
+        <a class="btn btn-outline" href="{{ url_for('inventaire_etiquettes', kind='composites') }}">Étiquettes</a>
         <a class="btn btn-outline" href="/export_composites">📄 Exporter PDF</a>
         <a class="btn btn-outline" href="/export_composites_csv">📊 Exporter CSV</a>
     </div>
@@ -32,6 +33,7 @@
         <thead>
             <tr>
                 <th class="th-id" data-sort="number">ID</th>
+                <th style="white-space:nowrap">Code</th>
                 <th>Nom</th>
                 <th>Type</th>
                 <th>Statut</th>
@@ -45,6 +47,13 @@
             {% set asg_open = (c.assignments|rejectattr('date_returned')|list)|first %}
             <tr>
                 <td class="small muted td-tabular">{{ er.ref_composite(c.id, c.id) }}</td>
+                <td class="td-tabular">
+                    {% if c.tag %}
+                        <code style="font-weight:600;letter-spacing:0.02em">{{ c.tag }}</code>
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </td>
                 <td><strong>{{ er.ref_composite(c.id, c.name) }}</strong></td>
                 <td>{{ c.type }}</td>
                 <td>

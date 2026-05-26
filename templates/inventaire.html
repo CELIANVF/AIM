@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+
+{% block title %}Inventaire{% endblock %}
+
+{% block content %}
+<style>
+    .inv-scan-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .inv-scan-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .inv-scan-form input[name="q"] {
+        flex: 1 1 280px;
+        font-size: 1.5rem;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        letter-spacing: 0.05em;
+        padding: 14px 16px;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        background: var(--background);
+        text-transform: uppercase;
+    }
+    .inv-scan-form input[name="q"]:focus {
+        outline: none;
+        border-color: var(--primary, #3b82f6);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    .inv-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+    }
+    .inv-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .inv-card:hover {
+        border-color: var(--primary, #3b82f6);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .inv-card__title {
+        font-weight: 600;
+        font-size: 1.05rem;
+        margin: 0;
+    }
+    .inv-card__desc {
+        color: var(--muted, #6b7280);
+        margin: 0;
+        font-size: 0.92rem;
+    }
+    .inv-stat-row {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        color: var(--muted, #6b7280);
+        font-size: 0.92rem;
+    }
+    .inv-stat-row strong { color: var(--text, inherit); }
+    .inv-warning {
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        color: #9a3412;
+        padding: 14px 16px;
+        border-radius: 10px;
+        margin: 12px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    [data-theme="dark"] .inv-warning {
+        background: rgba(154, 52, 18, 0.18);
+        color: #fed7aa;
+        border-color: rgba(253, 186, 116, 0.4);
+    }
+    .inv-section-title {
+        margin: 28px 0 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+</style>
+
+<div class="header-with-actions">
+    <div>
+        <h1>Inventaire</h1>
+        <p class="muted">Codes, étiquettes et recherche par scan.</p>
+    </div>
+</div>
+
+<div class="inv-scan-card">
+    <h2 style="margin:0 0 4px;font-size:1.1rem">Rechercher par code</h2>
+    <p class="muted" style="margin:0">Ex. <code>V-003</code> (viseur), <code>P-007</code> (poignée), <code>B-031-H</code> (branche haut), <code>A-012</code> (arc).</p>
+    <form class="inv-scan-form" action="{{ url_for('inventaire_lookup') }}" method="get" autocomplete="off">
+        <input type="text" name="q" placeholder="Code…" autofocus required>
+        <button type="submit" class="btn btn-primary">Ouvrir</button>
+    </form>
+    <div class="inv-stat-row">
+        <span><strong>{{ products_total }}</strong> produit(s)</span>
+        <span><strong>{{ composites_total }}</strong> arc(s)</span>
+        {% if products_without_tag or composites_without_tag %}
+        <span><strong>{{ products_without_tag + composites_without_tag }}</strong> sans code</span>
+        {% endif %}
+    </div>
+</div>
+
+{% if (products_without_tag or composites_without_tag) and current_user.can_edit() %}
+<div class="inv-warning">
+    <div>
+        {{ products_without_tag }} produit(s) et {{ composites_without_tag }} arc(s) sans code.
+    </div>
+    <form method="post" action="{{ url_for('inventaire_regenerer_tags') }}" style="margin:0">
+        <input type="hidden" name="target" value="all">
+        <button type="submit" class="btn btn-primary">Générer les codes</button>
+    </form>
+</div>
+{% endif %}
+
+{% if current_user.can_edit() %}
+<div class="card" style="margin-bottom:20px;padding:14px 16px">
+    <p class="muted small" style="margin:0 0 10px">Préfixe automatique par catégorie :</p>
+    <p class="small" style="margin:0;line-height:1.6">
+        {% for item in tag_prefix_legend %}
+        <strong>{{ item.prefix }}</strong> {{ item.name }}{% if not loop.last %} · {% endif %}
+        {% endfor %}
+        · <strong>A</strong> arcs
+    </p>
+    <form method="post" action="{{ url_for('inventaire_recoder_par_categorie') }}" style="margin:12px 0 0"
+          onsubmit="return confirm('Recoder tous les produits selon leur catégorie ? Les anciens codes P-… seront remplacés. Réimprimez les étiquettes.');">
+        <button type="submit" class="btn btn-outline btn-sm">Recoder tous les produits (P→V, B, …)</button>
+    </form>
+</div>
+{% endif %}
+
+<div class="inv-section-title">Imprimer</div>
+<div class="inv-cards-grid">
+    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='composites') }}">
+        <h3 class="inv-card__title">Arcs</h3>
+        <p class="inv-card__desc">{{ composites_total }} arc(s)</p>
+    </a>
+    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='products') }}">
+        <h3 class="inv-card__title">Produits</h3>
+        <p class="inv-card__desc">{{ products_total }} produit(s)</p>
+    </a>
+    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='mixed') }}">
+        <h3 class="inv-card__title">Tout</h3>
+        <p class="inv-card__desc">{{ products_total + composites_total }} étiquette(s)</p>
+    </a>
+</div>
+
+<div class="inv-section-title">Par catégorie</div>
+<div class="inv-cards-grid">
+    {% for cat in categories %}
+    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='products', category_id=cat.id) }}">
+        <h3 class="inv-card__title">{{ cat.name }}</h3>
+        <p class="inv-card__desc">{{ cat.products|length }} produit(s)</p>
+    </a>
+    {% else %}
+    <p class="muted">Aucune catégorie.</p>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -111,6 +111,8 @@ class Product(db.Model):
     power = db.Column(db.String(20))
     model = db.Column(db.String(50))
     custom_values = db.Column(db.JSON)
+    # Code d'identification physique (ex. "P-001") — imprimé sur l'étiquette du matériel
+    tag = db.Column(db.String(32), unique=True, index=True, nullable=True)
     category = db.relationship('Category', backref='products')
 
 composite_components = db.Table('composite_components',
@@ -123,6 +125,8 @@ class CompositeProduct(db.Model):
     name = db.Column(db.String(100), nullable=False)
     type = db.Column(db.String(10))  # BB, CL
     status = db.Column(db.String(20), default='club')  # club, loan
+    # Code d'identification physique (ex. "A-001") — imprimé sur l'étiquette de l'arc
+    tag = db.Column(db.String(32), unique=True, index=True, nullable=True)
     components = db.relationship('Product', secondary=composite_components, backref='composites')
 
 class Archer(UserMixin, db.Model):

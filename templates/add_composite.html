@@ -18,6 +18,10 @@
 </style>
 <form method="post">
     <label>Nom/Référence: <input type="text" name="name" required></label><br>
+    <label>Code (étiquette):
+        <input type="text" name="tag" value="{{ suggested_tag or '' }}" placeholder="Ex. A-007 (laissez vide pour auto-générer)"
+            style="text-transform:uppercase;font-family:ui-monospace,monospace;letter-spacing:0.02em">
+    </label><br>
     <label>Type:
         <select name="type">
             <option value="BB">BB (Bare Bow)</option>

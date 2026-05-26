@@ -97,6 +97,7 @@
         {% if current_user.can_edit() %}
         <a class="btn btn-primary" href="/add_product">➕ Ajouter un produit</a>
         {% endif %}
+        <a class="btn btn-outline" href="{{ url_for('inventaire_etiquettes', kind='products') }}">Étiquettes</a>
         <a class="btn btn-outline" href="/export_products">📄 Exporter PDF</a>
         <a class="btn btn-outline" href="/export_products_csv">📊 Exporter CSV</a>
     </div>
@@ -149,10 +150,11 @@
         </div>
         <div class="accordion-content">
             <div class="table-responsive">
-            <table class="table table-sortable" style="margin:0;min-width:880px">
+            <table class="table table-sortable" style="margin:0;min-width:940px">
                 <thead>
                     <tr>
                         <th style="width:1%;white-space:nowrap" data-sort="number">ID</th>
+                        <th style="white-space:nowrap">Code</th>
                         <th>Statut</th>
                         <th>Marque</th>
                         <th>Modèle</th>
@@ -187,6 +189,13 @@
                     {% endfor %}
                 {% endif %}>
                 <td class="small muted td-tabular">{{ er.ref_product(p.id, p.id) }}</td>
+                <td class="td-tabular">
+                    {% if p.tag %}
+                        <code style="font-weight:600;letter-spacing:0.02em">{{ p.tag }}</code>
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if assigned_comps %}
                         {% set _ac = assigned_comps[0] %}
