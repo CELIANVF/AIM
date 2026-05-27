@@ -259,9 +259,16 @@
 }
 
 @media print {
-    /* Même gabarit qu'à l'aperçu : pas de gap/polices/traits différents en impression. */
+    /* Une planche = exactement une feuille A4. */
+    :root { --label-gap: 1mm; }
+    html, body { margin: 0 !important; padding: 0 !important; }
     .labels-page {
+        box-sizing: border-box;
+        width: 210mm;
+        height: 297mm;
         margin: 0;
+        padding: 0;
+        overflow: hidden;
         page-break-after: avoid;
         break-after: avoid-page;
     }
@@ -272,9 +279,21 @@
     .labels-sheet {
         box-shadow: none;
         border-radius: 0;
+        max-width: none;
+        margin: 0;
+        height: 100%;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4mm;
     }
     .labels-grid {
-        page-break-inside: auto;
-        break-inside: auto;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .label-cell {
+        page-break-inside: avoid;
+        break-inside: avoid;
     }
 }
