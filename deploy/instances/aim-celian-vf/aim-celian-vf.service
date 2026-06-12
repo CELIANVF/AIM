@@ -1,0 +1,16 @@
+[Unit]
+Description=AIM celian-vf.fr (Gunicorn)
+After=network.target
+
+[Service]
+User=celian
+Group=celian
+WorkingDirectory=/home/celian/AIM-celian-vf
+Environment=FLASK_DEBUG=0
+EnvironmentFile=-/home/celian/AIM-celian-vf/.env
+ExecStart=/home/celian/AIM-celian-vf/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5002 --timeout 120 app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

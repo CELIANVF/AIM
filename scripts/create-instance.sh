@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+# Crée rapidement une nouvelle instance AIM sur le serveur.
+#
+# Usage (sur le VPS) :
+#   bash scripts/create-instance.sh --name mon-club --domain matos.monclub.fr
+#   sudo bash scripts/create-instance.sh --name mon-club --domain matos.monclub.fr --sudo
+#
+# Options :
+#   --name, -n       Identifiant (service systemd, dossier deploy/instances/)
+#   --domain, -d     Nom de domaine (nginx + certbot)
+#   --port, -p       Port Gunicorn (défaut : premier libre entre 5001–5099)
+#   --dir            Répertoire de l'instance (défaut : /home/$USER/AIM-<name>)
+#   --source-env     .env dont copier uniquement les variables MAIL_* (défaut : /home/$USER/AIM/.env)
+#   --git-url        Dépôt à cloner (défaut : origin du dépôt courant)
+#   --cert-email     E-mail Let's Encrypt (défaut : celian@celian-vf.fr)
+#   --admin-password Mot de passe admin (défaut : généré aléatoirement)
+#   --sudo           Phase systemd + nginx + certbot (nécessite root)
+#   --help, -h       Aide
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEMPLATES_DIR="$ROOT/deploy/templates"
+
+INSTANCE_NAME=""
+DOMAIN=""
+GUNICORN_PORT=""
+INSTANCE_DIR=""
+SOURCE_ENV=""
+GIT_URL=""
+CERT_EMAIL="${AIM_CERT_EMAIL:-celian@celian-vf.fr}"
+ADMIN_PASSWORD=""
+DO_SUDO=false
+RUN_USER="${SUDO_USER:-${USER:-celian}}"
+
+usage() {
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
+}
+
+slug_ok() {
+  [[ "$1" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$ ]]
+}
+
+domain_ok() {
+  [[ "$1" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+}
+
+render_template() {
+  local template="$1" dest="$2"
+  sed \
+    -e "s|{{INSTANCE_NAME}}|${INSTANCE_NAME}|g" \
+    -e "s|{{INSTANCE_DIR}}|${INSTANCE_DIR}|g" \
+    -e "s|{{GUNICORN_PORT}}|${GUNICORN_PORT}|g" \
+    -e "s|{{DOMAIN}}|${DOMAIN}|g" \
+    -e "s|{{USER}}|${RUN_USER}|g" \
+    -e "s|{{GROUP}}|${RUN_USER}|g" \
+    "$template" > "$dest"
+}
+
+pick_free_port() {
+  local p
+  for p in $(seq 5001 5099); do
+    if ! ss -tln 2>/dev/null | grep -q "127.0.0.1:${p} "; then
+      echo "$p"
+      return 0
+    fi
+  done
+  echo "Erreur : aucun port libre entre 5001 et 5099." >&2
+  exit 1
+}
+
+default_git_url() {
+  if git -C "$ROOT" rev-parse --is-inside-work-tree &>/dev/null; then
+    git -C "$ROOT" remote get-url origin 2>/dev/null || true
+  fi
+}
+
+instance_database_url() {
+  local db_file="${INSTANCE_DIR}/instance/equipment.db"
+  echo "sqlite:///${db_file}"
+}
+
+init_instance_env() {
+  local env_file="${INSTANCE_DIR}/.env"
+  local db_url
+  db_url="$(instance_database_url)"
+  local secret_key
+  secret_key="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+
+  if [[ -f "$env_file" ]]; then
+    echo ".env déjà présent — non modifié."
+    if ! grep -q '^DATABASE_URL=' "$env_file"; then
+      tail -c1 "$env_file" | read -r _ || echo >> "$env_file"
+      echo "DATABASE_URL=${db_url}" >> "$env_file"
+      echo "DATABASE_URL ajouté (base locale de cette instance)."
+    fi
+    return
+  fi
+
+  mkdir -p "${INSTANCE_DIR}/instance"
+
+  {
+    echo "# Instance AIM : ${INSTANCE_NAME} (${DOMAIN})"
+    echo "# Généré par scripts/create-instance.sh — ne pas réutiliser sur une autre instance."
+    echo ""
+    if [[ -f "$SOURCE_ENV" ]]; then
+      echo "# SMTP (copié depuis ${SOURCE_ENV})"
+      grep -E '^MAIL_' "$SOURCE_ENV" 2>/dev/null || true
+      echo ""
+    else
+      echo "# SMTP — renseigner (voir .env.example)"
+      grep -E '^MAIL_' "${INSTANCE_DIR}/.env.example" 2>/dev/null || true
+      echo ""
+    fi
+    echo "# Base de données propre à cette instance"
+    echo "DATABASE_URL=${db_url}"
+    echo ""
+    echo "# Clé secrète propre à cette instance"
+    echo "SECRET_KEY=${secret_key}"
+  } > "$env_file"
+
+  echo ".env créé : DATABASE_URL → ${INSTANCE_DIR}/instance/equipment.db"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --name|-n) INSTANCE_NAME="$2"; shift 2 ;;
+    --domain|-d) DOMAIN="$2"; shift 2 ;;
+    --port|-p) GUNICORN_PORT="$2"; shift 2 ;;
+    --dir) INSTANCE_DIR="$2"; shift 2 ;;
+    --source-env) SOURCE_ENV="$2"; shift 2 ;;
+    --git-url) GIT_URL="$2"; shift 2 ;;
+    --cert-email) CERT_EMAIL="$2"; shift 2 ;;
+    --admin-password) ADMIN_PASSWORD="$2"; shift 2 ;;
+    --sudo) DO_SUDO=true; shift ;;
+    --help|-h) usage 0 ;;
+    *) echo "Option inconnue : $1" >&2; usage 1 ;;
+  esac
+done
+
+[[ -n "$INSTANCE_NAME" ]] || { echo "Erreur : --name requis." >&2; usage 1; }
+[[ -n "$DOMAIN" ]] || { echo "Erreur : --domain requis." >&2; usage 1; }
+slug_ok "$INSTANCE_NAME" || { echo "Erreur : --name invalide (a-z, 0-9, tirets)." >&2; exit 1; }
+domain_ok "$DOMAIN" || { echo "Erreur : --domain invalide." >&2; exit 1; }
+
+INSTANCE_DIR="${INSTANCE_DIR:-/home/${RUN_USER}/AIM-${INSTANCE_NAME}}"
+GUNICORN_PORT="${GUNICORN_PORT:-$(pick_free_port)}"
+GIT_URL="${GIT_URL:-$(default_git_url)}"
+GIT_URL="${GIT_URL:-https://github.com/CELIANVF/AIM}"
+SOURCE_ENV="${SOURCE_ENV:-/home/${RUN_USER}/AIM/.env}"
+
+DEPLOY_INSTANCE_DIR="${INSTANCE_DIR}/deploy/instances/${INSTANCE_NAME}"
+SERVICE_FILE="${DEPLOY_INSTANCE_DIR}/${INSTANCE_NAME}.service"
+NGINX_FILE="${DEPLOY_INSTANCE_DIR}/${DOMAIN}.nginx.conf"
+
+generate_deploy_files() {
+  mkdir -p "$DEPLOY_INSTANCE_DIR"
+  render_template "$TEMPLATES_DIR/instance.service.template" "$SERVICE_FILE"
+  render_template "$TEMPLATES_DIR/instance.nginx.template" "$NGINX_FILE"
+}
+
+phase_sudo() {
+  if [[ "$(id -u)" -ne 0 ]]; then
+    echo "Relancez avec sudo : sudo bash $0 --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT} --sudo"
+    exit 1
+  fi
+
+  if [[ ! -f "$SERVICE_FILE" || ! -f "$NGINX_FILE" ]]; then
+    generate_deploy_files
+  fi
+
+  cp "$SERVICE_FILE" "/etc/systemd/system/${INSTANCE_NAME}.service"
+  systemctl daemon-reload
+  systemctl enable "$INSTANCE_NAME"
+  systemctl restart "$INSTANCE_NAME"
+  echo "Service ${INSTANCE_NAME} démarré (127.0.0.1:${GUNICORN_PORT})."
+
+  cp "$NGINX_FILE" "/etc/nginx/sites-available/${DOMAIN}"
+  ln -sf "/etc/nginx/sites-available/${DOMAIN}" /etc/nginx/sites-enabled/
+  nginx -t
+  systemctl reload nginx
+  echo "Nginx configuré pour ${DOMAIN}."
+
+  if [[ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]]; then
+    certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$CERT_EMAIL" || {
+      echo "Certbot a échoué — lancez : certbot --nginx -d ${DOMAIN}"
+    }
+  else
+    echo "Certificat SSL déjà présent pour ${DOMAIN}."
+  fi
+
+  echo ""
+  echo "Instance prête : https://${DOMAIN}"
+  exit 0
+}
+
+if $DO_SUDO; then
+  phase_sudo
+fi
+
+echo "=== Nouvelle instance AIM : ${DOMAIN} ==="
+echo "  Nom service : ${INSTANCE_NAME}"
+echo "  Répertoire  : ${INSTANCE_DIR}"
+echo "  Port        : ${GUNICORN_PORT}"
+echo ""
+
+if [[ ! -d "$INSTANCE_DIR" ]]; then
+  echo "Clonage de ${GIT_URL}..."
+  git clone "$GIT_URL" "$INSTANCE_DIR"
+fi
+
+# S'assurer que les templates et ce script existent dans la copie clonée.
+mkdir -p "$INSTANCE_DIR/deploy/templates" "$INSTANCE_DIR/scripts"
+cp "$TEMPLATES_DIR/instance.service.template" "$INSTANCE_DIR/deploy/templates/"
+cp "$TEMPLATES_DIR/instance.nginx.template" "$INSTANCE_DIR/deploy/templates/"
+cp "$ROOT/scripts/create-instance.sh" "$INSTANCE_DIR/scripts/"
+chmod +x "$INSTANCE_DIR/scripts/create-instance.sh"
+generate_deploy_files
+
+cd "$INSTANCE_DIR"
+
+if [[ ! -d venv ]]; then
+  python3 -m venv venv
+fi
+# shellcheck source=/dev/null
+source venv/bin/activate
+pip install -q -r requirements.txt
+
+init_instance_env
+
+export FLASK_APP=app.py
+if [[ -d migrations ]]; then
+  flask db upgrade
+fi
+
+if ! python3 -c "
+from app import app
+from models import db, User
+with app.app_context():
+    print('admin_exists' if User.query.filter_by(username='admin').first() else 'no_admin')
+" | grep -q admin_exists; then
+  ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')}"
+  python3 -c "
+from app import app
+from models import db, User
+with app.app_context():
+    u = User(username='admin', role='admin')
+    u.set_password('${ADMIN_PASSWORD}')
+    db.session.add(u)
+    db.session.commit()
+"
+  echo "Compte admin créé : admin / ${ADMIN_PASSWORD}"
+else
+  echo "Compte admin déjà présent."
+fi
+
+echo ""
+echo "Fichiers générés :"
+echo "  ${SERVICE_FILE}"
+echo "  ${NGINX_FILE}"
+echo ""
+echo "Étape suivante (sudo) :"
+echo "  sudo bash ${INSTANCE_DIR}/scripts/create-instance.sh \\"
+echo "    --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT} --sudo"

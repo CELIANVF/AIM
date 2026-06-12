@@ -1,0 +1,16 @@
+[Unit]
+Description=AIM {{DOMAIN}} (Gunicorn)
+After=network.target
+
+[Service]
+User={{USER}}
+Group={{GROUP}}
+WorkingDirectory={{INSTANCE_DIR}}
+Environment=FLASK_DEBUG=0
+EnvironmentFile=-{{INSTANCE_DIR}}/.env
+ExecStart={{INSTANCE_DIR}}/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:{{GUNICORN_PORT}} --timeout 120 app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

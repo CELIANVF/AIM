@@ -31,7 +31,8 @@ def _env_int(name, default):
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'change-this-to-a-random-secret-key'
-    SQLALCHEMY_DATABASE_URI = "sqlite:///" + _sqlite_path
+    # DATABASE_URL dans `.env` par instance (chemin SQLite ou Postgres dédié).
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or ("sqlite:///" + _sqlite_path)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Flask-Mail — définir dans `.env` (voir `.env.example`)
