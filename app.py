@@ -5603,6 +5603,27 @@ def reset_admin_password_command(username, password):
         click.echo(f'Mot de passe mis à jour pour « {username} ».')
 
 
+@app.cli.command('seed-demo')
+@click.option('--club-name', default='', help='Nom du club (personnalise les créneaux de cours).')
+def seed_demo_command(club_name):
+    """Charge des données de démonstration (matériel, archers, cours…)."""
+    from seed_demo import seed_demo_data
+
+    with app.app_context():
+        result = seed_demo_data(club_name or None)
+        if result.get('skipped'):
+            click.echo('Données démo déjà présentes — rien à faire.')
+            return
+        click.echo(
+            'Données démo chargées : '
+            f"{result['categories']} catégories, "
+            f"{result['products']} produits, "
+            f"{result['composites']} arcs, "
+            f"{result['archers']} archers, "
+            f"{result['courses']} cours."
+        )
+
+
 if __name__ == '__main__':
     import os
     # Default port handling: respect $PORT if set, otherwise

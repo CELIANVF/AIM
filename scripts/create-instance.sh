@@ -16,6 +16,8 @@
 #   --git-url        Dépôt à cloner (défaut : origin du dépôt courant)
 #   --cert-email     E-mail Let's Encrypt (défaut : celian@celian-vf.fr)
 #   --admin-password Mot de passe admin (défaut : généré aléatoirement)
+#   --demo-data      Charger des données de démonstration (matériel, archers, cours…)
+#   --club-name      Nom du club (pour --demo-data)
 #   --sudo           Phase systemd + nginx + certbot (nécessite root)
 #   --help, -h       Aide
 #
@@ -37,6 +39,8 @@ ADMIN_USERNAME="admin"
 ADMIN_PASSWORD=""
 ADMIN_CREATED=false
 DO_SUDO=false
+DO_DEMO_DATA=false
+CLUB_NAME=""
 RUN_USER="${SUDO_USER:-${USER:-celian}}"
 
 ADMIN_CREDENTIALS_FILE=""
@@ -161,12 +165,14 @@ ensure_admin_user() {
   source venv/bin/activate
   export FLASK_APP=app.py
 
-  if python3 -c "
+  if AIM_ADMIN_USERNAME="${ADMIN_USERNAME}" python3 - <<'PYEOF' | grep -q admin_exists
+import os
 from app import app
 from models import db, User
 with app.app_context():
-    print('admin_exists' if User.query.filter_by(username='${ADMIN_USERNAME}').first() else 'no_admin')
-" | grep -q admin_exists; then
+    print('admin_exists' if User.query.filter_by(username=os.environ['AIM_ADMIN_USERNAME']).first() else 'no_admin')
+PYEOF
+  then
     echo "Compte admin « ${ADMIN_USERNAME} » déjà présent."
     if load_admin_credentials; then
       ADMIN_CREATED=false
@@ -177,18 +183,40 @@ with app.app_context():
   fi
 
   ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')}"
-  python3 -c "
+  # Passer les valeurs sensibles via des variables d'environnement, jamais par expansion
+  # directe dans le code Python (vecteur d'injection de commandes shell).
+  AIM_ADMIN_USERNAME="${ADMIN_USERNAME}" AIM_ADMIN_PASSWORD="${ADMIN_PASSWORD}" python3 - <<'PYEOF'
+import os
 from app import app
 from models import db, User
 with app.app_context():
-    u = User(username='${ADMIN_USERNAME}', role='admin')
-    u.set_password('${ADMIN_PASSWORD}')
+    u = User(username=os.environ['AIM_ADMIN_USERNAME'], role='admin')
+    u.set_password(os.environ['AIM_ADMIN_PASSWORD'])
     db.session.add(u)
     db.session.commit()
-"
+PYEOF
   ADMIN_CREATED=true
   save_admin_credentials
   echo "Compte admin « ${ADMIN_USERNAME} » créé."
+}
+
+seed_demo_data_if_requested() {
+  if ! $DO_DEMO_DATA; then
+    return 0
+  fi
+  cd "$INSTANCE_DIR"
+  # shellcheck source=/dev/null
+  source venv/bin/activate
+  export FLASK_APP=app.py
+  echo "Chargement des données de démonstration…"
+  local seed_args=()
+  [[ -n "$CLUB_NAME" ]] && seed_args+=(--club-name "$CLUB_NAME")
+  if flask seed-demo "${seed_args[@]}"; then
+    echo "Données de démonstration chargées."
+  else
+    echo "Attention : échec du chargement des données de démonstration." >&2
+    return 1
+  fi
 }
 
 print_final_summary() {
@@ -232,6 +260,8 @@ while [[ $# -gt 0 ]]; do
     --git-url) GIT_URL="$2"; shift 2 ;;
     --cert-email) CERT_EMAIL="$2"; shift 2 ;;
     --admin-password) ADMIN_PASSWORD="$2"; shift 2 ;;
+    --demo-data) DO_DEMO_DATA=true; shift ;;
+    --club-name) CLUB_NAME="$2"; shift 2 ;;
     --sudo) DO_SUDO=true; shift ;;
     --help|-h) usage 0 ;;
     *) echo "Option inconnue : $1" >&2; usage 1 ;;
@@ -272,6 +302,8 @@ provision_as_app_user() {
   )
   [[ -n "$SOURCE_ENV" ]] && provision_args+=(--source-env "$SOURCE_ENV")
   [[ -n "$ADMIN_PASSWORD" ]] && provision_args+=(--admin-password "$ADMIN_PASSWORD")
+  $DO_DEMO_DATA && provision_args+=(--demo-data)
+  [[ -n "$CLUB_NAME" ]] && provision_args+=(--club-name "$CLUB_NAME")
   [[ -n "$GIT_URL" ]] && provision_args+=(--git-url "$GIT_URL")
 
   echo "Installation applicative (clone, venv, BDD) pour ${DOMAIN}..."
@@ -327,12 +359,13 @@ phase_sudo() {
   systemctl reload nginx
   echo "Nginx configuré pour ${DOMAIN}."
 
-  if [[ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]]; then
-    certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$CERT_EMAIL" || {
-      echo "Certbot a échoué — lancez : certbot --nginx -d ${DOMAIN}"
-    }
+  # Toujours lancer certbot : la config nginx vient d'être écrasée (HTTP seul) et doit
+  # recevoir le bloc SSL. Si le certificat existe déjà, certbot réinjecte quand même HTTPS.
+  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$CERT_EMAIL" --redirect; then
+    echo "HTTPS configuré pour ${DOMAIN}."
   else
-    echo "Certificat SSL déjà présent pour ${DOMAIN}."
+    echo "Certbot a échoué — l'instance n'est accessible qu'en HTTP pour l'instant." >&2
+    echo "Corrigez avec : certbot --nginx -d ${DOMAIN}" >&2
   fi
 
   print_final_summary "sudo"
@@ -379,5 +412,7 @@ if [[ -d migrations ]]; then
 fi
 
 ensure_admin_user
+
+seed_demo_data_if_requested || true
 
 print_final_summary "provision"
