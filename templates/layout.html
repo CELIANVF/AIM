@@ -26,6 +26,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     {# Apply persisted theme before paint to avoid a flash of incorrect theme. #}
     <script>
@@ -50,7 +51,7 @@
             {% endif %}
             <div class="logo">
                 <a href="{% if current_user.is_authenticated %}{{ url_for('index') }}{% else %}{{ url_for('login') }}{% endif %}" class="logo-link">
-                    <img class="logo-img" src="{{ url_for('static', filename='logo.png') }}" alt="Logo AIM">
+                    <img class="logo-img" src="{{ url_for('static', filename='logo.png') }}" alt="Logo CVF">
                     <span class="logo-wordmark">AIM</span>
                 </a>
             </div>
