@@ -18,6 +18,8 @@
 #   --admin-password Mot de passe admin (défaut : généré aléatoirement)
 #   --sudo           Phase systemd + nginx + certbot (nécessite root)
 #   --help, -h       Aide
+#
+# Suppression : scripts/delete-instance.sh
 
 set -euo pipefail
 
@@ -31,9 +33,13 @@ INSTANCE_DIR=""
 SOURCE_ENV=""
 GIT_URL=""
 CERT_EMAIL="${AIM_CERT_EMAIL:-celian@celian-vf.fr}"
+ADMIN_USERNAME="admin"
 ADMIN_PASSWORD=""
+ADMIN_CREATED=false
 DO_SUDO=false
 RUN_USER="${SUDO_USER:-${USER:-celian}}"
+
+ADMIN_CREDENTIALS_FILE=""
 
 usage() {
   sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
@@ -123,6 +129,97 @@ init_instance_env() {
   } > "$env_file"
 
   echo ".env créé : DATABASE_URL → ${INSTANCE_DIR}/instance/equipment.db"
+}
+
+save_admin_credentials() {
+  ADMIN_CREDENTIALS_FILE="${INSTANCE_DIR}/instance/.initial-admin-credentials"
+  mkdir -p "${INSTANCE_DIR}/instance"
+  cat > "$ADMIN_CREDENTIALS_FILE" <<EOF
+# Identifiants admin initiaux — généré par scripts/create-instance.sh
+# Conserver en lieu sûr ; supprimé avec l'instance (scripts/delete-instance.sh).
+ADMIN_USERNAME=${ADMIN_USERNAME}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+DOMAIN=${DOMAIN}
+CREATED_AT=$(date -Iseconds)
+EOF
+  chmod 600 "$ADMIN_CREDENTIALS_FILE"
+}
+
+load_admin_credentials() {
+  ADMIN_CREDENTIALS_FILE="${INSTANCE_DIR}/instance/.initial-admin-credentials"
+  if [[ ! -f "$ADMIN_CREDENTIALS_FILE" ]]; then
+    return 1
+  fi
+  # shellcheck source=/dev/null
+  source "$ADMIN_CREDENTIALS_FILE"
+  return 0
+}
+
+ensure_admin_user() {
+  cd "$INSTANCE_DIR"
+  # shellcheck source=/dev/null
+  source venv/bin/activate
+  export FLASK_APP=app.py
+
+  if python3 -c "
+from app import app
+from models import db, User
+with app.app_context():
+    print('admin_exists' if User.query.filter_by(username='${ADMIN_USERNAME}').first() else 'no_admin')
+" | grep -q admin_exists; then
+    echo "Compte admin « ${ADMIN_USERNAME} » déjà présent."
+    if load_admin_credentials; then
+      ADMIN_CREATED=false
+      return 0
+    fi
+    echo "Mot de passe inconnu — utilisez : flask reset-admin-password -u ${ADMIN_USERNAME}"
+    return 0
+  fi
+
+  ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')}"
+  python3 -c "
+from app import app
+from models import db, User
+with app.app_context():
+    u = User(username='${ADMIN_USERNAME}', role='admin')
+    u.set_password('${ADMIN_PASSWORD}')
+    db.session.add(u)
+    db.session.commit()
+"
+  ADMIN_CREATED=true
+  save_admin_credentials
+  echo "Compte admin « ${ADMIN_USERNAME} » créé."
+}
+
+print_final_summary() {
+  local phase="${1:-}"
+  echo ""
+  echo "════════════════════════════════════════════════════════"
+  echo "  Instance AIM : ${DOMAIN}"
+  [[ -n "$phase" ]] && echo "  Phase        : ${phase}"
+  echo "════════════════════════════════════════════════════════"
+  echo "  URL          : https://${DOMAIN}"
+  echo "  Répertoire   : ${INSTANCE_DIR}"
+  echo "  Service      : ${INSTANCE_NAME}"
+  echo "  Port         : ${GUNICORN_PORT}"
+  echo "  Base         : ${INSTANCE_DIR}/instance/equipment.db"
+  echo "────────────────────────────────────────────────────────"
+  if load_admin_credentials 2>/dev/null; then
+    echo "  Connexion admin :"
+    echo "    Identifiant : ${ADMIN_USERNAME}"
+    echo "    Mot de passe: ${ADMIN_PASSWORD}"
+    echo "  (sauvegardé dans ${ADMIN_CREDENTIALS_FILE})"
+  else
+    echo "  Connexion admin : compte « ${ADMIN_USERNAME} » — mot de passe non disponible"
+    echo "    Réinitialiser : cd ${INSTANCE_DIR} && source venv/bin/activate && flask reset-admin-password"
+  fi
+  echo "════════════════════════════════════════════════════════"
+  if [[ "$phase" != "sudo" ]]; then
+    echo ""
+    echo "Étape suivante (sudo) :"
+    echo "  sudo bash ${INSTANCE_DIR}/scripts/create-instance.sh \\"
+    echo "    --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT} --sudo"
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -238,8 +335,7 @@ phase_sudo() {
     echo "Certificat SSL déjà présent pour ${DOMAIN}."
   fi
 
-  echo ""
-  echo "Instance prête : https://${DOMAIN}"
+  print_final_summary "sudo"
   exit 0
 }
 
@@ -262,8 +358,8 @@ fi
 mkdir -p "$INSTANCE_DIR/deploy/templates" "$INSTANCE_DIR/scripts"
 cp "$TEMPLATES_DIR/instance.service.template" "$INSTANCE_DIR/deploy/templates/"
 cp "$TEMPLATES_DIR/instance.nginx.template" "$INSTANCE_DIR/deploy/templates/"
-cp "$ROOT/scripts/create-instance.sh" "$INSTANCE_DIR/scripts/"
-chmod +x "$INSTANCE_DIR/scripts/create-instance.sh"
+cp "$ROOT/scripts/create-instance.sh" "$ROOT/scripts/delete-instance.sh" "$INSTANCE_DIR/scripts/"
+chmod +x "$INSTANCE_DIR/scripts/create-instance.sh" "$INSTANCE_DIR/scripts/delete-instance.sh"
 generate_deploy_files
 
 cd "$INSTANCE_DIR"
@@ -282,32 +378,6 @@ if [[ -d migrations ]]; then
   flask db upgrade
 fi
 
-if ! python3 -c "
-from app import app
-from models import db, User
-with app.app_context():
-    print('admin_exists' if User.query.filter_by(username='admin').first() else 'no_admin')
-" | grep -q admin_exists; then
-  ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')}"
-  python3 -c "
-from app import app
-from models import db, User
-with app.app_context():
-    u = User(username='admin', role='admin')
-    u.set_password('${ADMIN_PASSWORD}')
-    db.session.add(u)
-    db.session.commit()
-"
-  echo "Compte admin créé : admin / ${ADMIN_PASSWORD}"
-else
-  echo "Compte admin déjà présent."
-fi
+ensure_admin_user
 
-echo ""
-echo "Fichiers générés :"
-echo "  ${SERVICE_FILE}"
-echo "  ${NGINX_FILE}"
-echo ""
-echo "Étape suivante (sudo) :"
-echo "  sudo bash ${INSTANCE_DIR}/scripts/create-instance.sh \\"
-echo "    --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT} --sudo"
+print_final_summary "provision"
