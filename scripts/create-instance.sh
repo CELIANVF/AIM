@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Crée rapidement une nouvelle instance AIM sur le serveur.
 #
-# Usage (sur le VPS) :
-#   bash scripts/create-instance.sh --name mon-club --domain matos.monclub.fr
-#   sudo bash scripts/create-instance.sh --name mon-club --domain matos.monclub.fr --sudo
+# Usage (sur le VPS) — TOUJOURS dans cet ordre :
+#   1. bash scripts/create-instance.sh --name mon-club --domain matos.monclub.fr
+#   2. sudo bash scripts/create-instance.sh --name mon-club --domain matos.monclub.fr --sudo
+#
+# La phase --sudo configure nginx/systemd uniquement ; elle ne clone pas le code ni le venv.
 #
 # Options :
 #   --name, -n       Identifiant (service systemd, dossier deploy/instances/)
@@ -160,20 +162,66 @@ generate_deploy_files() {
   render_template "$TEMPLATES_DIR/instance.nginx.template" "$NGINX_FILE"
 }
 
+instance_is_provisioned() {
+  [[ -f "${INSTANCE_DIR}/app.py" && -x "${INSTANCE_DIR}/venv/bin/gunicorn" ]]
+}
+
+provision_as_app_user() {
+  local provision_args=(
+    --name "$INSTANCE_NAME"
+    --domain "$DOMAIN"
+    --port "$GUNICORN_PORT"
+    --dir "$INSTANCE_DIR"
+  )
+  [[ -n "$SOURCE_ENV" ]] && provision_args+=(--source-env "$SOURCE_ENV")
+  [[ -n "$ADMIN_PASSWORD" ]] && provision_args+=(--admin-password "$ADMIN_PASSWORD")
+  [[ -n "$GIT_URL" ]] && provision_args+=(--git-url "$GIT_URL")
+
+  echo "Installation applicative (clone, venv, BDD) pour ${DOMAIN}..."
+  if [[ "$(id -u)" -eq 0 ]]; then
+    sudo -u "$RUN_USER" bash "$ROOT/scripts/create-instance.sh" "${provision_args[@]}"
+  else
+    bash "$ROOT/scripts/create-instance.sh" "${provision_args[@]}"
+  fi
+}
+
 phase_sudo() {
   if [[ "$(id -u)" -ne 0 ]]; then
     echo "Relancez avec sudo : sudo bash $0 --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT} --sudo"
     exit 1
   fi
 
-  if [[ ! -f "$SERVICE_FILE" || ! -f "$NGINX_FILE" ]]; then
-    generate_deploy_files
+  if ! instance_is_provisioned; then
+    if [[ -d "$INSTANCE_DIR" && ! -f "${INSTANCE_DIR}/app.py" ]]; then
+      echo "Erreur : ${INSTANCE_DIR} existe mais l'application n'y est pas installée." >&2
+      echo "Souvent causé par un --sudo lancé avant l'étape sans sudo." >&2
+      echo "Corrigez avec :" >&2
+      echo "  sudo rm -rf ${INSTANCE_DIR}" >&2
+      echo "  bash scripts/create-instance.sh --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT}" >&2
+      echo "  sudo bash scripts/create-instance.sh --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT} --sudo" >&2
+      exit 1
+    fi
+    provision_as_app_user
   fi
+
+  if [[ ! -f "$SERVICE_FILE" || ! -f "$NGINX_FILE" ]]; then
+    echo "Erreur : fichiers deploy manquants dans ${DEPLOY_INSTANCE_DIR}." >&2
+    echo "Relancez sans sudo : bash scripts/create-instance.sh --name ${INSTANCE_NAME} --domain ${DOMAIN} --port ${GUNICORN_PORT}" >&2
+    exit 1
+  fi
+
+  chown -R "${RUN_USER}:${RUN_USER}" "$INSTANCE_DIR"
 
   cp "$SERVICE_FILE" "/etc/systemd/system/${INSTANCE_NAME}.service"
   systemctl daemon-reload
   systemctl enable "$INSTANCE_NAME"
   systemctl restart "$INSTANCE_NAME"
+  sleep 1
+  if ! systemctl is-active --quiet "$INSTANCE_NAME"; then
+    echo "Erreur : le service ${INSTANCE_NAME} n'a pas démarré." >&2
+    journalctl -u "$INSTANCE_NAME" -n 15 --no-pager >&2 || true
+    exit 1
+  fi
   echo "Service ${INSTANCE_NAME} démarré (127.0.0.1:${GUNICORN_PORT})."
 
   cp "$NGINX_FILE" "/etc/nginx/sites-available/${DOMAIN}"
