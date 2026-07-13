@@ -1,12 +1,15 @@
-# Déploiement automatique : à chaque push sur `main`, SSH vers le VPS puis
-# sauvegarde BDD → git pull + deps + migrations + restart du service Gunicorn.
+# Déploiement automatique : à chaque push sur `main`, connexion WireGuard puis SSH
+# vers le VPS → sauvegarde BDD → git pull + deps + migrations + restart Gunicorn.
 #
 # Secrets GitHub (Settings → Secrets and variables → Actions) :
-#   DEPLOY_HOST     — IP ou domaine du serveur (ex. matos.anc93.com)
-#   DEPLOY_USER     — utilisateur SSH (ex. celian)
-#   DEPLOY_SSH_KEY  — clé privée SSH (PEM) dont la clé publique est dans ~/.ssh/authorized_keys sur le serveur
+#   WIREGUARD_CONFIG — configuration client WireGuard complète ([Interface] + [Peer])
+#   DEPLOY_HOST      — IP WireGuard du VPS (ex. 10.8.0.1)
+#   DEPLOY_USER      — utilisateur SSH (ex. celian)
+#   DEPLOY_SSH_KEY   — clé privée SSH (PEM) dont la clé publique est dans ~/.ssh/authorized_keys
 #
 # Prérequis sur le serveur :
+#   - peer WireGuard dédié à la CI (AllowedIPs incluant l'IP du serveur)
+#   - SSH accessible depuis le subnet WireGuard (ufw allow from 10.8.0.0/24 to any port 22)
 #   - dépôt git cloné (même remote que GitHub), branche main à jour une première fois
 #   - sudo NOPASSWD pour : systemctl restart aim (et éventuellement nginx)
 #   - accès git : pour un dépôt privé, clé de déploiement ou token configuré sur le serveur (git pull)
@@ -24,22 +27,74 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Chemin absolu du dépôt sur le VPS (adapter si besoin)
   APP_DIR: /home/celian/AIM
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Connexion WireGuard
+        env:
+          WIREGUARD_CONFIG: ${{ secrets.WIREGUARD_CONFIG }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${WIREGUARD_CONFIG:-}" ]]; then
+            echo "Erreur : secret WIREGUARD_CONFIG manquant." >&2
+            exit 1
+          fi
+          if ! command -v wg-quick >/dev/null 2>&1; then
+            echo "Installation wireguard-tools..."
+            timeout 90 sudo apt-get update -qq
+            timeout 120 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+              --no-install-recommends wireguard-tools
+          fi
+          sudo modprobe wireguard 2>/dev/null || true
+          umask 077
+          printf '%s\n' "$WIREGUARD_CONFIG" | sudo tee /etc/wireguard/wg0.conf > /dev/null
+          sudo chmod 600 /etc/wireguard/wg0.conf
+          sudo wg-quick up wg0
+          sudo wg show
+          if [[ -n "${DEPLOY_HOST:-}" ]]; then
+            echo "Attente tunnel vers ${DEPLOY_HOST}..."
+            for attempt in $(seq 1 15); do
+              if ping -c 1 -W 2 "$DEPLOY_HOST" >/dev/null 2>&1; then
+                echo "Tunnel OK (tentative ${attempt})."
+                break
+              fi
+              if [[ "$attempt" -eq 15 ]]; then
+                echo "Erreur : ${DEPLOY_HOST} injoignable via WireGuard." >&2
+                sudo wg show
+                exit 1
+              fi
+              sleep 2
+            done
+          fi
+
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          command_timeout: 15m
-          script: |
-            set -euo pipefail
-            cd ${{ env.APP_DIR }}
-            bash scripts/deploy-remote.sh
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DEPLOY_HOST:-}" || -z "${DEPLOY_USER:-}" || -z "${SSH_PRIVATE_KEY:-}" ]]; then
+            echo "Erreur : DEPLOY_HOST, DEPLOY_USER ou DEPLOY_SSH_KEY manquant." >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=30 \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            bash -s -- "${{ env.APP_DIR }}" <<'REMOTE'
+          set -euo pipefail
+          cd "$1"
+          bash scripts/deploy-remote.sh
+          REMOTE
+
+      - name: Déconnexion WireGuard
+        if: always()
+        run: sudo wg-quick down wg0 2>/dev/null || true
