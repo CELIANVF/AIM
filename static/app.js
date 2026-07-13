@@ -81,6 +81,17 @@
     var flashes = document.querySelectorAll('.flash');
     for (var i = 0; i < flashes.length; i++) {
       var el = flashes[i];
+      if (!el.querySelector('.flash-icon')) {
+        var iconName = 'info';
+        if (el.classList.contains('success')) iconName = 'check';
+        else if (el.classList.contains('danger') || el.classList.contains('error')) iconName = 'triangle-alert';
+        else if (el.classList.contains('warning')) iconName = 'circle-alert';
+        var iconWrap = document.createElement('span');
+        iconWrap.className = 'flash-icon';
+        iconWrap.setAttribute('aria-hidden', 'true');
+        iconWrap.innerHTML = '<i data-lucide="' + iconName + '" class="icon" style="width:18px;height:18px"></i>';
+        el.insertBefore(iconWrap, el.firstChild);
+      }
       if (el.querySelector('.flash-close')) continue;
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -96,6 +107,7 @@
         }
       })(el);
     }
+    initIcons();
   }
 
   /* ---------- "/" focuses global search ---------- */
@@ -132,6 +144,21 @@
     }, true);
   }
 
+  /* ---------- Lucide icons ---------- */
+  function initIcons(root) {
+    if (typeof lucide === 'undefined') return;
+    if (root) {
+      lucide.createIcons({ root: root });
+    } else {
+      lucide.createIcons();
+    }
+  }
+  window.aimRefreshIcons = initIcons;
+  window.aimIcon = function (name, size) {
+    size = size || 16;
+    return '<i data-lucide="' + name + '" class="icon" style="width:' + size + 'px;height:' + size + 'px" aria-hidden="true"></i>';
+  };
+
   /* ---------- Init on DOM ready ---------- */
   function run() {
     initTheme();
@@ -139,6 +166,7 @@
     initFlashes();
     initSearchShortcut();
     initFormSubmit();
+    initIcons();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', run);

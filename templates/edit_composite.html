@@ -1,11 +1,12 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Modifier un arc{% endblock %}
 
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>🎯 Modifier un arc</h1>
+        <h1><span class="with-icon">{{ icon("target", 20) }} Modifier un arc</span></h1>
         <p class="muted">{{ composite.name }} — gérer l'équipement monté sur cet arc</p>
     </div>
     <div class="action-group">
@@ -40,6 +41,17 @@
                     <option value="loan" {% if composite.status == 'loan' %}selected{% endif %}>En prêt</option>
                 </select>
             </label>
+            <label>
+                <span class="muted small">Dernière vérification</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="date" name="last_verification_date" id="last-verif-date"
+                        value="{{ composite.last_verification_date.strftime('%Y-%m-%d') if composite.last_verification_date else '' }}">
+                    <button type="button" class="btn btn-outline" style="white-space:nowrap;font-size:0.82em;padding:4px 10px"
+                        onclick="document.getElementById('last-verif-date').value = new Date().toLocaleDateString('en-CA')">
+                        ✓ Aujourd'hui
+                    </button>
+                </div>
+            </label>
         </div>
         {% if composite.tag %}
         <p class="muted small" style="margin:6px 0 0">
@@ -54,7 +66,7 @@
     <div class="card" style="margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
             <div>
-                <h2 style="margin:0">🧩 Composants montés</h2>
+                <h2 style="margin:0"><span class="with-icon">{{ icon("puzzle", 20) }} Composants montés</span></h2>
                 <p class="muted small" style="margin:4px 0 0">Une ligne par catégorie. Cliquez sur <em>Changer</em> ou <em>Ajouter</em> pour choisir un composant. Une pièce déjà montée sur un autre arc non prêté sera échangée automatiquement.</p>
             </div>
         </div>
@@ -96,11 +108,11 @@
                                         <span class="badge badge-primary">Monté</span>
                                     {% endif %}
                                     {% if current.location %}
-                                        <span class="muted">📍 {% if current.location == 'club' %}Au club{% elif current.location == 'loan' %}En prêt{% else %}{{ current.location }}{% endif %}</span>
+                                        <span class="muted"><span class="with-icon">{{ icon('map-pin', 14) }} {% if current.location == 'club' %}Au club{% elif current.location == 'loan' %}En prêt{% else %}{{ current.location }}{% endif %}</span></span>
                                     {% endif %}
                                 </div>
                                 {% if current.comments %}
-                                <div class="component-slot__chip-comment small" title="{{ current.comments|e }}">💬 {{ current.comments }}</div>
+                                <div class="component-slot__chip-comment small" title="{{ current.comments|e }}"><span class="with-icon">{{ icon('message-circle', 14) }} {{ current.comments }}</span></div>
                                 {% endif %}
                             </div>
                         {% else %}
@@ -109,11 +121,11 @@
                     </div>
                     <div class="component-slot__actions">
                         {% if current %}
-                            <button type="button" class="btn btn-outline btn-sm" data-action="change">🔄 Changer</button>
-                            <button type="button" class="btn btn-danger btn-sm" data-action="remove">🗑️ Retirer</button>
+                            <button type="button" class="btn btn-outline btn-sm" data-action="change"><span class="with-icon">{{ icon("refresh-cw", 16) }} Changer</span></button>
+                            <button type="button" class="btn btn-danger btn-sm" data-action="remove"><span class="with-icon">{{ icon("trash-2", 16) }} Retirer</span></button>
                         {% else %}
                             {% if c.products %}
-                                <button type="button" class="btn btn-primary btn-sm" data-action="change">➕ Ajouter</button>
+                                <button type="button" class="btn btn-primary btn-sm" data-action="change"><span class="with-icon">{{ icon("plus", 16) }} Ajouter</span></button>
                             {% else %}
                                 <span class="muted small">Aucun produit disponible</span>
                             {% endif %}
@@ -125,7 +137,7 @@
     </div>
 
     <div class="form-actions" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-primary" type="submit">💾 Sauvegarder les modifications</button>
+        <button class="btn btn-primary" type="submit"><span class="with-icon">{{ icon("save", 16) }} Sauvegarder les modifications</span></button>
         <a class="btn btn-outline" href="{{ url_for('composites') }}">Annuler</a>
     </div>
 </form>
@@ -135,7 +147,7 @@
     <div class="picker-modal" role="dialog" aria-modal="true" aria-labelledby="picker-title">
         <header class="picker-modal__header">
             <h2 id="picker-title">Choisir un composant</h2>
-            <button type="button" class="btn btn-outline btn-sm" id="picker-close" aria-label="Fermer">✕</button>
+            <button type="button" class="btn btn-outline btn-sm" id="picker-close" aria-label="Fermer"><span class="with-icon">{{ icon("x", 16) }}</span></button>
         </header>
         <div class="picker-modal__toolbar">
             <input type="search" id="picker-search" placeholder="Rechercher (marque, modèle, taille, commentaire…)" autocomplete="off">
@@ -317,11 +329,12 @@
                 +   (sizePower ? '<div class="small muted">' + sizePower + '</div>' : '')
                 +   (mountedBadges ? '<div class="picker-item__mounted">' + mountedBadges + '</div>' : '')
                 +   customLines
-                +   (p.comments ? '<div class="small picker-item__comment">💬 ' + escapeHtml(p.comments) + '</div>' : '')
+                +   (p.comments ? '<div class="small picker-item__comment"><span class="with-icon">' + aimIcon('message-circle', 14) + ' ' + escapeHtml(p.comments) + '</span></div>' : '')
                 +   '<div class="picker-item__foot"><a href="' + escapeHtml(p.edit_url) + '" target="_blank" rel="noopener" class="small ref-link" onclick="event.stopPropagation()">Modifier la fiche produit ↗</a></div>'
                 + '</button>';
         }).join('');
         pickerList.innerHTML = html;
+        if (window.aimRefreshIcons) window.aimRefreshIcons(pickerList);
 
         Array.from(pickerList.querySelectorAll('.picker-item')).forEach(el => {
             el.addEventListener('click', function(){
@@ -376,20 +389,24 @@
                 +   '</div>'
                 +   '<div class="component-slot__chip-meta small">'
                 +     badge
-                +     (locText ? '<span class="muted">📍 ' + escapeHtml(locText) + '</span>' : '')
+                +     (locText ? '<span class="muted"><span class="with-icon">' + aimIcon('map-pin', 14) + ' ' + escapeHtml(locText) + '</span></span>' : '')
                 +   '</div>'
-                +   (p.comments ? '<div class="component-slot__chip-comment small">💬 ' + escapeHtml(p.comments) + '</div>' : '')
+                +   (p.comments ? '<div class="component-slot__chip-comment small"><span class="with-icon">' + aimIcon('message-circle', 14) + ' ' + escapeHtml(p.comments) + '</span></div>' : '')
                 + '</div>';
             actionsEl.innerHTML = ''
-                + '<button type="button" class="btn btn-outline btn-sm" data-action="change">🔄 Changer</button>'
-                + '<button type="button" class="btn btn-danger btn-sm" data-action="remove">🗑️ Retirer</button>';
+                + '<button type="button" class="btn btn-outline btn-sm" data-action="change"><span class="with-icon">' + aimIcon('refresh-cw', 16) + ' Changer</span></button>'
+                + '<button type="button" class="btn btn-danger btn-sm" data-action="remove"><span class="with-icon">' + aimIcon('trash-2', 16) + ' Retirer</span></button>';
         } else {
             currentEl.innerHTML = '<span class="muted small component-slot__empty">— Aucun composant —</span>';
             if (productCount > 0){
-                actionsEl.innerHTML = '<button type="button" class="btn btn-primary btn-sm" data-action="change">➕ Ajouter</button>';
+                actionsEl.innerHTML = '<button type="button" class="btn btn-primary btn-sm" data-action="change"><span class="with-icon">' + aimIcon('plus', 16) + ' Ajouter</span></button>';
             } else {
                 actionsEl.innerHTML = '<span class="muted small">Aucun produit disponible</span>';
             }
+        }
+        if (window.aimRefreshIcons) {
+            window.aimRefreshIcons(currentEl);
+            window.aimRefreshIcons(actionsEl);
         }
     }
 

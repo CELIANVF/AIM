@@ -1,14 +1,15 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Importer des arcs{% endblock %}
 
 {% block content %}
 <div style="max-width: 600px; margin: 0 auto;">
-    <h1>📥 Importer des arcs (CSV)</h1>
+    <h1><span class="with-icon">{{ icon("upload", 20) }} Importer des arcs (CSV)</span></h1>
 
     {% if success %}
     <div class="alert alert-success" style="padding: 16px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0;">✅ Import terminé</h3>
+        <h3 style="margin-top: 0;"><span class="with-icon">{{ icon("circle-check", 20) }} Import terminé</span></h3>
         <p><strong>{{ imported }} ligne(s) traitée(s)</strong> (création ou mise à jour d’arc)</p>
         {% if notices %}
             <p><strong>Créations automatiques ({{ notices|length }}) :</strong></p>
@@ -32,7 +33,7 @@
 
     {% if error %}
     <div class="alert alert-danger" style="padding: 16px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0;">⚠️ Erreur</h3>
+        <h3 style="margin-top: 0;"><span class="with-icon">{{ icon('triangle-alert', 20) }} Erreur</span></h3>
         <p>{{ error }}</p>
     </div>
     {% endif %}
@@ -62,7 +63,7 @@
                 style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box;"
             >
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">📥 Importer</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%;"><span class="with-icon">{{ icon("upload", 16) }} Importer</span></button>
     </form>
 </div>
 {% endblock %}

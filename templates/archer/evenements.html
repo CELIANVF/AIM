@@ -1,11 +1,12 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Événements{% endblock %}
 
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>📅 Événements</h1>
+        <h1><span class="with-icon">{{ icon("calendar", 20) }} Événements</span></h1>
         <p class="muted">Inscriptions ouvertes par le club</p>
     </div>
     <a class="btn btn-outline" href="{{ url_for('archer_portal') }}">← Mon espace</a>

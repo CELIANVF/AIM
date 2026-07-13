@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
 {% block title %}Produits{% endblock %}
@@ -90,16 +91,16 @@
 
 <div class="header-with-actions">
     <div>
-        <h1>📦 Produits unitaires</h1>
+        <h1><span class="with-icon">{{ icon("package", 20) }} Produits unitaires</span></h1>
         <p class="muted">{{ products|length }} produit(s) au total</p>
     </div>
     <div class="action-group">
         {% if current_user.can_edit() %}
-        <a class="btn btn-primary" href="/add_product">➕ Ajouter un produit</a>
+        <a class="btn btn-primary" href="/add_product"><span class="with-icon">{{ icon("plus", 16) }} Ajouter un produit</span></a>
         {% endif %}
         <a class="btn btn-outline" href="{{ url_for('inventaire_etiquettes', kind='products') }}">Étiquettes</a>
-        <a class="btn btn-outline" href="/export_products">📄 Exporter PDF</a>
-        <a class="btn btn-outline" href="/export_products_csv">📊 Exporter CSV</a>
+        <a class="btn btn-outline" href="/export_products"><span class="with-icon">{{ icon("file-text", 16) }} Exporter PDF</span></a>
+        <a class="btn btn-outline" href="/export_products_csv"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter CSV</span></a>
     </div>
 </div>
 
@@ -124,7 +125,7 @@
         <div class="accordion" data-category="{{ cat.name|e }}">
         <div class="accordion-header" onclick="toggleAccordion(this)">
             <span>{{ cat.name }} ({{ products_by_category|length }})</span>
-            <span class="accordion-icon">▼</span>
+            <span class="accordion-icon">{{ icon("chevron-down", 14) }}</span>
         </div>
         <div class="accordion-controls" style="padding:8px 12px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <label class="small muted" style="margin-right:6px">Trier:</label>
@@ -245,19 +246,19 @@
                         {% endfor %}
                     {% endif %}
                     {% if p.comments %}
-                        <div class="muted" style="margin-top:4px">💬 {{ p.comments }}</div>
+                        <div class="muted" style="margin-top:4px"><span class="with-icon">{{ icon("message-circle", 14) }} {{ p.comments }}</div>
                     {% endif %}
                     {% if not cat_cf and not p.custom_values and not p.comments %}<span class="muted">—</span>{% endif %}
                 </td>
                 <td style="text-align:right">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}">✏️</a>
-                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}">📋</a>
+                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}"><span class="with-icon">{{ icon("pencil", 16) }}</span></a>
+                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}"><span class="with-icon">{{ icon("clipboard-list", 16) }}</span></a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_product/{{ p.id }}" style="display:inline;margin:0" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger">🗑️</button>
+                        <form method="POST" action="/delete_product/{{ p.id }}" style="display:inline;margin:0" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
                         </form>
                         {% endif %}
                     </div>
@@ -275,7 +276,7 @@
     <div class="card" style="text-align:center;padding:48px 24px">
         <p class="muted">Aucun produit enregistré pour le moment</p>
         {% if current_user.can_edit() %}
-        <a href="/add_product" class="btn btn-primary" style="margin-top:16px">➕ Ajouter le premier produit</a>
+        <a href="/add_product" class="btn btn-primary" style="margin-top:16px"><span class="with-icon">{{ icon("plus", 16) }} Ajouter le premier produit</span></a>
         {% endif %}
     </div>
 {% endif %}

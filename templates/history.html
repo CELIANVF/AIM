@@ -1,10 +1,11 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
 {% block title %}Historique{% endblock %}
 
 {% block content %}
-<h1>🕒 Historique</h1>
+<h1><span class="with-icon">{{ icon("history", 20) }} Historique</span></h1>
 
 <div class="card" style="margin-bottom:24px">
     <h2>Assignations</h2>

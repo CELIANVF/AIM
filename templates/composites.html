@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
 {% block title %}Arcs{% endblock %}
@@ -6,25 +7,25 @@
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>🎯 Arcs composés</h1>
+        <h1><span class="with-icon">{{ icon("target", 20) }} Arcs composés</span></h1>
         <p class="muted">{{ composites|length }} arc(s) enregistré(s)</p>
     </div>
     <div class="action-group">
         {% if current_user.can_edit() %}
-        <a class="btn btn-primary" href="/add_composite">➕ Nouvel arc</a>
-        <a class="btn btn-outline" href="{{ url_for('import_composites') }}">📥 Importer CSV</a>
+        <a class="btn btn-primary" href="/add_composite"><span class="with-icon">{{ icon("plus", 16) }} Nouvel arc</span></a>
+        <a class="btn btn-outline" href="{{ url_for('import_composites') }}"><span class="with-icon">{{ icon("upload", 16) }} Importer CSV</span></a>
         {% endif %}
         <a class="btn btn-outline" href="{{ url_for('inventaire_etiquettes', kind='composites') }}">Étiquettes</a>
-        <a class="btn btn-outline" href="/export_composites">📄 Exporter PDF</a>
-        <a class="btn btn-outline" href="/export_composites_csv">📊 Exporter CSV</a>
+        <a class="btn btn-outline" href="/export_composites"><span class="with-icon">{{ icon("file-text", 16) }} Exporter PDF</span></a>
+        <a class="btn btn-outline" href="/export_composites_csv"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter CSV</span></a>
     </div>
 </div>
 
 <div class="sort-toolbar">
     <span class="sort-toolbar__label">Trier par</span>
-    <a href="/composites?sort=name" class="btn btn-sm {% if current_sort == 'name' %}btn-primary{% else %}btn-outline{% endif %}">📝 Nom</a>
-    <a href="/composites?sort=type" class="btn btn-sm {% if current_sort == 'type' %}btn-primary{% else %}btn-outline{% endif %}">🏷️ Type</a>
-    <a href="/composites?sort=status" class="btn btn-sm {% if current_sort == 'status' %}btn-primary{% else %}btn-outline{% endif %}">📍 Statut</a>
+    <a href="/composites?sort=name" class="btn btn-sm {% if current_sort == 'name' %}btn-primary{% else %}btn-outline{% endif %}"><span class="with-icon">{{ icon("file-text", 16) }} Nom</span></a>
+    <a href="/composites?sort=type" class="btn btn-sm {% if current_sort == 'type' %}btn-primary{% else %}btn-outline{% endif %}"><span class="with-icon">{{ icon("tag", 16) }} Type</span></a>
+    <a href="/composites?sort=status" class="btn btn-sm {% if current_sort == 'status' %}btn-primary{% else %}btn-outline{% endif %}"><span class="with-icon">{{ icon("map-pin", 16) }} Statut</span></a>
 </div>
 
 {% if composites %}
@@ -37,6 +38,7 @@
                 <th>Nom</th>
                 <th>Type</th>
                 <th>Statut</th>
+                <th style="white-space:nowrap">Vérification</th>
                 <th>Caractéristiques</th>
                 <th class="th-actions" data-sort="disable">Actions</th>
             </tr>
@@ -61,6 +63,13 @@
                         <span class="badge badge-success">Au club</span>
                     {% elif c.status == 'loan' %}
                         <span class="badge badge-warning">En prêt</span>
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </td>
+                <td class="small td-tabular" style="white-space:nowrap">
+                    {% if c.last_verification_date %}
+                        {{ c.last_verification_date.strftime('%d/%m/%Y') }}
                     {% else %}
                         <span class="muted">—</span>
                     {% endif %}
@@ -90,11 +99,11 @@
                 <td class="td-actions">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline btn-sm" href="/edit_composite/{{ c.id }}">✏️ Modifier</a>
+                        <a class="btn btn-outline btn-sm" href="/edit_composite/{{ c.id }}"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_composite/{{ c.id }}" class="form-inline" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet arc ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer cet arc">🗑️</button>
+                        <form method="POST" action="/delete_composite/{{ c.id }}" class="form-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet arc ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer cet arc"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
                         </form>
                         {% endif %}
                     </div>
@@ -108,7 +117,7 @@
 <div class="card empty-state">
     <p class="muted">Aucun arc enregistré pour le moment</p>
     {% if current_user.can_edit() %}
-    <a href="/add_composite" class="btn btn-primary">➕ Ajouter le premier arc</a>
+    <a href="/add_composite" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Ajouter le premier arc</span></a>
     {% endif %}
 </div>
 {% endif %}

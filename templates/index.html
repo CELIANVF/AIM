@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Accueil{% endblock %}
 
 {% block content %}
@@ -10,8 +11,8 @@
 	</div>
 	<div class="action-group">
 		{% if current_user.can_edit() %}
-		<a href="{{ url_for('add_product') }}" class="btn btn-primary">➕ Nouveau produit</a>
-		<a href="{{ url_for('assign') }}" class="btn btn-outline">🔄 Nouvelle affectation</a>
+		<a href="{{ url_for('add_product') }}" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Nouveau produit</span></a>
+		<a href="{{ url_for('assign') }}" class="btn btn-outline"><span class="with-icon">{{ icon("refresh-cw", 16) }} Nouvelle affectation</span></a>
 		{% endif %}
 	</div>
 </div>
@@ -19,25 +20,25 @@
 <div class="stats-grid">
 	<a href="{{ url_for('products') }}" class="stat-card" data-tone="info" style="text-decoration:none;color:inherit">
 		<div class="stat-value">{{ products_count if products_count is defined else '—' }}</div>
-		<div class="stat-label">📦 Produits totaux</div>
+		<div class="stat-label"><span class="with-icon">{{ icon("package", 14) }} Produits totaux</span></div>
 	</a>
 	<a href="{{ url_for('archers') }}" class="stat-card" data-tone="success" style="text-decoration:none;color:inherit">
 		<div class="stat-value">{{ archers_count if archers_count is defined else '—' }}</div>
-		<div class="stat-label">👥 Archers actifs</div>
+		<div class="stat-label"><span class="with-icon">{{ icon("users", 14) }} Archers actifs</span></div>
 	</a>
 	<a href="{{ url_for('composites') }}" class="stat-card" data-tone="warning" style="text-decoration:none;color:inherit">
 		<div class="stat-value">{{ composites_count if composites_count is defined else '—' }}</div>
-		<div class="stat-label">🎯 Arcs disponibles</div>
+		<div class="stat-label"><span class="with-icon">{{ icon("target", 14) }} Arcs disponibles</span></div>
 	</a>
 	{% if current_user.role not in ('lecteur', 'archer') %}
 	<a href="{{ url_for('categories') }}" class="stat-card" style="text-decoration:none;color:inherit">
 		<div class="stat-value">{{ categories_count if categories_count is defined else '—' }}</div>
-		<div class="stat-label">📁 Catégories</div>
+		<div class="stat-label"><span class="with-icon">{{ icon("folder", 14) }} Catégories</span></div>
 	</a>
 	{% else %}
 	<div class="stat-card">
 		<div class="stat-value">{{ categories_count if categories_count is defined else '—' }}</div>
-		<div class="stat-label">📁 Catégories</div>
+		<div class="stat-label"><span class="with-icon">{{ icon("folder", 14) }} Catégories</span></div>
 	</div>
 	{% endif %}
 </div>
@@ -46,31 +47,31 @@
 <h2 class="mb-2">Actions rapides</h2>
 <div class="quick-grid">
 	<a href="{{ url_for('add_product') }}" class="quick-card">
-		<div class="quick-card__icon">📦</div>
+		<div class="quick-card__icon">{{ icon("package", 20) }}</div>
 		<h3 class="quick-card__title">Nouveau produit</h3>
 		<p class="quick-card__desc">Enregistrer un nouveau produit dans le stock unitaire.</p>
 		<span class="quick-card__cta">Créer un produit →</span>
 	</a>
 	<a href="{{ url_for('add_composite') }}" class="quick-card">
-		<div class="quick-card__icon">🎯</div>
+		<div class="quick-card__icon">{{ icon("target", 20) }}</div>
 		<h3 class="quick-card__title">Nouvel arc</h3>
 		<p class="quick-card__desc">Composer un arc à partir des produits du club.</p>
 		<span class="quick-card__cta">Ajouter un arc →</span>
 	</a>
 	<a href="{{ url_for('add_archer') }}" class="quick-card">
-		<div class="quick-card__icon">👤</div>
+		<div class="quick-card__icon">{{ icon("user", 20) }}</div>
 		<h3 class="quick-card__title">Nouvel archer</h3>
 		<p class="quick-card__desc">Inscrire un archer (licence, cours, contact).</p>
 		<span class="quick-card__cta">Ajouter un archer →</span>
 	</a>
 	<a href="{{ url_for('assign') }}" class="quick-card" data-tone="warning">
-		<div class="quick-card__icon">🔄</div>
+		<div class="quick-card__icon">{{ icon("refresh-cw", 20) }}</div>
 		<h3 class="quick-card__title">Affecter un arc</h3>
 		<p class="quick-card__desc">Attribuer un arc disponible à un archer.</p>
 		<span class="quick-card__cta">Nouvelle affectation →</span>
 	</a>
 	<a href="{{ url_for('add_category') }}" class="quick-card" data-tone="muted">
-		<div class="quick-card__icon">📁</div>
+		<div class="quick-card__icon">{{ icon("folder", 20) }}</div>
 		<h3 class="quick-card__title">Nouvelle catégorie</h3>
 		<p class="quick-card__desc">Créer une catégorie pour classer les produits.</p>
 		<span class="quick-card__cta">Ajouter une catégorie →</span>
@@ -81,42 +82,43 @@
 <h2 class="mb-2">Explorer</h2>
 <div class="quick-grid">
 	<a href="{{ url_for('products') }}" class="quick-card" data-tone="info">
-		<div class="quick-card__icon">📦</div>
+		<div class="quick-card__icon">{{ icon("package", 20) }}</div>
 		<h3 class="quick-card__title">Produits</h3>
 		<p class="quick-card__desc">Liste et recherche des produits unitaires en stock.</p>
 		<span class="quick-card__cta">Voir les produits →</span>
 	</a>
 	<a href="{{ url_for('composites') }}" class="quick-card" data-tone="info">
-		<div class="quick-card__icon">🎯</div>
+		<div class="quick-card__icon">{{ icon("target", 20) }}</div>
 		<h3 class="quick-card__title">Arcs composés</h3>
 		<p class="quick-card__desc">Arcs du club et statut prêt / disponibilité.</p>
 		<span class="quick-card__cta">Voir les arcs →</span>
 	</a>
 	<a href="{{ url_for('archers') }}" class="quick-card" data-tone="info">
-		<div class="quick-card__icon">👥</div>
+		<div class="quick-card__icon">{{ icon("users", 20) }}</div>
 		<h3 class="quick-card__title">Archers</h3>
 		<p class="quick-card__desc">Liste des archers, cours et matériel personnel.</p>
 		<span class="quick-card__cta">Voir les archers →</span>
 	</a>
 	<a href="{{ url_for('assignments') }}" class="quick-card" data-tone="success">
-		<div class="quick-card__icon">🔄</div>
+		<div class="quick-card__icon">{{ icon("refresh-cw", 20) }}</div>
 		<h3 class="quick-card__title">Assignations</h3>
 		<p class="quick-card__desc">Prêts en cours et retours d'arcs.</p>
 		<span class="quick-card__cta">Voir les assignations →</span>
 	</a>
 	<a href="{{ url_for('courses') }}" class="quick-card" data-tone="muted">
-		<div class="quick-card__icon">📚</div>
+		<div class="quick-card__icon">{{ icon("book-open", 20) }}</div>
 		<h3 class="quick-card__title">Cours</h3>
 		<p class="quick-card__desc">Sessions, plannings et inscriptions.</p>
 		<span class="quick-card__cta">Voir les cours →</span>
 	</a>
 	<a href="{{ url_for('inventaire') }}" class="quick-card" data-tone="warning">
+		<div class="quick-card__icon">{{ icon('scan-barcode', 20) }}</div>
 		<h3 class="quick-card__title">Inventaire</h3>
 		<p class="quick-card__desc">Codes, étiquettes et recherche par scan.</p>
 		<span class="quick-card__cta">Ouvrir →</span>
 	</a>
 	<a href="/export_products" class="quick-card" data-tone="muted">
-		<div class="quick-card__icon">📄</div>
+		<div class="quick-card__icon">{{ icon("file-text", 20) }}</div>
 		<h3 class="quick-card__title">Exports PDF</h3>
 		<p class="quick-card__desc">Inventaire produits, archers, arcs — prêts à imprimer.</p>
 		<span class="quick-card__cta">Exporter →</span>

@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
 {% block content %}
@@ -11,9 +12,7 @@
             <a href="{{ url_for('add_user') }}" class="btn btn-success">
                 <i class="bi bi-plus-circle"></i> Créer un utilisateur
             </a>
-            <a href="{{ url_for('export_users_csv') }}" class="btn btn-outline">
-                📊 Exporter CSV
-            </a>
+            <a href="{{ url_for('export_users_csv') }}" class="btn btn-outline"><span class="with-icon">{{ icon('chart-bar', 16) }} Exporter CSV</span></a>
         </div>
     </div>
 
@@ -57,32 +56,28 @@
                             <td>
                                 {% if user.role == 'admin' %}
                                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fee2e2; color: #991b1b; font-size: 13px; font-weight: 600;">
-                                        <span>👑</span> Admin
+                                        <span>{{ icon("crown", 16) }}</span> Admin
                                     </span>
                                 {% elif user.role == 'responsable' %}
                                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 600;">
-                                        <span>📋</span> Responsable
+                                        <span>{{ icon("clipboard-list", 16) }}</span> Responsable
                                     </span>
                                 {% elif user.role == 'lecteur' %}
                                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e5e7eb; color: #374151; font-size: 13px; font-weight: 600;">
-                                        <span>👁️</span> Lecteur
+                                        <span>{{ icon("eye", 16) }}</span> Lecteur
                                     </span>
                                 {% elif user.role == 'entraineur' %}
                                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e0f2fe; color: #0369a1; font-size: 13px; font-weight: 600;">
-                                        <span>🏆</span> Entraîneur
+                                        <span>{{ icon("trophy", 16) }}</span> Entraîneur
                                     </span>
                                 {% endif %}
                             </td>
                             <td style="text-align: right;">
                                 <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn" style="background: var(--primary); color: white; padding: 8px 14px; font-size: 13px;">
-                                        ✏️ Modifier
-                                    </a>
+                                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn" style="background: var(--primary); color: white; padding: 8px 14px; font-size: 13px;"><span class="with-icon">{{ icon('pencil', 16) }} Modifier</span></a>
                                     {% if user.id != current_user.id %}
                                         <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur?');">
-                                            <button type="submit" class="btn" style="background: var(--danger); color: white; padding: 8px 14px; font-size: 13px;">
-                                                🗑️ Supprimer
-                                            </button>
+                                            <button type="submit" class="btn" style="background: var(--danger); color: white; padding: 8px 14px; font-size: 13px;"><span class="with-icon">{{ icon('trash-2', 16) }} Supprimer</span></button>
                                         </form>
                                     {% endif %}
                                 </div>
@@ -99,32 +94,32 @@
     {% endif %}
 
     <div style="margin-top: 40px;">
-        <h3 style="margin-bottom: 20px;">📋 Niveaux de permission</h3>
+        <h3 style="margin-bottom: 20px;"><span class="with-icon">{{ icon("clipboard-list", 20) }} Niveaux de permission</span></h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
             <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">👑</span>
+                    <span style="font-size: 28px;">{{ icon("crown", 28) }}</span>
                     <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Admin</h4>
                 </div>
                 <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Accès complet + gestion des utilisateurs</p>
             </div>
             <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">📋</span>
+                    <span style="font-size: 28px;">{{ icon("clipboard-list", 28) }}</span>
                     <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Responsable</h4>
                 </div>
                 <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion complète (archers, équipements, cours + assignations)</p>
             </div>
             <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">👁️</span>
+                    <span style="font-size: 28px;">{{ icon("eye", 28) }}</span>
                     <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Lecteur</h4>
                 </div>
                 <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Consultation uniquement (historique inclus)</p>
             </div>
             <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">🏆</span>
+                    <span style="font-size: 28px;">{{ icon("trophy", 28) }}</span>
                     <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Entraîneur</h4>
                 </div>
                 <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion des cours, présences et assignation du matériel</p>

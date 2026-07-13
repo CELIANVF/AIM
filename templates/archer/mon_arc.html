@@ -1,11 +1,12 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Mon arc{% endblock %}
 
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>🎯 Mon arc</h1>
+        <h1><span class="with-icon">{{ icon("target", 20) }} Mon arc</span></h1>
         <p class="muted">Matériel du club qui vous est assigné</p>
     </div>
     <a class="btn btn-outline" href="{{ url_for('archer_portal') }}">← Mon espace</a>

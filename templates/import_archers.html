@@ -1,14 +1,15 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Importer Archers{% endblock %}
 
 {% block content %}
 <div style="max-width: 600px; margin: 0 auto;">
-    <h1>📥 Importer des Archers</h1>
+    <h1><span class="with-icon">{{ icon("upload", 20) }} Importer des Archers</span></h1>
     
     {% if success %}
     <div class="alert alert-success" style="padding: 16px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0;">✅ Import réussi!</h3>
+        <h3 style="margin-top: 0;"><span class="with-icon">{{ icon("circle-check", 20) }} Import réussi!</span></h3>
         <p><strong>{{ imported }} archer(s) importé(s)</strong></p>
         {% if errors %}
             <p><strong>Erreurs ({{ errors|length }}):</strong></p>
@@ -24,7 +25,7 @@
     
     {% if error %}
     <div class="alert alert-danger" style="padding: 16px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0;">⚠️ Erreur</h3>
+        <h3 style="margin-top: 0;"><span class="with-icon">{{ icon('triangle-alert', 20) }} Erreur</span></h3>
         <p>{{ error }}</p>
     </div>
     {% endif %}
@@ -73,7 +74,7 @@
             >
             <small style="color: #666; display: block; margin-top: 8px;">CSV avec points-virgules. Encodage reconnu : UTF-8 (avec ou sans BOM), <strong>Windows-1252</strong> (Western European — Excel « Enregistrer sous CSV »), Latin-1, etc.</small>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">📥 Importer</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%;"><span class="with-icon">{{ icon("upload", 16) }} Importer</span></button>
     </form>
     
     <div style="margin-top: 24px; padding: 16px; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">

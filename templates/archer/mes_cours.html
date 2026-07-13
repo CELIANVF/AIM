@@ -1,11 +1,12 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Mes cours{% endblock %}
 
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>📚 Mes cours</h1>
+        <h1><span class="with-icon">{{ icon("book-open", 20) }} Mes cours</span></h1>
         <p class="muted">Cours auxquels vous êtes inscrit(e)</p>
     </div>
     <a class="btn btn-outline" href="{{ url_for('archer_portal') }}">← Mon espace</a>

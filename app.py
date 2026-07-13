@@ -2350,6 +2350,12 @@ def edit_composite(comp_id):
         comp.name = request.form['name']
         comp.type = request.form['type']
         comp.status = request.form['status']
+        raw_verif = request.form.get('last_verification_date', '').strip()
+        if raw_verif:
+            from datetime import date as _date
+            comp.last_verification_date = _date.fromisoformat(raw_verif)
+        else:
+            comp.last_verification_date = None
 
         # collect selection but do not immediately clear the relationship, we
         # need to know which new products belonged to other composites so we

@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Modifier Catégorie{% endblock %}
 
 {% block content %}
@@ -24,7 +25,7 @@
                 <div class="custom-field-row" style="display:flex;gap:8px;align-items:center">
                     <input type="text" class="custom-name" value="{{ key }}" placeholder="Nom du champ" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--border)">
                     <input type="text" class="custom-unit" value="{{ category.field_units.get(key.lower(), '') if category.field_units else '' }}" placeholder="Unité (optionnel)" style="width:160px;padding:6px;border-radius:6px;border:1px solid var(--border)">
-                    <button type="button" class="remove-field btn" title="Supprimer" style="padding:6px 8px;border-radius:6px">✕</button>
+                    <button type="button" class="remove-field btn" title="Supprimer" style="padding:6px 8px;border-radius:6px"><span class="with-icon">{{ icon("x", 16) }}</span></button>
                 </div>
             {%- endfor -%}
         {% endif %}
@@ -76,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function(){
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'remove-field btn';
-        removeBtn.textContent = '✕';
+        removeBtn.innerHTML = '<i data-lucide="x" class="icon" style="width:14px;height:14px" aria-hidden="true"></i>';
         removeBtn.title = 'Supprimer';
         removeBtn.style.padding = '6px 8px';
         removeBtn.style.borderRadius = '6px';
@@ -86,6 +87,7 @@ document.addEventListener('DOMContentLoaded', function(){
         row.appendChild(nameInput);
         row.appendChild(unitInput);
         row.appendChild(removeBtn);
+        if (window.aimRefreshIcons) window.aimRefreshIcons(removeBtn);
         return row;
     }
 

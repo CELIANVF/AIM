@@ -1,3 +1,35 @@
+/* Lucide icons */
+.icon{
+  display:inline-flex;
+  flex-shrink:0;
+  vertical-align:middle;
+  line-height:0;
+}
+.icon svg{
+  width:100%;
+  height:100%;
+  stroke:currentColor;
+}
+.with-icon{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+h1 .with-icon,
+h2 .with-icon,
+h3 .with-icon{
+  gap:10px;
+}
+.btn .with-icon,
+.stat-label .with-icon,
+.quick-card__icon .icon{
+  gap:6px;
+}
+.quick-card__icon .icon{
+  width:20px;
+  height:20px;
+}
+
 /* Modern responsive stylesheet — Inter chargée depuis layout.html (preconnect + link) */
 
 :root{
@@ -1750,18 +1782,24 @@ html{scroll-behavior:smooth}
   animation:flashIn 0.25s ease-out both;
 }
 .flash::before{
+  display:none;
+}
+.flash-icon{
   position:absolute;
   left:14px;
   top:50%;
   transform:translateY(-50%);
-  font-size:18px;
-  line-height:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
 }
-.flash.success::before{content:'✓';color:var(--success);font-weight:700}
-.flash.error::before,
-.flash.danger::before{content:'⚠';color:var(--danger);font-weight:700}
-.flash.warning::before{content:'!';color:var(--warning);font-weight:700;font-family:ui-monospace,monospace}
-.flash.info::before{content:'i';color:var(--info);font-weight:700;font-style:italic;font-family:Georgia,serif}
+.flash.success .flash-icon{color:var(--success)}
+.flash.error .flash-icon,
+.flash.danger .flash-icon{color:var(--danger)}
+.flash.warning .flash-icon{color:var(--warning)}
+.flash.info .flash-icon{color:var(--info)}
 .flash .flash-close{
   position:absolute;
   right:8px;

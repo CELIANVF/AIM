@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Ajouter Arc{% endblock %}
 
 {% block content %}
@@ -78,7 +79,7 @@
                                 {% endfor %}
                             {% endif %}
                             <div class="small muted" style="margin-top:6px">État: {% if p.state == 'stock' %}Disponible{% elif p.state == 'loan' %}En prêt{% elif p.state == 'broken' %}Cassé{% else %}{{ p.state }}{% endif %} • Localisation: {% if p.location == 'club' %}Au club{% elif p.location == 'loan' %}En prêt{% else %}{{ p.location }}{% endif %}</div>
-                            {% if p.comments %}<div class="small" style="margin-top:6px">💬 {{ p.comments }}</div>{% endif %}
+                            {% if p.comments %}<div class="small" style="margin-top:6px"><span class="with-icon">{{ icon("message-circle", 14) }} {{ p.comments }}</div>{% endif %}
                             {% if p.custom_values %}
                             <div class="small muted" style="margin-top:6px">
                                 {% for k, v in p.custom_values.items() %}

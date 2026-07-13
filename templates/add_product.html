@@ -1,11 +1,12 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Ajouter Produit{% endblock %}
 
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>➕ Ajouter un produit</h1>
+        <h1><span class="with-icon">{{ icon("plus", 20) }} Ajouter un produit</span></h1>
         <p class="muted">Remplissez les informations du nouveau produit</p>
     </div>
     <a href="/products" class="btn btn-outline">← Retour</a>
@@ -48,8 +49,8 @@
         <div class="form-group">
             <label>État</label>
             <select name="state">
-                <option value="stock">✓ Disponible</option>
-                <option value="broken">✗ Cassé / Hors service</option>
+                <option value="stock"><span class="with-icon">{{ icon("check", 14) }} Disponible</span></option>
+                <option value="broken"><span class="with-icon">{{ icon("x", 14) }} Cassé / Hors service</span></option>
             </select>
         </div>
 
@@ -76,7 +77,7 @@
         <div id="custom_fields"></div>
 
         <div class="action-group" style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
-            <button class="btn btn-primary" type="submit">✓ Ajouter le produit</button>
+            <button class="btn btn-primary" type="submit"><span class="with-icon">{{ icon("check", 16) }} Ajouter le produit</span></button>
             <a href="/products" class="btn btn-outline">Annuler</a>
         </div>
     </form>

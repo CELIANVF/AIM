@@ -1,0 +1,3 @@
+{% macro icon(name, size=16, class='') -%}
+<i data-lucide="{{ name }}" class="icon{% if class %} {{ class }}{% endif %}" style="width:{{ size }}px;height:{{ size }}px" aria-hidden="true"></i>
+{%- endmacro %}

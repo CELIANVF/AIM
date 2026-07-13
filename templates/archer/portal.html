@@ -1,11 +1,12 @@
 {% extends "layout.html" %}
 
+{% from "_icons.html" import icon %}
 {% block title %}Mon espace{% endblock %}
 
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>🏠 Mon espace</h1>
+        <h1><span class="with-icon">{{ icon("home", 20) }} Mon espace</span></h1>
         <p class="muted">{{ archer.name }}{% if archer.license_number %} · Licence {{ archer.license_number }}{% endif %}</p>
     </div>
 </div>
@@ -13,24 +14,24 @@
 <div class="stats-grid stats-grid--below-header">
     <div class="stat-card">
         <div class="stat-value">{% if assignment %}1{% else %}0{% endif %}</div>
-        <div class="stat-label">🎯 Arc assigné</div>
+        <div class="stat-label"><span class="with-icon">{{ icon("target", 14) }} Arc assigné</span></div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ courses|length }}</div>
-        <div class="stat-label">📚 Cours actifs</div>
+        <div class="stat-label"><span class="with-icon">{{ icon("book-open", 14) }} Cours actifs</span></div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ open_events|length }}</div>
-        <div class="stat-label">📅 Événements ouverts</div>
+        <div class="stat-label"><span class="with-icon">{{ icon("calendar", 14) }} Événements ouverts</span></div>
     </div>
 </div>
 
 <div class="card card--portal">
     <h2 class="card-section-title">Accès rapide</h2>
     <div class="action-group">
-        <a class="btn btn-primary" href="{{ url_for('archer_my_bow') }}">🎯 Voir mon arc</a>
-        <a class="btn btn-outline" href="{{ url_for('archer_my_courses') }}">📚 Mes cours</a>
-        <a class="btn btn-outline" href="{{ url_for('archer_events') }}">📅 Événements</a>
+        <a class="btn btn-primary" href="{{ url_for('archer_my_bow') }}"><span class="with-icon">{{ icon("target", 16) }} Voir mon arc</span></a>
+        <a class="btn btn-outline" href="{{ url_for('archer_my_courses') }}"><span class="with-icon">{{ icon("book-open", 16) }} Mes cours</span></a>
+        <a class="btn btn-outline" href="{{ url_for('archer_events') }}"><span class="with-icon">{{ icon("calendar", 16) }} Événements</span></a>
     </div>
 </div>
 

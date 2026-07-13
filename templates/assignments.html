@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
 {% block title %}Assignations{% endblock %}
@@ -13,8 +14,8 @@
         {% if current_user.can_manage_assignments_for_coach() %}
         <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
         {% endif %}
-        <a class="btn btn-secondary" href="/export_assignments">📄 Exporter en PDF</a>
-        <a class="btn btn-outline" href="/export_assignments_csv">📊 Exporter en CSV</a>
+        <a class="btn btn-secondary" href="/export_assignments"><span class="with-icon">{{ icon("file-text", 16) }} Exporter en PDF</span></a>
+        <a class="btn btn-outline" href="/export_assignments_csv"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter en CSV</span></a>
     </div>
 </div>
 
@@ -40,7 +41,7 @@
                 <td class="td-actions" data-label="Actions">
                     {% if current_user.can_manage_assignments_for_coach() %}
                     <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" class="form-inline">
-                        <button class="btn btn-outline btn-sm" type="submit">↩️ Retourner</button>
+                        <button class="btn btn-outline btn-sm" type="submit"><span class="with-icon">{{ icon("undo-2", 16) }} Retourner</span></button>
                     </form>
                     {% else %}
                     <span class="muted">—</span>
@@ -55,7 +56,7 @@
 <div class="card empty-state">
     <p class="muted">Aucune assignation en cours</p>
     {% if current_user.can_manage_assignments_for_coach() %}
-    <a href="/assign" class="btn btn-primary">🎯 Nouvelle assignation</a>
+    <a href="/assign" class="btn btn-primary"><span class="with-icon">{{ icon("target", 16) }} Nouvelle assignation</span></a>
     {% endif %}
 </div>
 {% endif %}

@@ -28,6 +28,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% from "_icons.html" import icon %}
     {# Apply persisted theme before paint to avoid a flash of incorrect theme. #}
     <script>
       (function(){
@@ -47,7 +48,7 @@
     <div class="top-bar">
         <div class="container">
             {% if not shell_minimal %}
-            <button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
+            <button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">{{ icon('menu', 20) }}</button>
             {% endif %}
             <div class="logo">
                 <a href="{% if current_user.is_authenticated %}{{ url_for('index') }}{% else %}{{ url_for('login') }}{% endif %}" class="logo-link">
@@ -66,12 +67,12 @@
             {% if not shell_minimal %}
             <div class="top-bar-tools">
                 <button type="button" class="theme-toggle" data-theme-toggle title="Changer le thème" aria-label="Changer le thème">
-                    <span class="theme-icon-light" aria-hidden="true">☀︎</span>
-                    <span class="theme-icon-dark" aria-hidden="true">☾</span>
+                    <span class="theme-icon-light" aria-hidden="true">{{ icon('sun', 18) }}</span>
+                    <span class="theme-icon-dark" aria-hidden="true">{{ icon('moon', 18) }}</span>
                 </button>
                 <div class="user-menu">
                     {% if current_user.is_authenticated %}
-                    <span>👤 {{ current_user.username }}</span>
+                    <span class="with-icon">{{ icon('user', 16) }} {{ current_user.username }}</span>
                     <a class="btn-logout" href="{{ url_for('logout') }}">Déconnexion</a>
                     {% else %}
                     <a href="{{ url_for('login') }}">Connexion</a>
@@ -84,39 +85,39 @@
 
     {% if not shell_minimal %}<div class="main-layout">{% endif %}
         {% if not shell_minimal %}
-        {% macro nav_link(href, icon, label, active) -%}
-            <li><a href="{{ href }}" class="{% if active %}active{% endif %}" title="{{ label }}"><span class="nav-icon" aria-hidden="true">{{ icon }}</span><span class="nav-label">{{ label }}</span></a></li>
+        {% macro nav_link(href, icon_name, label, active) -%}
+            <li><a href="{{ href }}" class="{% if active %}active{% endif %}" title="{{ label }}"><span class="nav-icon" aria-hidden="true">{{ icon(icon_name, 18) }}</span><span class="nav-label">{{ label }}</span></a></li>
         {%- endmacro %}
         <aside class="sidebar" aria-label="Navigation principale">
             <button type="button" class="sidebar-collapse-btn" data-sidebar-collapse aria-label="Réduire ou agrandir le menu latéral"><span class="sidebar-collapse-label">Réduire</span></button>
             <nav>
                 <ul>
                     {% if current_user.is_authenticated and current_user.role == 'archer' %}
-                    {{ nav_link(url_for('archer_portal'), '🏠', 'Mon espace', request.endpoint == 'archer_portal') }}
-                    {{ nav_link(url_for('archer_my_bow'), '🎯', 'Mon arc', request.endpoint == 'archer_my_bow') }}
-                    {{ nav_link(url_for('archer_my_courses'), '📚', 'Mes cours', request.endpoint == 'archer_my_courses') }}
-                    {{ nav_link(url_for('archer_events'), '📅', 'Événements', request.endpoint in ('archer_events', 'archer_event_signup', 'archer_event_cancel_registration')) }}
+                    {{ nav_link(url_for('archer_portal'), 'home', 'Mon espace', request.endpoint == 'archer_portal') }}
+                    {{ nav_link(url_for('archer_my_bow'), 'target', 'Mon arc', request.endpoint == 'archer_my_bow') }}
+                    {{ nav_link(url_for('archer_my_courses'), 'book-open', 'Mes cours', request.endpoint == 'archer_my_courses') }}
+                    {{ nav_link(url_for('archer_events'), 'calendar', 'Événements', request.endpoint in ('archer_events', 'archer_event_signup', 'archer_event_cancel_registration')) }}
                     {% else %}
-                    {{ nav_link('/', '🏠', 'Accueil', request.path == '/') }}
+                    {{ nav_link('/', 'home', 'Accueil', request.path == '/') }}
                     {% if current_user.role not in ('lecteur', 'archer') %}
-                    {{ nav_link('/categories', '📁', 'Catégories', request.path.startswith('/categories')) }}
+                    {{ nav_link('/categories', 'folder', 'Catégories', request.path.startswith('/categories')) }}
                     {% endif %}
-                    {{ nav_link('/products', '📦', 'Produits', request.path.startswith('/products')) }}
-                    {{ nav_link('/composites', '🎯', 'Arcs', request.path.startswith('/composites')) }}
-                    {{ nav_link(url_for('inventaire'), 'Inv', 'Inventaire', request.path.startswith('/inventaire')) }}
+                    {{ nav_link('/products', 'package', 'Produits', request.path.startswith('/products')) }}
+                    {{ nav_link('/composites', 'target', 'Arcs', request.path.startswith('/composites')) }}
+                    {{ nav_link(url_for('inventaire'), 'scan-barcode', 'Inventaire', request.path.startswith('/inventaire')) }}
                     {% if current_user.role not in ('lecteur', 'archer') %}
-                    {{ nav_link('/archers', '👥', 'Archers', request.path.startswith('/archers')) }}
-                    {{ nav_link('/inscription_evenement', '📧', 'Inscription (mail)', request.path.startswith('/inscription_evenement')) }}
+                    {{ nav_link('/archers', 'users', 'Archers', request.path.startswith('/archers')) }}
+                    {{ nav_link('/inscription_evenement', 'mail', 'Inscription (mail)', request.path.startswith('/inscription_evenement')) }}
                     {% endif %}
-                    {{ nav_link('/assignments', '🔄', 'Assignations', request.path.startswith('/assignments')) }}
-                    {{ nav_link('/courses', '📚', 'Cours', request.path.startswith('/courses')) }}
+                    {{ nav_link('/assignments', 'refresh-cw', 'Assignations', request.path.startswith('/assignments')) }}
+                    {{ nav_link('/courses', 'book-open', 'Cours', request.path.startswith('/courses')) }}
                     {% if current_user.role not in ('lecteur', 'archer') %}
-                    {{ nav_link('/history', '🕒', 'Historique', request.path.startswith('/history')) }}
+                    {{ nav_link('/history', 'history', 'Historique', request.path.startswith('/history')) }}
                     {% endif %}
                     {% if current_user.is_authenticated and current_user.is_admin() %}
                     <li><hr></li>
-                    {{ nav_link('/users', '👤', 'Utilisateurs', request.path.startswith('/users')) }}
-                    {{ nav_link(url_for('login_history'), '🔑', 'Connexions', request.path.startswith('/login_history')) }}
+                    {{ nav_link('/users', 'user', 'Utilisateurs', request.path.startswith('/users')) }}
+                    {{ nav_link(url_for('login_history'), 'key', 'Connexions', request.path.startswith('/login_history')) }}
                     {% endif %}
                     {% endif %}
                 </ul>
@@ -169,6 +170,7 @@
         }
       })();
     </script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
     {% if not shell_minimal %}
     <script src="{{ url_for('static', filename='table-sort.js') }}" defer></script>

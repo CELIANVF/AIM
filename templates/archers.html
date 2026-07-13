@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
 {% block title %}Archers{% endblock %}
@@ -6,20 +7,20 @@
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>👥 Archers</h1>
+        <h1><span class="with-icon">{{ icon("users", 20) }} Archers</span></h1>
         <p class="muted">{{ archers|length }} archer(s) enregistré(s)</p>
     </div>
     <div class="action-group">
         {% if current_user.can_edit() %}
-        <a class="btn btn-primary" href="/add_archer">➕ Ajouter un archer</a>
-        <a class="btn btn-outline" href="/import_archers">📥 Importer CSV</a>
+        <a class="btn btn-primary" href="/add_archer"><span class="with-icon">{{ icon("plus", 16) }} Ajouter un archer</span></a>
+        <a class="btn btn-outline" href="/import_archers"><span class="with-icon">{{ icon("upload", 16) }} Importer CSV</span></a>
         {% endif %}
         {% if current_user.can_create_archer_account() %}
-        <a class="btn btn-outline" href="{{ url_for('create_archer_account') }}">🔐 Créer compte Archer</a>
+        <a class="btn btn-outline" href="{{ url_for('create_archer_account') }}"><span class="with-icon">{{ icon("lock", 16) }} Créer compte Archer</span></a>
         {% endif %}
-        <a class="btn btn-outline" href="{{ url_for('inscription_evenement') }}">📧 Texte d'inscription</a>
-        <a class="btn btn-outline" href="/export_archers">📄 Exporter PDF</a>
-        <a class="btn btn-outline" href="/export_archers_csv">📊 Exporter CSV</a>
+        <a class="btn btn-outline" href="{{ url_for('inscription_evenement') }}"><span class="with-icon">{{ icon("mail", 16) }} Texte d'inscription</span></a>
+        <a class="btn btn-outline" href="/export_archers"><span class="with-icon">{{ icon("file-text", 16) }} Exporter PDF</span></a>
+        <a class="btn btn-outline" href="/export_archers_csv"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter CSV</span></a>
     </div>
 </div>
 
@@ -37,12 +38,12 @@
 {% if current_filters.max_age %}{% set _ = _active_filters.append({'k':'max_age','label':'Âge ≤ ' ~ current_filters.max_age}) %}{% endif %}
 
 <details class="filter-panel" {% if _active_filters %}open{% endif %}>
-    <summary class="filter-panel__label">📊 Filtrer et trier
+    <summary class="filter-panel__label"><span class="with-icon">{{ icon('chart-bar', 16) }} Filtrer et trier</span>
         {% if _active_filters %}<span class="badge badge-primary badge--inline-sm">{{ _active_filters|length }}</span>{% endif %}
     </summary>
     <div class="filter-panel__row mt-2">
         <form method="GET" action="/archers" class="filter-panel__form" data-no-loading>
-            <input type="text" name="q" placeholder="🔍 Recherche (nom/prénom)" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}" aria-label="Recherche">
+            <input type="text" name="q" placeholder="Recherche (nom/prénom)" value="{% if current_filters.q %}{{ current_filters.q }}{% endif %}" aria-label="Recherche">
             <select name="course_id" onchange="this.form.submit()" aria-label="Cours">
                 <option value="">Tous les cours</option>
                 {% for course in courses %}
@@ -51,8 +52,8 @@
             </select>
             <select name="has_arc" onchange="this.form.submit()" aria-label="Statut d'arc">
                 <option value="">Arc (tous)</option>
-                <option value="yes" {% if current_filters.has_arc == 'yes' %}selected{% endif %}>✅ Assigné</option>
-                <option value="no" {% if current_filters.has_arc == 'no' %}selected{% endif %}>❌ Non assigné</option>
+                <option value="yes" {% if current_filters.has_arc == 'yes' %}selected{% endif %}><span class="with-icon">{{ icon("circle-check", 14) }} Assigné</span></option>
+                <option value="no" {% if current_filters.has_arc == 'no' %}selected{% endif %}><span class="with-icon">{{ icon("circle-x", 14) }} Non assigné</span></option>
             </select>
             <select name="category" onchange="this.form.submit()" aria-label="Catégorie">
                 <option value="">Toutes catégories</option>
@@ -156,27 +157,27 @@
                 <td class="td-actions">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline btn-sm" href="/edit_archer/{{ a.id }}">✏️ Modifier</a>
+                        <a class="btn btn-outline btn-sm" href="/edit_archer/{{ a.id }}"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
                         {% if a.current_assignment %}
                         <form method="POST" action="/return/{{ a.current_assignment.id }}" class="form-inline" onsubmit="return confirm('Retourner l\'arc {{ a.current_assignment.composite.name }} ?');">
-                            <button type="submit" class="btn btn-warning btn-sm">↩️ Retour</button>
+                            <button type="submit" class="btn btn-warning btn-sm"><span class="with-icon">{{ icon("undo-2", 16) }} Retour</span></button>
                         </form>
                         {% else %}
-                        <a class="btn btn-success btn-sm" href="/assign?archer_id={{ a.id }}">🎯 Arc</a>
+                        <a class="btn btn-success btn-sm" href="/assign?archer_id={{ a.id }}"><span class="with-icon">{{ icon("target", 16) }} Arc</span></a>
                         {% endif %}
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_archer/{{ a.id }}" class="form-inline" onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                        <form method="POST" action="/delete_archer/{{ a.id }}" class="form-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet archer ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger btn-sm"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
                         </form>
                         {% endif %}
                         {% if current_user.can_create_archer_account() and not a.has_account %}
                             {% if a.email %}
                             <form method="POST" action="{{ url_for('create_archer_account_row', archer_id=a.id) }}" class="form-inline" onsubmit="return confirm('Créer un compte et envoyer les identifiants par e-mail à cet archer ?');">
-                                <button type="submit" class="btn btn-outline btn-sm">🔐 Créer compte</button>
+                                <button type="submit" class="btn btn-outline btn-sm"><span class="with-icon">{{ icon("lock", 16) }} Créer compte</span></button>
                             </form>
                             {% elif current_user.can_edit() %}
-                            <a class="btn btn-outline btn-sm btn-muted" href="{{ url_for('edit_archer', archer_id=a.id) }}" title="Ajoutez un e-mail sur la fiche pour pouvoir créer un compte">📧 E-mail requis</a>
+                            <a class="btn btn-outline btn-sm btn-muted" href="{{ url_for('edit_archer', archer_id=a.id) }}" title="Ajoutez un e-mail sur la fiche pour pouvoir créer un compte"><span class="with-icon">{{ icon("mail", 16) }} E-mail requis</span></a>
                             {% else %}
                             <span class="muted small text-nowrap" title="Adresse e-mail manquante — un responsable peut la renseigner sur la fiche archer">Sans e-mail</span>
                             {% endif %}
@@ -192,7 +193,7 @@
 <div class="card empty-state">
     <p class="muted">Aucun archer enregistré pour le moment</p>
     {% if current_user.can_edit() %}
-    <a href="/add_archer" class="btn btn-primary">➕ Ajouter le premier archer</a>
+    <a href="/add_archer" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Ajouter le premier archer</span></a>
     {% endif %}
 </div>
 {% endif %}

@@ -127,6 +127,7 @@ class CompositeProduct(db.Model):
     status = db.Column(db.String(20), default='club')  # club, loan
     # Code d'identification physique (ex. "A-001") — imprimé sur l'étiquette de l'arc
     tag = db.Column(db.String(32), unique=True, index=True, nullable=True)
+    last_verification_date = db.Column(db.Date, nullable=True)
     components = db.relationship('Product', secondary=composite_components, backref='composites')
 
 class Archer(UserMixin, db.Model):

@@ -1,3 +1,4 @@
+{% from "_icons.html" import icon %}
 {# Références cliquables vers les fiches (selon les droits utilisateur). #}
 {% macro ref_archer(aid, text=None) -%}
 {%- set label = text if text is not none else aid -%}

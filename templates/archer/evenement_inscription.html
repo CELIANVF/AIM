@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_icons.html" import icon %}
 {% set aid = archer.id %}
 {% set archer_disc_count = inscription_disciplines|length %}
 {% set archer_fixed_disc = archer_disc_count == 1 %}
@@ -16,7 +17,7 @@
 {% block content %}
 <div class="header-with-actions">
     <div>
-        <h1>📅 {{ event.title }}</h1>
+        <h1><span class="with-icon">{{ icon("calendar", 20) }} {{ event.title }}</span></h1>
         <p class="muted">Complétez ou modifiez votre inscription</p>
     </div>
     <a class="btn btn-outline" href="{{ url_for('archer_events') }}">← Événements</a>
