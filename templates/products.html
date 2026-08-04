@@ -201,29 +201,51 @@
                 <td>
                     {% if direct_loan %}
                         {% set _who = direct_loan.archer.name if direct_loan.archer else ('#' ~ direct_loan.archer_id) %}
-                        {% if current_user.can_edit() %}
-                        <a class="badge badge-warning product-assign-badge" href="{{ url_for('edit_archer', archer_id=direct_loan.archer_id) }}" title="Fiche archer">Assigné<span class="product-assign-name">{{ _who }}</span></a>
-                        {% else %}
-                        <span class="badge badge-warning product-assign-badge product-assign-badge--static">Assigné<span class="product-assign-name">{{ _who }}</span></span>
-                        {% endif %}
+                        <span class="badge badge-warning product-assign-badge product-assign-badge--static">
+                            Assigné
+                            <span class="product-assign-refs">
+                                {% if current_user.can_edit() %}
+                                <a class="product-assign-ref" href="{{ url_for('edit_archer', archer_id=direct_loan.archer_id) }}" title="Fiche archer"><span class="product-assign-ref-label">Archer</span> {{ _who }}</a>
+                                {% else %}
+                                <span class="product-assign-ref"><span class="product-assign-ref-label">Archer</span> {{ _who }}</span>
+                                {% endif %}
+                            </span>
+                        </span>
                     {% elif assigned_comps %}
                         {% set _ac = assigned_comps[0] %}
                         {% set _loan = (_ac.assignments|rejectattr('date_returned')|list)|first %}
                         {% set _who = (_loan.archer.name if _loan and _loan.archer else ('#' ~ _loan.archer_id if _loan else None)) %}
-                        {% if current_user.can_edit() and _loan %}
-                        <a class="badge badge-warning product-assign-badge" href="{{ url_for('edit_archer', archer_id=_loan.archer_id) }}" title="Fiche archer">Assigné{% if _who %}<span class="product-assign-name">{{ _who }}</span>{% endif %}</a>
-                        {% elif current_user.can_edit() %}
-                        <a class="badge badge-warning product-assign-badge" href="{{ url_for('edit_composite', comp_id=_ac.id) }}" title="Ouvrir l’arc">Assigné{% if _who %}<span class="product-assign-name">{{ _who }}</span>{% endif %}</a>
-                        {% else %}
-                        <span class="badge badge-warning product-assign-badge product-assign-badge--static">Assigné{% if _who %}<span class="product-assign-name">{{ _who }}</span>{% endif %}</span>
-                        {% endif %}
+                        {% set _arc_name = _ac.name or ('#' ~ _ac.id) %}
+                        <span class="badge badge-warning product-assign-badge product-assign-badge--static">
+                            Assigné
+                            <span class="product-assign-refs">
+                                {% if _loan %}
+                                    {% if current_user.can_edit() %}
+                                    <a class="product-assign-ref" href="{{ url_for('edit_archer', archer_id=_loan.archer_id) }}" title="Fiche archer"><span class="product-assign-ref-label">Archer</span> {{ _who }}</a>
+                                    {% else %}
+                                    <span class="product-assign-ref"><span class="product-assign-ref-label">Archer</span> {{ _who }}</span>
+                                    {% endif %}
+                                {% endif %}
+                                {% if current_user.can_edit() %}
+                                <a class="product-assign-ref" href="{{ url_for('edit_composite', comp_id=_ac.id) }}" title="Ouvrir l’arc"><span class="product-assign-ref-label">Arc</span> {{ _arc_name }}</a>
+                                {% else %}
+                                <span class="product-assign-ref"><span class="product-assign-ref-label">Arc</span> {{ _arc_name }}</span>
+                                {% endif %}
+                            </span>
+                        </span>
                     {% elif comps %}
                         {% set _mc = comps[0] %}
-                        {% if current_user.can_edit() %}
-                        <a class="badge badge-primary" style="text-decoration:none" href="{{ url_for('edit_composite', comp_id=_mc.id) }}" title="Ouvrir l’arc">Monté</a>
-                        {% else %}
-                        <span class="badge badge-primary">Monté</span>
-                        {% endif %}
+                        {% set _arc_name = _mc.name or ('#' ~ _mc.id) %}
+                        <span class="badge badge-primary product-assign-badge product-assign-badge--static">
+                            Monté
+                            <span class="product-assign-refs">
+                                {% if current_user.can_edit() %}
+                                <a class="product-assign-ref" href="{{ url_for('edit_composite', comp_id=_mc.id) }}" title="Ouvrir l’arc"><span class="product-assign-ref-label">Arc</span> {{ _arc_name }}</a>
+                                {% else %}
+                                <span class="product-assign-ref"><span class="product-assign-ref-label">Arc</span> {{ _arc_name }}</span>
+                                {% endif %}
+                            </span>
+                        </span>
                     {% elif p.state == 'stock' %}
                         <span class="badge badge-success">Dispo</span>
                     {% elif p.state == 'broken' %}

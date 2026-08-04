@@ -393,8 +393,8 @@ span.product-assign-badge--static{
   display:inline-flex;
   flex-direction:column;
   align-items:flex-start;
-  gap:2px;
-  max-width:min(260px,100%);
+  gap:3px;
+  max-width:min(280px,100%);
   white-space:normal;
   text-align:left;
   line-height:1.3;
@@ -407,6 +407,30 @@ span.product-assign-badge--static{
   color:var(--text-secondary);
   max-width:100%;
   overflow-wrap:anywhere;
+}
+.product-assign-refs{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  max-width:100%;
+}
+.product-assign-ref{
+  display:block;
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-secondary);
+  max-width:100%;
+  overflow-wrap:anywhere;
+  text-decoration:none;
+}
+a.product-assign-ref:hover{
+  color:var(--primary-hover);
+  text-decoration:underline;
+}
+.product-assign-ref-label{
+  font-weight:500;
+  opacity:0.75;
 }
 a.product-assign-badge:hover .product-assign-name{
   color:var(--primary-hover);
