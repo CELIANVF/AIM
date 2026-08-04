@@ -94,6 +94,7 @@
                                             {{ current.brand }}{% if current.model %} {{ current.model }}{% endif %}
                                         </a>
                                     </strong>
+                                    {% if current.tag %}<code class="small">{{ current.tag }}</code>{% endif %}
                                     <span class="muted small">
                                         {% if current.size %}{{ current.size }}{% endif %}
                                         {% if current.power %}{% if current.size %} • {% endif %}{{ current.power }}{% endif %}
@@ -150,7 +151,7 @@
             <button type="button" class="btn btn-outline btn-sm" id="picker-close" aria-label="Fermer"><span class="with-icon">{{ icon("x", 16) }}</span></button>
         </header>
         <div class="picker-modal__toolbar">
-            <input type="search" id="picker-search" placeholder="Rechercher (marque, modèle, taille, commentaire…)" autocomplete="off">
+            <input type="search" id="picker-search" placeholder="Rechercher (code, marque, modèle, taille, commentaire…)" autocomplete="off">
             <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">
                 <input type="checkbox" id="picker-only-free">
                 Disponibles uniquement
@@ -177,6 +178,7 @@
         {% endfor %}
         {% set _ = products_list.append({
             'id': p.id,
+            'tag': p.tag or '',
             'brand': p.brand or '',
             'model': p.model or '',
             'size': p.size or '',
@@ -276,7 +278,7 @@
     function productMatchesQuery(p, q){
         if (!q) return true;
         const haystack = [
-            p.brand, p.model, p.size, p.power, p.state, p.location, p.comments,
+            p.tag, p.brand, p.model, p.size, p.power, p.state, p.location, p.comments,
             ...(p.custom_values ? Object.entries(p.custom_values).map(([k,v]) => k+':'+v) : []),
             ...(p.mounted_on ? p.mounted_on.map(o => o.name) : []),
         ].join(' ').toLowerCase();
@@ -315,10 +317,12 @@
                 : '';
             const title = escapeHtml((p.brand || '') + (p.model ? ' ' + p.model : '')) || '<em>(sans nom)</em>';
             const sizePower = [p.size, p.power].filter(Boolean).map(escapeHtml).join(' • ');
+            const tagHtml = p.tag ? '<code class="small">' + escapeHtml(p.tag) + '</code>' : '';
             return ''
                 + '<button type="button" class="picker-item' + (isSelected ? ' picker-item--selected' : '') + '" data-pid="' + p.id + '">'
                 +   '<div class="picker-item__head">'
                 +     '<strong class="picker-item__title">' + title + '</strong>'
+                +     tagHtml
                 +     stateBadgeHtml(p.state, badgeCtx)
                 +     (isSelected ? '<span class="badge badge-primary">Actuellement monté</span>' : '')
                 +   '</div>'
@@ -381,6 +385,7 @@
                 + '<div class="component-slot__chip" data-product-id="' + p.id + '">'
                 +   '<div class="component-slot__chip-main">'
                 +     '<strong><a href="' + escapeHtml(p.edit_url) + '" target="_blank" rel="noopener" class="ref-link" onclick="event.stopPropagation()">' + title + '</a></strong>'
+                +     (p.tag ? '<code class="small">' + escapeHtml(p.tag) + '</code>' : '')
                 +     (sizePower ? '<span class="muted small">' + sizePower + '</span>' : '')
                 +   '</div>'
                 +   '<div class="component-slot__chip-meta small">'
