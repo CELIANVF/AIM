@@ -12,6 +12,7 @@ from models import (
     CompositeProduct,
     Archer,
     Assignment,
+    ProductAssignment,
     HistoryEvent,
     Course,
     Attendance,
@@ -3371,7 +3372,23 @@ def search():
 @require_permission('view_assignments')
 def assignments():
     assigns = Assignment.query.filter_by(date_returned=None).all()
-    return render_template('assignments.html', assignments=assigns)
+    product_assigns = ProductAssignment.query.filter_by(date_returned=None).all()
+    # Regroupement par archer : une carte = tout le matériel emprunté par un archer
+    by_archer = {}
+    for a in assigns:
+        by_archer.setdefault(a.archer, {'bows': [], 'products': []})['bows'].append(a)
+    for pa in product_assigns:
+        by_archer.setdefault(pa.archer, {'bows': [], 'products': []})['products'].append(pa)
+    archer_groups = sorted(
+        by_archer.items(),
+        key=lambda kv: ((kv[0].last_name or '').lower(), (kv[0].first_name or '').lower()),
+    )
+    return render_template(
+        'assignments.html',
+        assignments=assigns,
+        product_assignments=product_assigns,
+        archer_groups=archer_groups,
+    )
 
 @app.route('/return/<int:assign_id>', methods=['POST'])
 @login_required
@@ -3399,6 +3416,7 @@ def delete_archer(archer_id):
     Attendance.query.filter_by(archer_id=archer_id).delete()
     # Delete associated assignments (cascade will also handle this now)
     Assignment.query.filter_by(archer_id=archer_id).delete()
+    ProductAssignment.query.filter_by(archer_id=archer_id).delete()
     db.session.delete(arch)
     db.session.commit()
     return redirect(url_for('archers'))
@@ -3411,6 +3429,8 @@ def delete_product(prod_id):
     # Remove from any composites
     for comp in prod.composites:
         comp.components.remove(prod)
+    # Delete direct loans of this product
+    ProductAssignment.query.filter_by(product_id=prod_id).delete()
     log_history(
         event_type='product_deleted',
         entity_type='product',
@@ -3993,6 +4013,75 @@ def assign():
     selected_archer = Archer.query.get(archer_id) if archer_id else None
     return render_template('assign.html', archers=archs, composites=comps, selected_archer=selected_archer, all_composites=all_comps)
 
+@app.route('/assign_product', methods=['GET', 'POST'])
+@login_required
+@require_permission('manage_assignments_for_coach')
+def assign_product():
+    if request.method == 'POST':
+        archer_id = request.form['archer_id']
+        product_id = request.form['product_id']
+        prod = Product.query.get_or_404(product_id)
+        archer = Archer.query.get_or_404(archer_id)
+        # Garde-fou : produit déjà prêté ou monté sur un arc
+        if prod.current_assignment or prod.composites:
+            flash("Ce produit n'est pas disponible (déjà prêté ou monté sur un arc).", 'error')
+            return redirect(url_for('assign_product'))
+        pa = ProductAssignment(archer_id=archer.id, product_id=prod.id)
+        prod.state = 'loan'
+        db.session.add(pa)
+        log_history(
+            event_type='product_assignment',
+            entity_type='product_assignment',
+            entity_id=None,
+            summary=f"Produit assigné: {archer.name} ← {_product_label(prod)}",
+            details={'archer': archer.name, 'product': _product_label(prod)}
+        )
+        db.session.commit()
+        return redirect(url_for('assignments'))
+    archer_id = request.args.get('archer_id')
+    archs = Archer.query.order_by(Archer.last_name).all()
+    all_products = Product.query.join(Category).order_by(Category.position.asc(), Product.brand.asc()).all()
+    open_loan_ids = {pa.product_id for pa in ProductAssignment.query.filter_by(date_returned=None).all()}
+    available_products = [
+        p for p in all_products
+        if p.id not in open_loan_ids and not p.composites and p.state != 'broken'
+    ]
+    selected_archer = Archer.query.get(archer_id) if archer_id else None
+    return render_template(
+        'assign_product.html',
+        archers=archs,
+        products=available_products,
+        selected_archer=selected_archer,
+    )
+
+@app.route('/return_product/<int:passign_id>', methods=['POST'])
+@login_required
+@require_permission('manage_assignments_for_coach')
+def return_product_assignment(passign_id):
+    pa = ProductAssignment.query.get_or_404(passign_id)
+    pa.date_returned = db.func.now()
+    if pa.product and pa.product.state == 'loan':
+        pa.product.state = 'stock'
+    log_history(
+        event_type='product_assignment_return',
+        entity_type='product_assignment',
+        entity_id=pa.id,
+        summary=f"Retour produit: {pa.archer.name} → {_product_label(pa.product)}",
+        details={'archer': pa.archer.name, 'product': _product_label(pa.product)}
+    )
+    db.session.commit()
+    return redirect(url_for('assignments'))
+
+def _product_label(prod):
+    """Libellé lisible d'un produit pour l'historique et les listes (ex. « Palette Decut (M) »)."""
+    if not prod:
+        return 'Produit inconnu'
+    parts = [prod.category.name if prod.category else None, prod.brand, prod.model]
+    label = ' '.join(x for x in parts if x)
+    if prod.size:
+        label += f" ({prod.size})"
+    return label or f"Produit #{prod.id}"
+
 @app.route('/reset_composite_status/<int:comp_id>', methods=['POST'])
 @login_required
 @require_permission('manage_assignments_for_coach')
@@ -4006,7 +4095,7 @@ def reset_composite_status(comp_id):
 @login_required
 def history():
     events = HistoryEvent.query.order_by(HistoryEvent.created_at.desc()).all()
-    assignment_events = [e for e in events if e.event_type in ('assignment', 'assignment_return')]
+    assignment_events = [e for e in events if e.event_type in ('assignment', 'assignment_return', 'product_assignment', 'product_assignment_return')]
     composite_events = [e for e in events if e.event_type in ('composite_created', 'composite_change', 'composite_deleted')]
     product_events = [e for e in events if e.event_type in ('product_created', 'product_updated', 'product_deleted')]
     return render_template(
@@ -4227,7 +4316,8 @@ def export_assignments():
         from flask import render_template
 
         assigns = Assignment.query.filter_by(date_returned=None).all()
-        html = render_template('assignments_pdf.html', assigns=assigns)
+        product_assigns = ProductAssignment.query.filter_by(date_returned=None).all()
+        html = render_template('assignments_pdf.html', assigns=assigns, product_assigns=product_assigns)
         css = CSS(string='''
             body { font-family: Arial, sans-serif; font-size:12px; }
             h1 { font-size:18px; }
@@ -4244,10 +4334,17 @@ def export_assignments():
         buffer = BytesIO()
         p = canvas.Canvas(buffer)
         assigns = Assignment.query.filter_by(date_returned=None).all()
+        product_assigns = ProductAssignment.query.filter_by(date_returned=None).all()
         p.drawString(100, 800, "Assignations actuelles")
         y = 780
         for ass in assigns:
             p.drawString(100, y, f"{ass.archer.name} - {ass.composite.name} - {ass.date_assigned.strftime('%d/%m/%Y')}")
+            y -= 20
+            if y < 50:
+                p.showPage()
+                y = 800
+        for pa in product_assigns:
+            p.drawString(100, y, f"{pa.archer.name} - {_product_label(pa.product)} - {pa.date_assigned.strftime('%d/%m/%Y')}")
             y -= 20
             if y < 50:
                 p.showPage()
@@ -4975,11 +5072,9 @@ def export_assignments_csv():
     writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     
     # Headers
-    writer.writerow(['ID', 'Archer', 'Arc', 'Date d\'assignation', 'Date de retour', 'Durée (jours)', 'Statut'])
-    
-    # Data
-    assigns = Assignment.query.all()
-    for ass in assigns:
+    writer.writerow(['ID', 'Type', 'Archer', 'Matériel', 'Date d\'assignation', 'Date de retour', 'Durée (jours)', 'Statut'])
+
+    def _row(ass, kind, label):
         duration = ''
         status = 'Actif'
         if ass.date_returned:
@@ -4987,16 +5082,21 @@ def export_assignments_csv():
             status = 'Retourné'
         else:
             duration = (datetime.now().date() - ass.date_assigned.date()).days if isinstance(ass.date_assigned, datetime) else ''
-        
         writer.writerow([
             ass.id,
+            kind,
             f"{ass.archer.first_name} {ass.archer.last_name}" if ass.archer else '',
-            ass.composite.name if ass.composite else '',
+            label,
             ass.date_assigned.strftime('%d/%m/%Y') if ass.date_assigned else '',
             ass.date_returned.strftime('%d/%m/%Y') if ass.date_returned else '',
             duration,
             status
         ])
+
+    for ass in Assignment.query.all():
+        _row(ass, 'Arc', ass.composite.name if ass.composite else '')
+    for pa in ProductAssignment.query.all():
+        _row(pa, 'Produit', _product_label(pa.product))
     
     buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
     buffer.seek(0)
@@ -5417,12 +5517,14 @@ def archer_my_bow():
     assign = archer.current_assignment
     comp = assign.composite if assign else None
     products = list(comp.components) if comp else []
+    product_loans = ProductAssignment.query.filter_by(archer_id=archer.id, date_returned=None).all()
     return render_template(
         'archer/mon_arc.html',
         archer=archer,
         assignment=assign,
         composite=comp,
         products=products,
+        product_loans=product_loans,
     )
 
 

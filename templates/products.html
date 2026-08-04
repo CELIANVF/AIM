@@ -171,7 +171,8 @@
             {% for p in products_by_category %}
             {%- set comps = p.composites|list -%}
             {%- set assigned_comps = comps|selectattr('status','equalto','loan')|list -%}
-            {%- if assigned_comps -%}
+            {%- set direct_loan = p.current_assignment -%}
+            {%- if assigned_comps or direct_loan -%}
                 {%- set _status_label = 'Assigné' -%}
             {%- elif comps -%}
                 {%- set _status_label = 'Monté' -%}
@@ -198,7 +199,14 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if assigned_comps %}
+                    {% if direct_loan %}
+                        {% set _who = direct_loan.archer.name if direct_loan.archer else ('#' ~ direct_loan.archer_id) %}
+                        {% if current_user.can_edit() %}
+                        <a class="badge badge-warning product-assign-badge" href="{{ url_for('edit_archer', archer_id=direct_loan.archer_id) }}" title="Fiche archer">Assigné<span class="product-assign-name">{{ _who }}</span></a>
+                        {% else %}
+                        <span class="badge badge-warning product-assign-badge product-assign-badge--static">Assigné<span class="product-assign-name">{{ _who }}</span></span>
+                        {% endif %}
+                    {% elif assigned_comps %}
                         {% set _ac = assigned_comps[0] %}
                         {% set _loan = (_ac.assignments|rejectattr('date_returned')|list)|first %}
                         {% set _who = (_loan.archer.name if _loan and _loan.archer else ('#' ~ _loan.archer_id if _loan else None)) %}

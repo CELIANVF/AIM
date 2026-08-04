@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% from "_icons.html" import icon %}
+
+{% block title %}Assigner Produit{% endblock %}
+
+{% block content %}
+<div class="action-bar-row">
+    <div>
+        <h1><span class="with-icon">{{ icon("package", 20) }} Assigner un produit à un archer</span></h1>
+        <p class="muted u-mb-0 mt-1">Prêt d'un produit unitaire, sans passer par un arc (ex. palette, carquois, plastron…)</p>
+    </div>
+    <a href="{{ url_for('assignments') }}" class="btn btn-outline">← Retour aux assignations</a>
+</div>
+
+<div class="card u-max-w-600">
+    <form method="post">
+        <div class="form-group">
+            <label for="archer_id">Archer</label>
+            <select name="archer_id" id="archer_id" required>
+                <option value="">— Sélectionnez un archer —</option>
+                {% for a in archers %}
+                <option value="{{ a.id }}"{% if selected_archer and selected_archer.id == a.id %} selected{% endif %}>{{ a.name }} ({{ a.license_number }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="product_id">Produit disponible</label>
+            <select name="product_id" id="product_id" required>
+                <option value="">— Sélectionnez un produit —</option>
+                {% for p in products %}
+                <option value="{{ p.id }}">
+                    {{ p.category.name if p.category else '?' }} — {{ p.brand or '' }}{% if p.model %} {{ p.model }}{% endif %}{% if p.size %} · Taille {{ p.size }}{% endif %}{% if p.power %} · {{ p.power }}{% endif %}{% if p.tag %} [{{ p.tag }}]{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <p class="form-help">Seuls les produits en stock, non montés sur un arc et non prêtés, sont proposés.</p>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit" {% if not products %}disabled{% endif %}><span class="with-icon">{{ icon("check", 16) }} Assigner le produit</span></button>
+            <a class="btn btn-outline" href="{{ url_for('assignments') }}">Annuler</a>
+        </div>
+    </form>
+</div>
+
+{% if not products %}
+<div class="notice">
+    <p class="small muted">Aucun produit disponible : tous les produits sont soit montés sur un arc, soit déjà prêtés, soit cassés.</p>
+</div>
+{% endif %}
+{% endblock %}

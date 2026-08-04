@@ -5,58 +5,166 @@
 {% block title %}Assignations{% endblock %}
 
 {% block content %}
+<style>
+    .loans-toolbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    .loans-search {
+        flex: 1;
+        min-width: 220px;
+        max-width: 380px;
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    .loans-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 16px;
+        align-items: start;
+    }
+    .loan-card {
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        background: var(--background, #fff);
+        overflow: hidden;
+    }
+    .loan-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        padding: 12px 14px;
+        background: var(--background-secondary, #f5f5f5);
+        border-bottom: 1px solid var(--border-light);
+    }
+    .loan-card__header .archer-name { font-weight: 600; }
+    .loan-card__items { list-style: none; margin: 0; padding: 0; }
+    .loan-card__items li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border-light);
+    }
+    .loan-card__items li:last-child { border-bottom: none; }
+    .loan-item__label { flex: 1; min-width: 0; }
+    .loan-item__date { white-space: nowrap; }
+    .loan-card__footer {
+        display: flex;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--background-secondary, #f5f5f5);
+        border-top: 1px solid var(--border-light);
+    }
+</style>
+
 <div class="header-with-actions">
     <div>
         <h1>Assignations actuelles</h1>
-        <p class="muted">{{ assignments|length }} assignation(s)</p>
+        <p class="muted">{{ archer_groups|length }} archer(s) · {{ assignments|length }} arc(s) · {{ product_assignments|length }} produit(s)</p>
     </div>
     <div class="action-group">
         {% if current_user.can_manage_assignments_for_coach() %}
-        <a class="btn btn-primary" href="/assign">Nouvelle assignation</a>
+        <a class="btn btn-primary" href="/assign"><span class="with-icon">{{ icon("target", 16) }} Assigner un arc</span></a>
+        <a class="btn btn-primary" href="/assign_product"><span class="with-icon">{{ icon("package", 16) }} Assigner un produit</span></a>
         {% endif %}
         <a class="btn btn-secondary" href="/export_assignments"><span class="with-icon">{{ icon("file-text", 16) }} Exporter en PDF</span></a>
         <a class="btn btn-outline" href="/export_assignments_csv"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter en CSV</span></a>
     </div>
 </div>
 
-{% if assignments %}
-<div class="table-responsive">
-    <table class="table table-sortable table--flush u-min-w-560 table--cards-mobile">
-        <thead>
-            <tr>
-                <th class="th-id" data-sort="number">ID</th>
-                <th>Arc</th>
-                <th>Archer</th>
-                <th data-sort="date">Date d'assignation</th>
-                <th class="th-actions" data-sort="disable">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ass in assignments %}
-            <tr>
-                <td class="small muted td-tabular" data-label="ID">{{ ass.id }}</td>
-                <td data-label="Arc"><strong>{{ er.ref_composite(ass.composite_id, ass.composite.name) }}</strong></td>
-                <td data-label="Archer">{{ er.ref_archer(ass.archer_id, ass.archer.name) }}</td>
-                <td class="small" data-label="Date d'assignation">{{ ass.date_assigned.strftime('%d/%m/%Y') }}</td>
-                <td class="td-actions" data-label="Actions">
-                    {% if current_user.can_manage_assignments_for_coach() %}
-                    <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" class="form-inline">
-                        <button class="btn btn-outline btn-sm" type="submit"><span class="with-icon">{{ icon("undo-2", 16) }} Retourner</span></button>
-                    </form>
-                    {% else %}
-                    <span class="muted">—</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+{% if archer_groups %}
+<div class="loans-toolbar">
+    <input type="search" id="loans-search" class="loans-search" placeholder="Rechercher un archer (nom, licence)…" autocomplete="off">
+    <span class="small muted" id="loans-search-count"></span>
 </div>
+
+<div class="loans-grid" id="loans-grid">
+    {% for archer, loans in archer_groups %}
+    <div class="loan-card" data-search="{{ (archer.name ~ ' ' ~ (archer.license_number or ''))|lower|e }}">
+        <div class="loan-card__header">
+            <span class="archer-name">{{ er.ref_archer(archer.id, archer.name) }}</span>
+            <span class="small muted">{{ archer.license_number }}</span>
+        </div>
+        <ul class="loan-card__items">
+            {% for ass in loans.bows %}
+            <li>
+                <span class="muted" title="Arc">{{ icon("target", 16) }}</span>
+                <span class="loan-item__label">
+                    <strong>{{ er.ref_composite(ass.composite_id, ass.composite.name) }}</strong>
+                    {% if ass.composite.type %}<span class="small muted"> · {{ ass.composite.type }}</span>{% endif %}
+                </span>
+                <span class="small muted loan-item__date">{{ ass.date_assigned.strftime('%d/%m/%Y') }}</span>
+                {% if current_user.can_manage_assignments_for_coach() %}
+                <form method="post" action="{{ url_for('return_assignment', assign_id=ass.id) }}" class="form-inline"
+                      onsubmit="return confirm('Retourner {{ ass.composite.name|e }} ?');">
+                    <button class="btn btn-outline btn-sm" type="submit" title="Retourner cet arc">{{ icon("undo-2", 16) }}</button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+            {% for pa in loans.products %}
+            <li>
+                <span class="muted" title="Produit">{{ icon("package", 16) }}</span>
+                <span class="loan-item__label">
+                    {{ er.ref_product(pa.product_id, ((pa.product.category.name ~ ' ') if pa.product and pa.product.category else '') ~ (pa.product.brand or '') ~ ((' ' ~ pa.product.model) if pa.product and pa.product.model else '')) }}
+                    {% if pa.product and pa.product.size %}<span class="small muted"> · Taille {{ pa.product.size }}</span>{% endif %}
+                    {% if pa.product and pa.product.tag %} <code class="small">{{ pa.product.tag }}</code>{% endif %}
+                </span>
+                <span class="small muted loan-item__date">{{ pa.date_assigned.strftime('%d/%m/%Y') }}</span>
+                {% if current_user.can_manage_assignments_for_coach() %}
+                <form method="post" action="{{ url_for('return_product_assignment', passign_id=pa.id) }}" class="form-inline"
+                      onsubmit="return confirm('Retourner ce produit ?');">
+                    <button class="btn btn-outline btn-sm" type="submit" title="Retourner ce produit">{{ icon("undo-2", 16) }}</button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% if current_user.can_manage_assignments_for_coach() %}
+        <div class="loan-card__footer">
+            {% if not loans.bows %}
+            <a class="btn btn-outline btn-sm" href="{{ url_for('assign', archer_id=archer.id) }}"><span class="with-icon">{{ icon("plus", 14) }} Arc</span></a>
+            {% endif %}
+            <a class="btn btn-outline btn-sm" href="{{ url_for('assign_product', archer_id=archer.id) }}"><span class="with-icon">{{ icon("plus", 14) }} Produit</span></a>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('loans-search');
+    const count = document.getElementById('loans-search-count');
+    const cards = Array.from(document.querySelectorAll('#loans-grid .loan-card'));
+    if (!input) return;
+    function apply() {
+        const q = input.value.trim().toLowerCase();
+        let visible = 0;
+        cards.forEach(c => {
+            const show = !q || (c.getAttribute('data-search') || '').includes(q);
+            c.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        count.textContent = q ? visible + ' archer(s) trouvé(s)' : '';
+    }
+    input.addEventListener('input', apply);
+});
+</script>
+
 {% else %}
 <div class="card empty-state">
     <p class="muted">Aucune assignation en cours</p>
     {% if current_user.can_manage_assignments_for_coach() %}
-    <a href="/assign" class="btn btn-primary"><span class="with-icon">{{ icon("target", 16) }} Nouvelle assignation</span></a>
+    <a href="/assign" class="btn btn-primary"><span class="with-icon">{{ icon("target", 16) }} Assigner un arc</span></a>
+    <a href="/assign_product" class="btn btn-primary"><span class="with-icon">{{ icon("package", 16) }} Assigner un produit</span></a>
     {% endif %}
 </div>
 {% endif %}

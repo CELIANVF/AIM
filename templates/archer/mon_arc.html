@@ -15,7 +15,7 @@
 {% if not assignment %}
 <div class="card empty-state--tight">
     <p class="muted">Aucun arc ne vous est actuellement assigné.</p>
-    <p class="small muted mt-2">Rapprochez-vous du club pour une mise à disposition.</p>
+    {% if not product_loans %}<p class="small muted mt-2">Rapprochez-vous du club pour une mise à disposition.</p>{% endif %}
 </div>
 {% else %}
 <div class="card card--portal">
@@ -56,5 +56,40 @@
 {% else %}
 <p class="muted">Aucun composant listé sur cet arc.</p>
 {% endif %}
+{% endif %}
+
+{% if product_loans %}
+<div class="card card--portal mt-2">
+    <h2 class="mon-arc-title">Autres produits prêtés</h2>
+    <p class="small muted mon-arc-meta">Matériel prêté individuellement, en dehors de votre arc</p>
+</div>
+<div class="table-responsive">
+    <table class="table table--flush">
+        <thead>
+            <tr>
+                <th>Catégorie</th>
+                <th>Marque</th>
+                <th>Détails</th>
+                <th>Prêté le</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pa in product_loans %}
+            {% set p = pa.product %}
+            <tr>
+                <td>{{ p.category.name if p and p.category else '—' }}</td>
+                <td>{{ p.brand or '—' if p else '—' }}</td>
+                <td class="small">
+                    {% if p and p.model %}{{ p.model }}{% endif %}
+                    {% if p and p.size %}{% if p.model %} · {% endif %}Taille {{ p.size }}{% endif %}
+                    {% if p and p.power %}{% if p.model or p.size %} · {% endif %}{{ p.power }}{% endif %}
+                    {% if not p or (not p.model and not p.size and not p.power) %}—{% endif %}
+                </td>
+                <td class="small">{{ pa.date_assigned.strftime('%d/%m/%Y') if pa.date_assigned else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endif %}
 {% endblock %}

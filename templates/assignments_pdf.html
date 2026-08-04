@@ -19,6 +19,18 @@
         <td>{{ a.date_assigned.strftime('%d/%m/%Y') if a.date_assigned else '' }}</td>
       </tr>
       {% endfor %}
+      {% for pa in product_assigns %}
+      <tr>
+        <td>{{ pa.archer.name }}</td>
+        <td>
+          {{ pa.product.category.name if pa.product and pa.product.category else '' }}
+          {{ pa.product.brand or '' }}
+          {{ pa.product.model or '' }}
+          {% if pa.product and pa.product.size %}(Taille {{ pa.product.size }}){% endif %}
+        </td>
+        <td>{{ pa.date_assigned.strftime('%d/%m/%Y') if pa.date_assigned else '' }}</td>
+      </tr>
+      {% endfor %}
     </tbody>
   </table>
 </body>

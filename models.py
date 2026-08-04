@@ -115,6 +115,11 @@ class Product(db.Model):
     tag = db.Column(db.String(32), unique=True, index=True, nullable=True)
     category = db.relationship('Category', backref='products')
 
+    @property
+    def current_assignment(self):
+        """Prêt direct en cours (non retourné) de ce produit à un archer."""
+        return ProductAssignment.query.filter_by(product_id=self.id, date_returned=None).first()
+
 composite_components = db.Table('composite_components',
     db.Column('composite_id', db.Integer, db.ForeignKey('composite_product.id')),
     db.Column('product_id', db.Integer, db.ForeignKey('product.id'))
@@ -147,6 +152,7 @@ class Archer(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=True)
     # Relationships with cascade delete
     assignments = db.relationship('Assignment', backref='archer', cascade='all, delete-orphan')
+    product_assignments = db.relationship('ProductAssignment', backref='archer', cascade='all, delete-orphan')
     attendances = db.relationship('Attendance', backref='archer', cascade='all, delete-orphan')
 
     def get_id(self):
@@ -238,6 +244,11 @@ class Archer(UserMixin, db.Model):
         """Get the current (non-returned) bow assignment for this archer"""
         return Assignment.query.filter_by(archer_id=self.id, date_returned=None).first()
 
+    @property
+    def current_product_assignments(self):
+        """Prêts de produits unitaires en cours (non retournés) pour cet archer."""
+        return ProductAssignment.query.filter_by(archer_id=self.id, date_returned=None).all()
+
 class Assignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     archer_id = db.Column(db.Integer, db.ForeignKey('archer.id'), nullable=False)
@@ -245,6 +256,17 @@ class Assignment(db.Model):
     date_assigned = db.Column(db.DateTime, default=db.func.now())
     date_returned = db.Column(db.DateTime, nullable=True)
     composite = db.relationship('CompositeProduct', backref='assignments')
+
+class ProductAssignment(db.Model):
+    """Prêt direct d'un produit unitaire à un archer (sans passer par un arc)."""
+    __tablename__ = 'product_assignment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    archer_id = db.Column(db.Integer, db.ForeignKey('archer.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    date_assigned = db.Column(db.DateTime, default=db.func.now())
+    date_returned = db.Column(db.DateTime, nullable=True)
+    product = db.relationship('Product', backref='product_assignments')
 
 class HistoryEvent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
