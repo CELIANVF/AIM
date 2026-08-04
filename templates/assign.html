@@ -30,7 +30,7 @@
             <select name="composite_id" id="composite_id" required>
                 <option value="">— Sélectionnez un arc —</option>
                 {% for c in composites %}
-                <option value="{{ c.id }}">{{ c.name }} ({{ c.type }})</option>
+                <option value="{{ c.id }}"{% if selected_composite and selected_composite.id == c.id %} selected{% endif %}>{{ c.name }} ({{ c.type }})</option>
                 {% endfor %}
             </select>
             {% if not composites %}

@@ -5,10 +5,138 @@
 {% block title %}Arcs{% endblock %}
 
 {% block content %}
+<style>
+    .bows-toolbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+    .bows-search {
+        flex: 1;
+        min-width: 220px;
+        max-width: 360px;
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    .bows-filters {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .bows-filters .chip {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--background-secondary);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1.2;
+    }
+    .bows-filters .chip.active {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+    .bows-filters .chip-sep {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+        margin: 0 2px;
+    }
+    .bows-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 14px;
+        align-items: start;
+    }
+    .bow-card {
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        background: var(--background, #fff);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .bow-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 14px;
+        background: var(--background-secondary, #f5f5f5);
+        border-bottom: 1px solid var(--border-light);
+    }
+    .bow-card__title {
+        font-weight: 600;
+        font-size: 15px;
+        line-height: 1.3;
+    }
+    .bow-card__meta {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+        align-items: center;
+    }
+    .bow-card__body {
+        padding: 12px 14px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .bow-specs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 12px;
+        font-size: 13px;
+    }
+    .bow-specs dt {
+        color: var(--muted, #64748b);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin: 0;
+    }
+    .bow-specs dd {
+        margin: 0 0 2px;
+        font-weight: 500;
+    }
+    .bow-card__assignee {
+        font-size: 13px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--warning-light, #fef3c7);
+        color: var(--warning, #92400e);
+    }
+    .bow-card__assignee a { color: inherit; font-weight: 600; }
+    .bow-card__footer {
+        display: flex;
+        gap: 8px;
+        padding: 10px 14px;
+        border-top: 1px solid var(--border-light);
+        background: var(--background-secondary, #f5f5f5);
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .bow-card__footer .spacer { flex: 1; }
+    .bows-empty-filter {
+        display: none;
+        text-align: center;
+        padding: 32px 16px;
+        color: var(--muted, #64748b);
+    }
+</style>
+
 <div class="header-with-actions">
     <div>
         <h1><span class="with-icon">{{ icon("target", 20) }} Arcs composés</span></h1>
-        <p class="muted">{{ composites|length }} arc(s) enregistré(s)</p>
+        <p class="muted" id="bows-count">{{ composites|length }} arc(s) enregistré(s)</p>
     </div>
     <div class="action-group">
         {% if current_user.can_edit() %}
@@ -21,98 +149,171 @@
     </div>
 </div>
 
-<div class="sort-toolbar">
-    <span class="sort-toolbar__label">Trier par</span>
-    <a href="/composites?sort=name" class="btn btn-sm {% if current_sort == 'name' %}btn-primary{% else %}btn-outline{% endif %}"><span class="with-icon">{{ icon("file-text", 16) }} Nom</span></a>
-    <a href="/composites?sort=type" class="btn btn-sm {% if current_sort == 'type' %}btn-primary{% else %}btn-outline{% endif %}"><span class="with-icon">{{ icon("tag", 16) }} Type</span></a>
-    <a href="/composites?sort=status" class="btn btn-sm {% if current_sort == 'status' %}btn-primary{% else %}btn-outline{% endif %}"><span class="with-icon">{{ icon("map-pin", 16) }} Statut</span></a>
+{% if composites %}
+<div class="bows-toolbar">
+    <input type="search" id="bows-search" class="bows-search" placeholder="Rechercher (nom, code, archer)…" autocomplete="off">
+    <div class="bows-filters" id="bows-filters" role="group" aria-label="Filtres">
+        <button type="button" class="chip active" data-filter-group="status" data-filter="all">Tous</button>
+        <button type="button" class="chip" data-filter-group="status" data-filter="club">Au club</button>
+        <button type="button" class="chip" data-filter-group="status" data-filter="loan">En prêt</button>
+        <span class="chip-sep" aria-hidden="true"></span>
+        <button type="button" class="chip active" data-filter-group="type" data-filter="all">Tous types</button>
+        <button type="button" class="chip" data-filter-group="type" data-filter="CL">CL</button>
+        <button type="button" class="chip" data-filter-group="type" data-filter="BB">BB</button>
+    </div>
 </div>
 
-{% if composites %}
-<div class="table-responsive">
-    <table class="table table-sortable table--flush u-min-w-720">
-        <thead>
-            <tr>
-                <th class="th-id" data-sort="number">ID</th>
-                <th style="white-space:nowrap">Code</th>
-                <th>Nom</th>
-                <th>Type</th>
-                <th>Statut</th>
-                <th style="white-space:nowrap">Vérification</th>
-                <th>Caractéristiques</th>
-                <th class="th-actions" data-sort="disable">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in composites %}
-            {% set s = composite_summaries.get(c.id) if composite_summaries else None %}
-            {% set asg_open = (c.assignments|rejectattr('date_returned')|list)|first %}
-            <tr>
-                <td class="small muted td-tabular">{{ er.ref_composite(c.id, c.id) }}</td>
-                <td class="td-tabular">
-                    {% if c.tag %}
-                        <code style="font-weight:600;letter-spacing:0.02em">{{ c.tag }}</code>
-                    {% else %}
-                        <span class="muted">—</span>
-                    {% endif %}
-                </td>
-                <td><strong>{{ er.ref_composite(c.id, c.name) }}</strong></td>
-                <td>{{ c.type }}</td>
-                <td>
+<div class="bows-grid" id="bows-grid">
+    {% for c in composites %}
+    {% set s = composite_summaries.get(c.id) if composite_summaries else None %}
+    {% set asg_open = (c.assignments|rejectattr('date_returned')|list)|first %}
+    {% set search_bits = [c.name or '', c.tag or '', c.type or '', (s.assigned_to if s and s.assigned_to else '')] %}
+    <article class="bow-card"
+             data-status="{{ c.status or '' }}"
+             data-type="{{ c.type or '' }}"
+             data-search="{{ search_bits|join(' ')|lower|e }}"
+             data-name="{{ (c.name or '')|lower|e }}">
+        <div class="bow-card__header">
+            <div>
+                <div class="bow-card__title">{{ er.ref_composite(c.id, c.name) }}</div>
+                <div class="bow-card__meta">
+                    {% if c.tag %}<code class="small">{{ c.tag }}</code>{% endif %}
+                    {% if c.type %}<span class="badge badge-primary">{{ c.type }}</span>{% endif %}
                     {% if c.status == 'club' %}
                         <span class="badge badge-success">Au club</span>
                     {% elif c.status == 'loan' %}
                         <span class="badge badge-warning">En prêt</span>
-                    {% else %}
-                        <span class="muted">—</span>
                     {% endif %}
-                </td>
-                <td class="small td-tabular" style="white-space:nowrap">
-                    {% if c.last_verification_date %}
-                        {{ c.last_verification_date.strftime('%d/%m/%Y') }}
-                    {% else %}
-                        <span class="muted">—</span>
-                    {% endif %}
-                </td>
-                <td class="small">
-                    {% if s %}
-                        {% if s.power_display %}<div><span class="muted">Puissance</span> {{ s.power_display }}</div>{% endif %}
-                        {% if s.handle_size_display %}<div><span class="muted">Poignée</span> {{ s.handle_size_display }}</div>{% endif %}
-                        {% if s.branch_size_display %}<div><span class="muted">Branche</span> {{ s.branch_size_display }}</div>{% endif %}
-                        {% if s.taille is not none %}<div><span class="muted">Taille</span> {{ s.taille }}</div>{% endif %}
-                        {% if s.assigned_to %}
-                        <div class="muted">Assigné à
-                            {% if asg_open and asg_open.archer and current_user.can_edit() %}
-                            <a class="ref-link" href="{{ url_for('edit_archer', archer_id=asg_open.archer_id) }}">{{ asg_open.archer.name }}</a>
-                            {% else %}
-                            {{ s.assigned_to }}
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        {% if not (s.power_display or s.handle_size_display or s.branch_size_display or s.taille is not none or s.assigned_to) %}
-                            <span class="muted">—</span>
-                        {% endif %}
-                    {% else %}
-                        <span class="muted">—</span>
-                    {% endif %}
-                </td>
-                <td class="td-actions">
-                    <div class="table-row-actions">
-                        {% if current_user.can_edit() %}
-                        <a class="btn btn-outline btn-sm" href="/edit_composite/{{ c.id }}"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
-                        {% endif %}
-                        {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_composite/{{ c.id }}" class="form-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet arc ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer cet arc"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
-                        </form>
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </div>
+            </div>
+            <span class="small muted" title="Nombre de composants">{{ c.components|length }} pièce{{ 's' if c.components|length != 1 else '' }}</span>
+        </div>
+
+        <div class="bow-card__body">
+            {% if s and (s.power_display or s.handle_size_display or s.branch_size_display or s.taille is not none) %}
+            <dl class="bow-specs">
+                {% if s.power_display %}
+                <div>
+                    <dt>Puissance</dt>
+                    <dd>{{ s.power_display }}</dd>
+                </div>
+                {% endif %}
+                {% if s.taille is not none %}
+                <div>
+                    <dt>Taille AMO</dt>
+                    <dd>{{ s.taille }}</dd>
+                </div>
+                {% endif %}
+                {% if s.handle_size_display %}
+                <div>
+                    <dt>Poignée</dt>
+                    <dd>{{ s.handle_size_display }}</dd>
+                </div>
+                {% endif %}
+                {% if s.branch_size_display %}
+                <div>
+                    <dt>Branche</dt>
+                    <dd>{{ s.branch_size_display }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+            {% else %}
+            <p class="small muted u-mb-0">Aucune caractéristique renseignée</p>
+            {% endif %}
+
+            {% if asg_open and asg_open.archer %}
+            <div class="bow-card__assignee">
+                Assigné à
+                {% if current_user.can_edit() %}
+                <a href="{{ url_for('edit_archer', archer_id=asg_open.archer_id) }}">{{ asg_open.archer.name }}</a>
+                {% else %}
+                <strong>{{ asg_open.archer.name }}</strong>
+                {% endif %}
+                {% if asg_open.date_assigned %}
+                <span class="small"> · depuis le {{ asg_open.date_assigned.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
+            </div>
+            {% elif c.status == 'club' and current_user.can_manage_assignments_for_coach() %}
+            <div class="small muted">Disponible au club</div>
+            {% endif %}
+
+            {% if c.last_verification_date %}
+            <div class="small muted">Dernière vérif. {{ c.last_verification_date.strftime('%d/%m/%Y') }}</div>
+            {% endif %}
+        </div>
+
+        <div class="bow-card__footer">
+            {% if current_user.can_edit() %}
+            <a class="btn btn-outline btn-sm" href="/edit_composite/{{ c.id }}"><span class="with-icon">{{ icon("pencil", 14) }} Modifier</span></a>
+            {% endif %}
+            {% if c.status == 'club' and current_user.can_manage_assignments_for_coach() %}
+            <a class="btn btn-outline btn-sm" href="{{ url_for('assign', composite_id=c.id) }}"><span class="with-icon">{{ icon("user-plus", 14) }} Assigner</span></a>
+            {% endif %}
+            <span class="spacer"></span>
+            {% if current_user.can_delete() %}
+            <form method="POST" action="/delete_composite/{{ c.id }}" class="form-inline"
+                  onsubmit="return confirm('Supprimer l\'arc « {{ c.name|e }} » ? Cette action est irréversible.');">
+                <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer {{ c.name|e }}" title="Supprimer">{{ icon("trash-2", 14) }}</button>
+            </form>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
 </div>
+<p class="bows-empty-filter" id="bows-empty-filter">Aucun arc ne correspond à ces filtres.</p>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const search = document.getElementById('bows-search');
+    const grid = document.getElementById('bows-grid');
+    const countEl = document.getElementById('bows-count');
+    const emptyEl = document.getElementById('bows-empty-filter');
+    const chips = Array.from(document.querySelectorAll('#bows-filters .chip'));
+    const cards = Array.from(grid.querySelectorAll('.bow-card'));
+    const total = cards.length;
+    const state = { status: 'all', type: 'all', q: '' };
+
+    function setChipActive(group, value) {
+        chips.filter(c => c.dataset.filterGroup === group).forEach(c => {
+            c.classList.toggle('active', c.dataset.filter === value);
+        });
+    }
+
+    function apply() {
+        let visible = 0;
+        cards.forEach(card => {
+            const okStatus = state.status === 'all' || card.dataset.status === state.status;
+            const okType = state.type === 'all' || card.dataset.type === state.type;
+            const okSearch = !state.q || (card.dataset.search || '').includes(state.q);
+            const show = okStatus && okType && okSearch;
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        if (state.status === 'all' && state.type === 'all' && !state.q) {
+            countEl.textContent = total + ' arc(s) enregistré(s)';
+        } else {
+            countEl.textContent = visible + ' / ' + total + ' arc(s)';
+        }
+        emptyEl.style.display = visible === 0 ? 'block' : 'none';
+    }
+
+    chips.forEach(chip => {
+        chip.addEventListener('click', function () {
+            const group = this.dataset.filterGroup;
+            const value = this.dataset.filter;
+            state[group] = value;
+            setChipActive(group, value);
+            apply();
+        });
+    });
+
+    search.addEventListener('input', function () {
+        state.q = this.value.trim().toLowerCase();
+        apply();
+    });
+});
+</script>
+
 {% else %}
 <div class="card empty-state">
     <p class="muted">Aucun arc enregistré pour le moment</p>

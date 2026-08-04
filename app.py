@@ -4007,11 +4007,20 @@ def assign():
         db.session.commit()
         return redirect(url_for('assignments'))
     archer_id = request.args.get('archer_id')
+    composite_id = request.args.get('composite_id', type=int)
     archs = Archer.query.all()
     comps = CompositeProduct.query.filter_by(status='club').all()
     all_comps = CompositeProduct.query.all()
     selected_archer = Archer.query.get(archer_id) if archer_id else None
-    return render_template('assign.html', archers=archs, composites=comps, selected_archer=selected_archer, all_composites=all_comps)
+    selected_composite = CompositeProduct.query.get(composite_id) if composite_id else None
+    return render_template(
+        'assign.html',
+        archers=archs,
+        composites=comps,
+        selected_archer=selected_archer,
+        selected_composite=selected_composite,
+        all_composites=all_comps,
+    )
 
 @app.route('/assign_product', methods=['GET', 'POST'])
 @login_required
