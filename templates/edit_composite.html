@@ -196,14 +196,10 @@
         {% set _ = ns.initial.update({comp_prod.category.id: comp_prod.id}) %}
     {% endif %}
 {% endfor %}
-<script id="composite-data" type="application/json">{{ {'categories': ns.categories, 'current_composite_id': composite.id, 'initial_selection': ns.initial}|tojson }}</script>
-
 <script>
 (function(){
-    const dataEl = document.getElementById('composite-data');
-    if (!dataEl) return;
-    let DATA;
-    try { DATA = JSON.parse(dataEl.textContent); } catch(e){ console.error('composite data parse error', e); return; }
+    // Embed as a JS literal (not DOM textContent → innerHTML) to avoid DOM XSS.
+    const DATA = {{ {'categories': ns.categories, 'current_composite_id': composite.id, 'initial_selection': ns.initial}|tojson }};
 
     const productsByCat = {};
     const productById = {};

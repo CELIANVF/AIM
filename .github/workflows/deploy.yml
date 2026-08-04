@@ -26,6 +26,9 @@ concurrency:
   group: deploy-aim
   cancel-in-progress: false
 
+# Deploy uses SSH secrets only; GITHUB_TOKEN needs no scopes.
+permissions: {}
+
 env:
   APP_DIR: /home/celian/AIM
 

@@ -4459,10 +4459,10 @@ def export_archers():
 def import_archers():
     if request.method == 'POST':
         if 'file' not in request.files:
-            return redirect(request.url)
+            return redirect(url_for('import_archers'))
         file = request.files['file']
         if file.filename == '':
-            return redirect(request.url)
+            return redirect(url_for('import_archers'))
         if file and file.filename.endswith('.csv'):
             try:
                 raw = file.stream.read()
@@ -4752,10 +4752,10 @@ def import_archers():
 def import_composites():
     if request.method == 'POST':
         if 'file' not in request.files:
-            return redirect(request.url)
+            return redirect(url_for('import_composites'))
         file = request.files['file']
         if file.filename == '':
-            return redirect(request.url)
+            return redirect(url_for('import_composites'))
         if file and file.filename.endswith('.csv'):
             try:
                 raw = file.stream.read()
