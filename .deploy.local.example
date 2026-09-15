@@ -1,0 +1,11 @@
+# Copier en .deploy.local sur le serveur (non versionné).
+# Utilisé par scripts/deploy-remote.sh lors des déploiements CI ou manuels.
+
+# Nom du service systemd Gunicorn
+AIM_SERVICE=aim
+
+# Dossier venv (défaut : venv, sinon .venv si présent)
+# VENV_DIR=venv
+
+# Recharger nginx après déploiement (0 ou 1)
+# RELOAD_NGINX=0

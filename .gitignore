@@ -43,4 +43,5 @@ instance/
 .DS_Store
 .env
 .env.local
+.deploy.local
 .venv

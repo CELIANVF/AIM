@@ -1,0 +1,16 @@
+[Unit]
+Description=AIM matos.anc93.com (Gunicorn)
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/root/AIM
+Environment=FLASK_DEBUG=0
+EnvironmentFile=-/root/AIM/.env
+ExecStart=/root/AIM/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5001 --timeout 120 app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
