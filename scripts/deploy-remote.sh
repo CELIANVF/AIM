@@ -7,6 +7,23 @@
 
 set -euo pipefail
 
+ensure_command() {
+  local cmd="$1"
+  shift
+  if command -v "$cmd" >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ "$(id -u)" -eq 0 ]] && command -v apt-get >/dev/null 2>&1; then
+    echo "deploy: « ${cmd} » absent — installation via apt…"
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"
+    command -v "$cmd" >/dev/null 2>&1
+    return $?
+  fi
+  echo "Erreur : « ${cmd} » requis (ex. apt install ${*:-$cmd})." >&2
+  return 1
+}
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -30,19 +47,35 @@ AIM_SERVICE="${AIM_SERVICE:-aim}"
 
 if [[ "$(id -u)" -eq 0 ]]; then
   SYSTEMCTL=(systemctl)
+  SUDO=()
 else
-  SYSTEMCTL=(sudo systemctl)
+  if command -v sudo >/dev/null 2>&1; then
+    SYSTEMCTL=(sudo systemctl)
+    SUDO=(sudo)
+  else
+    echo "Erreur : exécutez en root ou installez sudo." >&2
+    exit 1
+  fi
 fi
 
 # shellcheck source=/dev/null
 source "${VENV_DIR}/bin/activate"
 export FLASK_APP=app.py
 
-python scripts/backup_database.py
+ensure_command git git
 
-git fetch origin
-git checkout main
-git reset --hard origin/main
+# Phase 1 : sauvegarde + mise à jour du code, puis re-exec (le script en cours
+# reste l'ancienne version en mémoire après git reset).
+if [[ "${AIM_DEPLOY_STAGE:-}" != "deploy" ]]; then
+  python scripts/backup_database.py
+
+  git fetch origin
+  git checkout main
+  git reset --hard origin/main
+
+  export AIM_DEPLOY_STAGE=deploy
+  exec env AIM_DEPLOY_STAGE=deploy AIM_SERVICE="${AIM_SERVICE}" bash "$0"
+fi
 
 pip install -r requirements.txt
 
@@ -56,15 +89,14 @@ if [[ -f "/etc/systemd/system/${AIM_SERVICE}.service" ]] \
   echo "Service ${AIM_SERVICE} redémarré."
 else
   echo "Attention : service systemd « ${AIM_SERVICE} » introuvable — pas de restart." >&2
+  echo "Installez-le : bash scripts/setup-matos.sh" >&2
 fi
 
 if [[ "${RELOAD_NGINX:-0}" == "1" ]] && command -v nginx >/dev/null 2>&1; then
-  if [[ "$(id -u)" -eq 0 ]]; then
-    nginx -t && systemctl reload nginx
-  else
-    sudo nginx -t && sudo systemctl reload nginx
+  if "${SUDO[@]}" nginx -t; then
+    "${SYSTEMCTL[@]}" reload nginx
+    echo "Nginx rechargé."
   fi
-  echo "Nginx rechargé."
 fi
 
 echo "Déploiement OK — $(git rev-parse --short HEAD) ($(date -Iseconds))"

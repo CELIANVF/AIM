@@ -15,6 +15,7 @@
 #   - peer WireGuard dédié à la CI (AllowedIPs incluant l'IP du serveur)
 #   - SSH accessible depuis le subnet WireGuard
 #   - git clone à jour sur main, accès pull (clé deploy ou token)
+#   - git installé (ou laissé au script deploy-remote.sh en root)
 #   - venv + pip install -r requirements.txt
 #   - systemd : bash scripts/setup-matos.sh  (service aim, nginx matos.anc93.com)
 #   - .deploy.local optionnel (voir .deploy.local.example)
@@ -100,6 +101,16 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
             bash -s -- "$APP_DIR" "$SERVICE" <<'REMOTE'
           set -euo pipefail
+          if ! command -v git >/dev/null 2>&1; then
+            echo "git absent sur le serveur — installation…"
+            if [[ "$(id -u)" -eq 0 ]] && command -v apt-get >/dev/null 2>&1; then
+              DEBIAN_FRONTEND=noninteractive apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git
+            else
+              echo "Erreur : installez git sur le serveur (apt install git)." >&2
+              exit 1
+            fi
+          fi
           cd "$1"
           export AIM_SERVICE="${2:-aim}"
           bash scripts/deploy-remote.sh

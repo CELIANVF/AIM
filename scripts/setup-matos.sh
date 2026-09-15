@@ -18,6 +18,11 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+echo "Installation des paquets système (git, nginx, python3)…"
+DEBIAN_FRONTEND=noninteractive apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+  git nginx python3 python3-venv python3-pip
+
 if [[ "$ROOT" != "$INSTANCE_DIR" ]]; then
   echo "Attention : ce script est prévu pour ${INSTANCE_DIR} (cwd: ${ROOT})." >&2
 fi
