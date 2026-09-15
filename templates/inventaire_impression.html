@@ -1,0 +1,307 @@
+{% extends "layout.html" %}
+
+{% from "_icons.html" import icon %}
+{% block title %}Impression{% endblock %}
+
+{% block content %}
+<style>
+    .imp-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0;
+    }
+    .imp-tabs a {
+        padding: 10px 16px;
+        text-decoration: none;
+        color: var(--muted, #6b7280);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        font-weight: 500;
+    }
+    .imp-tabs a.active {
+        color: var(--primary, #3b82f6);
+        border-bottom-color: var(--primary, #3b82f6);
+    }
+    .imp-panel {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+    }
+    .imp-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .imp-form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px 16px;
+        align-items: end;
+    }
+    .imp-form-row > label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.9rem;
+        color: var(--muted, #6b7280);
+    }
+    .imp-form-row select {
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--background);
+        color: var(--text, inherit);
+    }
+    .imp-categories {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        background: var(--background);
+    }
+    .imp-categories legend {
+        font-weight: 600;
+        font-size: 0.95rem;
+        padding: 0 6px;
+    }
+    .imp-cat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 6px 14px;
+    }
+    .imp-cat-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.92rem;
+        cursor: pointer;
+    }
+    .imp-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+    .imp-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+    }
+    .imp-card {
+        background: var(--background);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.12s ease;
+    }
+    .imp-card:hover {
+        border-color: var(--primary, #3b82f6);
+    }
+    .imp-card h3 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+    }
+    .imp-card p {
+        margin: 0;
+        color: var(--muted, #6b7280);
+        font-size: 0.92rem;
+    }
+    .imp-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    .imp-filter-section[data-kind] { display: none; }
+    .imp-filter-section[data-kind].visible { display: block; }
+</style>
+
+<div class="header-with-actions">
+    <div>
+        <h1>Impression</h1>
+        <p class="muted">Étiquettes physiques et listes à imprimer (PDF ou navigateur).</p>
+    </div>
+</div>
+
+<div class="imp-tabs">
+    <a href="{{ url_for('impression', tab='listes') }}" class="{% if tab == 'listes' %}active{% endif %}">Listes</a>
+    <a href="{{ url_for('impression', tab='etiquettes') }}" class="{% if tab == 'etiquettes' %}active{% endif %}">Étiquettes</a>
+</div>
+
+{% if tab == 'listes' %}
+<div class="imp-panel">
+    <p class="muted small" style="margin:0 0 14px">Raccourcis :</p>
+    <div class="imp-presets">
+        <a class="btn btn-outline btn-sm" href="{{ url_for('impression_rapport', kind='composites', status='club', usage='unassigned', detail='standard', format='html') }}">Arcs au club (non prêtés)</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('impression_rapport', kind='composites', status='loan', detail='standard', format='html') }}">Arcs prêtés</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('impression_rapport', kind='products', usage='available', state='stock', detail='standard', format='html', cat_filter='1', category_ids=branch_category_ids) }}">Branches en stock</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('impression_rapport', kind='products', usage='available', state='stock', detail='standard', format='html', cat_filter='1') }}">Produits disponibles</a>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('impression_rapport', kind='assignments', detail='standard', format='html') }}">Prêts en cours</a>
+    </div>
+</div>
+
+<div class="imp-panel">
+    <h2 style="margin:0 0 14px;font-size:1.05rem">Configurer une liste</h2>
+    <form class="imp-form" method="get" action="{{ url_for('impression_rapport') }}" id="report-form">
+        <input type="hidden" name="cat_filter" value="1">
+
+        <div class="imp-form-row">
+            <label>
+                Contenu
+                <select name="kind" id="report-kind">
+                    <option value="composites">Arcs</option>
+                    <option value="products">Produits</option>
+                    <option value="assignments">Prêts en cours</option>
+                </select>
+            </label>
+            <label>
+                Niveau de détail
+                <select name="detail">
+                    <option value="summary">Résumé — code, nom, statut</option>
+                    <option value="standard" selected>Standard — + taille, puissance</option>
+                    <option value="full">Complet — + composants, assignations, commentaires</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="imp-filter-section visible" data-kind="composites" id="filters-composites">
+            <div class="imp-form-row">
+                <label>
+                    Statut arc
+                    <select name="status">
+                        <option value="all">Tous</option>
+                        <option value="club">Au club</option>
+                        <option value="loan">Prêtés</option>
+                    </select>
+                </label>
+                <label>
+                    Montage / prêt
+                    <select name="usage">
+                        <option value="all">Tous</option>
+                        <option value="mounted">Montés seulement</option>
+                        <option value="unassigned">Non prêtés (disponibles au club)</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+
+        <div class="imp-filter-section" data-kind="products" id="filters-products">
+            <div class="imp-form-row">
+                <label>
+                    Disponibilité
+                    <select name="usage">
+                        <option value="all">Tous</option>
+                        <option value="available">Disponibles (en stock, non montés)</option>
+                        <option value="mounted">Montés sur un arc</option>
+                        <option value="assigned">Assignés / prêtés</option>
+                    </select>
+                </label>
+                <label>
+                    État
+                    <select name="state">
+                        <option value="all">Tous</option>
+                        <option value="stock">En stock</option>
+                        <option value="broken">Cassés</option>
+                    </select>
+                </label>
+            </div>
+            {% if categories_for_labels %}
+            <fieldset class="imp-categories" style="margin-top:12px">
+                <legend>Catégories</legend>
+                <div class="imp-presets" style="margin-bottom:8px">
+                    <button type="button" class="btn btn-outline btn-sm" id="cat-all">Tout cocher</button>
+                    <button type="button" class="btn btn-outline btn-sm" id="cat-none">Tout décocher</button>
+                    <button type="button" class="btn btn-outline btn-sm" id="cat-branches">Branches seulement</button>
+                </div>
+                <div class="imp-cat-grid">
+                    {% for cat in categories_for_labels %}
+                    <label class="imp-cat-check">
+                        <input type="checkbox" name="category_ids" value="{{ cat.id }}" class="report-cat-cb" checked
+                               data-is-branch="{% if cat.id in branch_category_ids %}1{% else %}0{% endif %}">
+                        <span><strong>{{ cat.prefix }}</strong> {{ cat.name }} ({{ cat.product_count }})</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            {% endif %}
+        </div>
+
+        <div class="imp-actions">
+            <button type="submit" class="btn btn-primary" name="format" value="html">Aperçu / Imprimer</button>
+            <button type="submit" class="btn btn-outline" name="format" value="pdf">Télécharger PDF</button>
+        </div>
+    </form>
+</div>
+
+{% else %}
+<div class="imp-panel">
+    <p class="muted" style="margin:0 0 16px">Impression d'étiquettes avec QR code ou code-barres sur planches Avery.</p>
+    <div class="imp-cards-grid">
+        <a class="imp-card" href="{{ url_for('inventaire_etiquettes', kind='composites') }}">
+            <h3>Arcs</h3>
+            <p>{{ composites_total }} arc(s)</p>
+        </a>
+        <a class="imp-card" href="{{ url_for('inventaire_etiquettes', kind='products') }}">
+            <h3>Produits</h3>
+            <p>{{ products_total }} produit(s) — choix des catégories</p>
+        </a>
+        <a class="imp-card" href="{{ url_for('inventaire_etiquettes', kind='mixed') }}">
+            <h3>Produits + arcs</h3>
+            <p>Catégories produits + tous les arcs</p>
+        </a>
+        <a class="imp-card" href="{{ url_for('inventaire_etiquettes', kind='composites', status='club') }}">
+            <h3>Arcs au club</h3>
+            <p>Étiquettes — statut club</p>
+        </a>
+        <a class="imp-card" href="{{ url_for('inventaire_etiquettes', kind='composites', status='loan') }}">
+            <h3>Arcs prêtés</h3>
+            <p>Étiquettes — statut prêt</p>
+        </a>
+        <a class="imp-card" href="{{ url_for('inventaire_etiquettes', kind='products', status='stock') }}">
+            <h3>Produits en stock</h3>
+            <p>Étiquettes — état stock</p>
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if tab == 'listes' %}
+<script>
+(function(){
+    var kindSelect = document.getElementById('report-kind');
+    var sections = document.querySelectorAll('.imp-filter-section[data-kind]');
+    function syncKind() {
+        var k = kindSelect ? kindSelect.value : 'composites';
+        sections.forEach(function(sec) {
+            var on = sec.getAttribute('data-kind') === k;
+            sec.classList.toggle('visible', on);
+            sec.querySelectorAll('select, input').forEach(function(el) {
+                el.disabled = !on;
+            });
+        });
+    }
+    if (kindSelect) {
+        kindSelect.addEventListener('change', syncKind);
+        syncKind();
+    }
+    var form = document.getElementById('report-form');
+    function boxes() { return Array.from(form.querySelectorAll('.report-cat-cb')); }
+    var allBtn = document.getElementById('cat-all');
+    var noneBtn = document.getElementById('cat-none');
+    var branchBtn = document.getElementById('cat-branches');
+    if (allBtn) allBtn.addEventListener('click', function(){ boxes().forEach(function(cb){ cb.checked = true; }); });
+    if (noneBtn) noneBtn.addEventListener('click', function(){ boxes().forEach(function(cb){ cb.checked = false; }); });
+    if (branchBtn) branchBtn.addEventListener('click', function(){
+        boxes().forEach(function(cb){ cb.checked = cb.getAttribute('data-is-branch') === '1'; });
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

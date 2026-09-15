@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 12mm; }
+        h1 { font-size: 16px; margin: 0 0 4px; }
+        .report-meta { font-size: 10px; color: #555; margin: 0 0 12px; }
+        .report-table { width: 100%; border-collapse: collapse; }
+        .report-table th, .report-table td {
+            border: 1px solid #ccc;
+            padding: 5px 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .report-table th { background: #f3f4f6; font-weight: 600; }
+        .report-table code { font-family: ui-monospace, monospace; font-weight: 600; }
+        .report-empty { padding: 24px; text-align: center; color: #666; }
+        .report-section-title { font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+        @page { size: A4; margin: 12mm; }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <p class="report-meta">{{ row_count }} élément(s) — {{ generated_at }}</p>
+    {% include '_equipment_report_body.html' %}
+    {% if auto_print|default(true) %}
+    <script>window.onload = function(){ window.print(); };</script>
+    {% endif %}
+</body>
+</html>

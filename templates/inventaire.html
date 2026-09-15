@@ -152,19 +152,4 @@
 </div>
 {% endif %}
 
-<div class="inv-section-title">Imprimer</div>
-<div class="inv-cards-grid">
-    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='composites') }}">
-        <h3 class="inv-card__title">Arcs</h3>
-        <p class="inv-card__desc">{{ composites_total }} arc(s)</p>
-    </a>
-    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='products') }}">
-        <h3 class="inv-card__title">Produits</h3>
-        <p class="inv-card__desc">{{ products_total }} produit(s) — choix des catégories sur la page</p>
-    </a>
-    <a class="inv-card" href="{{ url_for('inventaire_etiquettes', kind='mixed') }}">
-        <h3 class="inv-card__title">Produits + arcs</h3>
-        <p class="inv-card__desc">Sélection des catégories produits + tous les arcs</p>
-    </a>
-</div>
 {% endblock %}

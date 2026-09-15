@@ -104,7 +104,8 @@
                     {% endif %}
                     {{ nav_link('/products', 'package', 'Produits', request.path.startswith('/products')) }}
                     {{ nav_link('/composites', 'target', 'Arcs', request.path.startswith('/composites')) }}
-                    {{ nav_link(url_for('inventaire'), 'scan-barcode', 'Inventaire', request.path.startswith('/inventaire')) }}
+                    {{ nav_link(url_for('impression'), 'printer', 'Impression', request.endpoint in ('impression', 'impression_rapport', 'inventaire_etiquettes')) }}
+                    {{ nav_link(url_for('inventaire'), 'scan-barcode', 'Inventaire', request.endpoint in ('inventaire', 'inventaire_lookup', 'inventaire_regenerer_tags', 'inventaire_recoder_par_categorie')) }}
                     {% if current_user.role not in ('lecteur', 'archer') %}
                     {{ nav_link('/archers', 'users', 'Archers', request.path.startswith('/archers')) }}
                     {{ nav_link('/inscription_evenement', 'mail', 'Inscription (mail)', request.path.startswith('/inscription_evenement')) }}

@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% block body_class %}page-equipment-report{% endblock %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    .page-equipment-report .report-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .page-equipment-report .report-meta {
+        color: var(--muted, #6b7280);
+        font-size: 0.92rem;
+        margin: 0 0 12px;
+    }
+    .report-table-wrap {
+        overflow-x: auto;
+        background: var(--card, #fff);
+        border: 1px solid var(--border, #e5e7eb);
+        border-radius: 10px;
+    }
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+    }
+    .report-table th,
+    .report-table td {
+        border-bottom: 1px solid var(--border-light, #eee);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+    }
+    .report-table th {
+        background: var(--background-secondary, #f9fafb);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .report-table tr:last-child td { border-bottom: none; }
+    .report-table code {
+        font-family: ui-monospace, monospace;
+        font-weight: 600;
+    }
+    .report-empty {
+        padding: 32px;
+        text-align: center;
+        color: var(--muted, #6b7280);
+    }
+    .report-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 20px 0 8px;
+    }
+</style>
+
+<div class="report-toolbar no-print">
+    <div>
+        <h1 style="margin:0">{{ title }}</h1>
+        <p class="report-meta">{{ row_count }} élément(s) — généré le {{ generated_at }}</p>
+    </div>
+    <div class="action-group">
+        <a class="btn btn-outline" href="{{ url_for('impression', tab='listes') }}">Retour</a>
+        <a class="btn btn-outline" href="{{ pdf_url }}">PDF</a>
+        <button type="button" class="btn btn-primary" id="report-print-btn">Imprimer</button>
+    </div>
+</div>
+
+{% include '_equipment_report_body.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    var btn = document.getElementById('report-print-btn');
+    if (btn) {
+        btn.addEventListener('click', function() {
+            var url = new URL(window.location.href);
+            url.searchParams.set('bare', '1');
+            window.open(url.toString(), '_blank', 'noopener');
+        });
+    }
+})();
+</script>
+{% endblock %}

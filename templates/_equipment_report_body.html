@@ -1,0 +1,183 @@
+{% if kind == 'composites' %}
+<div class="report-table-wrap">
+    {% if rows %}
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Nom</th>
+                <th>Type</th>
+                <th>Statut</th>
+                {% if detail != 'summary' %}
+                <th>Taille AMO</th>
+                <th>Puissance</th>
+                <th>Poignée</th>
+                <th>Branches</th>
+                {% endif %}
+                {% if detail == 'full' %}
+                <th>Assigné à</th>
+                <th>Composants</th>
+                <th>Dernière vérif.</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td>{% if r.tag %}<code>{{ r.tag }}</code>{% else %}—{% endif %}</td>
+                <td><strong>{{ r.name }}</strong></td>
+                <td>{{ r.type or '—' }}</td>
+                <td>{{ r.status_label }}</td>
+                {% if detail != 'summary' %}
+                <td>{{ r.taille_display or '—' }}</td>
+                <td>{{ r.power_display or '—' }}</td>
+                <td>{{ r.handle_size_display or r.handle or '—' }}</td>
+                <td>{{ r.branch_size_display or r.branch or '—' }}</td>
+                {% endif %}
+                {% if detail == 'full' %}
+                <td>{{ r.assigned_to or '—' }}</td>
+                <td class="small">
+                    {% for c in r.components %}
+                    {{ c.brand or '' }}{% if c.model %} {{ c.model }}{% endif %}
+                    ({{ c.category.name if c.category else '' }}){% if not loop.last %}<br>{% endif %}
+                    {% else %}—{% endfor %}
+                </td>
+                <td>{{ r.last_verification_date.strftime('%d/%m/%Y') if r.last_verification_date else '—' }}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="report-empty">Aucun arc ne correspond aux filtres.</div>
+    {% endif %}
+</div>
+
+{% elif kind == 'products' %}
+<div class="report-table-wrap">
+    {% if rows %}
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Marque</th>
+                <th>Catégorie</th>
+                <th>Statut</th>
+                {% if detail != 'summary' %}
+                <th>Modèle</th>
+                <th>Taille</th>
+                <th>Puissance</th>
+                <th>Lieu</th>
+                {% endif %}
+                {% if detail == 'full' %}
+                <th>Monté sur</th>
+                <th>Assigné à</th>
+                <th>Commentaires</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td>{% if r.tag %}<code>{{ r.tag }}</code>{% else %}—{% endif %}</td>
+                <td><strong>{{ r.brand or '—' }}</strong></td>
+                <td>{{ r.category or '—' }}</td>
+                <td>{{ r.usage_label }}</td>
+                {% if detail != 'summary' %}
+                <td>{{ r.model or '—' }}</td>
+                <td>{{ r.size_display or '—' }}</td>
+                <td>{{ r.power_display or '—' }}</td>
+                <td>{{ r.location or '—' }}</td>
+                {% endif %}
+                {% if detail == 'full' %}
+                <td>{{ r.mounted_on or '—' }}</td>
+                <td>{{ r.assigned_to or '—' }}</td>
+                <td class="small">{{ r.comments or '—' }}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="report-empty">Aucun produit ne correspond aux filtres.</div>
+    {% endif %}
+</div>
+
+{% elif kind == 'assignments' %}
+{% if assignment_bows %}
+<h2 class="report-section-title">Arcs prêtés</h2>
+<div class="report-table-wrap">
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th>Archer</th>
+                <th>Arc</th>
+                {% if detail != 'summary' %}<th>Code</th>{% endif %}
+                <th>Date</th>
+                {% if detail != 'summary' %}
+                <th>Taille AMO</th>
+                <th>Puissance</th>
+                {% endif %}
+                {% if detail == 'full' %}<th>Type</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in assignment_bows %}
+            <tr>
+                <td>{{ r.archer }}</td>
+                <td><strong>{{ r.item }}</strong></td>
+                {% if detail != 'summary' %}<td>{% if r.tag %}<code>{{ r.tag }}</code>{% else %}—{% endif %}</td>{% endif %}
+                <td>{{ r.date }}</td>
+                {% if detail != 'summary' %}
+                <td>{{ r.taille_display or '—' }}</td>
+                <td>{{ r.power_display or '—' }}</td>
+                {% endif %}
+                {% if detail == 'full' %}<td>{{ r.type or '—' }}</td>{% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if assignment_products %}
+<h2 class="report-section-title">Produits prêtés</h2>
+<div class="report-table-wrap">
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th>Archer</th>
+                <th>Produit</th>
+                {% if detail != 'summary' %}<th>Code</th><th>Catégorie</th>{% endif %}
+                <th>Date</th>
+                {% if detail != 'summary' %}
+                <th>Taille</th>
+                <th>Puissance</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in assignment_products %}
+            <tr>
+                <td>{{ r.archer }}</td>
+                <td><strong>{{ r.item }}</strong></td>
+                {% if detail != 'summary' %}
+                <td>{% if r.tag %}<code>{{ r.tag }}</code>{% else %}—{% endif %}</td>
+                <td>{{ r.category or '—' }}</td>
+                {% endif %}
+                <td>{{ r.date }}</td>
+                {% if detail != 'summary' %}
+                <td>{{ r.size_display or '—' }}</td>
+                <td>{{ r.power_display or '—' }}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if not assignment_bows and not assignment_products %}
+<div class="report-empty">Aucun prêt en cours.</div>
+{% endif %}
+{% endif %}

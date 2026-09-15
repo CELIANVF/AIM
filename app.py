@@ -2171,6 +2171,296 @@ def _product_power_display(product):
         u = ' ' + str(cat.field_units.get('power'))
     return f"{raw}{u}"
 
+
+def _composite_summary(comp):
+    """Résumé affichage / impression d'un arc (poignée, branche, puissance, taille AMO, assigné)."""
+    handle = None
+    branch = None
+    handle_prod = None
+    branch_prod = None
+    for p in comp.components:
+        cname = (p.category.name or '').lower() if p.category else ''
+        if 'poign' in cname or 'handle' in cname:
+            if not handle:
+                parts = []
+                if p.size:
+                    parts.append(str(p.size))
+                if p.custom_values:
+                    for k in ('latéralité', 'lateralite', 'side', 'hand', 'lat'):
+                        if k in p.custom_values:
+                            parts.append(str(p.custom_values[k]))
+                            break
+                handle = ' '.join(parts) if parts else p.brand or ''
+            if handle_prod is None:
+                handle_prod = p
+        if 'branche' in cname or 'branch' in cname or 'limb' in cname:
+            if not branch:
+                parts = []
+                if p.model:
+                    parts.append(p.model)
+                if p.size:
+                    parts.append(str(p.size))
+                if p.power:
+                    parts.append(str(p.power))
+                if p.custom_values and not parts:
+                    if 'size' in p.custom_values:
+                        parts.append(str(p.custom_values['size']))
+                    if 'power' in p.custom_values:
+                        parts.append(str(p.custom_values['power']))
+                branch = ' '.join(parts) if parts else p.brand or ''
+            if branch_prod is None:
+                branch_prod = p
+    handle_num = None
+    branch_num = None
+    if handle_prod:
+        handle_num = _first_int_from_text(handle_prod.size)
+        if handle_num is None and handle_prod.custom_values:
+            handle_num = _first_int_from_text(handle_prod.custom_values.get('size'))
+    if branch_prod:
+        branch_num = _first_int_from_text(branch_prod.size)
+        if branch_num is None and branch_prod.custom_values:
+            branch_num = _first_int_from_text(branch_prod.custom_values.get('size'))
+    taille = None
+    if handle_num is not None and branch_num is not None:
+        taille = branch_num + handle_num - 25
+    assigned = None
+    for a in comp.assignments:
+        if not a.date_returned:
+            assigned = a.archer.name if a.archer else 'Assigné'
+            break
+    return {
+        'handle': handle,
+        'branch': branch,
+        'handle_size_display': _product_size_display(handle_prod),
+        'branch_size_display': _product_size_display(branch_prod),
+        'power_display': _product_power_display(branch_prod),
+        'taille': taille,
+        'assigned_to': assigned,
+        'handle_prod': handle_prod,
+        'branch_prod': branch_prod,
+    }
+
+
+def _product_usage_status(product):
+    """Statut d'utilisation d'un produit : assigned, mounted, available, broken, …"""
+    comps = list(product.composites or [])
+    direct_loan = product.current_assignment
+    assigned_comps = [c for c in comps if c.status == 'loan']
+    if direct_loan or assigned_comps:
+        return 'assigned'
+    if comps:
+        return 'mounted'
+    if product.state == 'broken':
+        return 'broken'
+    if product.state == 'stock':
+        return 'available'
+    return product.state or 'unknown'
+
+
+def _product_usage_label(status):
+    return {
+        'assigned': 'Assigné',
+        'mounted': 'Monté',
+        'available': 'Disponible',
+        'broken': 'Cassé',
+    }.get(status, status or '—')
+
+
+def _product_mounted_arc_name(product):
+    comps = list(product.composites or [])
+    if not comps:
+        return None
+    c = comps[0]
+    return c.name or f'#{c.id}'
+
+
+def _product_assigned_to(product):
+    direct = product.current_assignment
+    if direct and direct.archer:
+        return direct.archer.name
+    for c in product.composites or []:
+        if c.status != 'loan':
+            continue
+        for a in c.assignments:
+            if not a.date_returned and a.archer:
+                return a.archer.name
+    return None
+
+
+def _collect_report_composites(status_filter, usage_filter):
+    """Lignes rapport pour les arcs. usage_filter: all | mounted | unassigned (club sans prêt)."""
+    q = CompositeProduct.query.options(
+        selectinload(CompositeProduct.components).selectinload(Product.category),
+        selectinload(CompositeProduct.assignments).selectinload(Assignment.archer),
+    )
+    if status_filter == 'club':
+        q = q.filter(CompositeProduct.status == 'club')
+    elif status_filter == 'loan':
+        q = q.filter(CompositeProduct.status == 'loan')
+    comps = sorted(q.all(), key=lambda x: natural_sort_key(x.name))
+    rows = []
+    for comp in comps:
+        summary = _composite_summary(comp)
+        has_components = bool(comp.components)
+        is_loaned = comp.status == 'loan' or bool(summary['assigned_to'])
+        if usage_filter == 'mounted' and not has_components:
+            continue
+        if usage_filter == 'unassigned' and is_loaned:
+            continue
+        rows.append({
+            'id': comp.id,
+            'tag': comp.tag or '',
+            'name': comp.name,
+            'type': comp.type or '',
+            'status': comp.status or '',
+            'status_label': 'Prêté' if comp.status == 'loan' else 'Club',
+            'assigned_to': summary['assigned_to'],
+            'taille': summary['taille'],
+            'taille_display': str(summary['taille']) if summary['taille'] is not None else None,
+            'power_display': summary['power_display'],
+            'handle_size_display': summary['handle_size_display'],
+            'branch_size_display': summary['branch_size_display'],
+            'handle': summary['handle'],
+            'branch': summary['branch'],
+            'component_count': len(comp.components),
+            'components': comp.components,
+            'last_verification_date': comp.last_verification_date,
+            'mounted': has_components,
+        })
+    return rows
+
+
+def _collect_report_products(category_ids, usage_filter, state_filter):
+    """Lignes rapport pour les produits unitaires."""
+    q = Product.query.options(
+        selectinload(Product.category),
+        selectinload(Product.composites).selectinload(CompositeProduct.assignments).selectinload(Assignment.archer),
+    ).join(Category)
+    if category_ids is not None:
+        if not category_ids:
+            return []
+        q = q.filter(Product.category_id.in_(category_ids))
+    if state_filter == 'stock':
+        q = q.filter(Product.state == 'stock')
+    elif state_filter == 'broken':
+        q = q.filter(Product.state == 'broken')
+    q = q.order_by(Category.position.asc(), Category.name.asc(), Product.brand.asc())
+    rows = []
+    for p in q.all():
+        usage = _product_usage_status(p)
+        if usage_filter == 'available' and usage != 'available':
+            continue
+        if usage_filter == 'mounted' and usage != 'mounted':
+            continue
+        if usage_filter == 'assigned' and usage != 'assigned':
+            continue
+        rows.append({
+            'id': p.id,
+            'tag': p.tag or '',
+            'brand': p.brand or '',
+            'model': p.model or '',
+            'category': p.category.name if p.category else '',
+            'size_display': _product_size_display(p),
+            'power_display': _product_power_display(p),
+            'location': p.location or '',
+            'state': p.state or '',
+            'usage': usage,
+            'usage_label': _product_usage_label(usage),
+            'mounted_on': _product_mounted_arc_name(p),
+            'assigned_to': _product_assigned_to(p),
+            'comments': p.comments or '',
+            'custom_values': p.custom_values or {},
+            'category_obj': p.category,
+        })
+    return rows
+
+
+def _collect_report_assignments():
+    """Prêts en cours (arcs + produits)."""
+    bow_rows = []
+    for a in Assignment.query.filter_by(date_returned=None).options(
+        selectinload(Assignment.archer),
+        selectinload(Assignment.composite).selectinload(CompositeProduct.components).selectinload(Product.category),
+    ).all():
+        comp = a.composite
+        summary = _composite_summary(comp) if comp else {}
+        bow_rows.append({
+            'archer': a.archer.name if a.archer else f'#{a.archer_id}',
+            'item': comp.name if comp else f'#{a.composite_id}',
+            'tag': comp.tag if comp else '',
+            'type': comp.type if comp else '',
+            'date': a.date_assigned.strftime('%d/%m/%Y') if a.date_assigned else '',
+            'taille_display': str(summary.get('taille')) if summary.get('taille') is not None else None,
+            'power_display': summary.get('power_display'),
+        })
+    product_rows = []
+    for pa in ProductAssignment.query.filter_by(date_returned=None).options(
+        selectinload(ProductAssignment.archer),
+        selectinload(ProductAssignment.product).selectinload(Product.category),
+    ).all():
+        p = pa.product
+        product_rows.append({
+            'archer': pa.archer.name if pa.archer else f'#{pa.archer_id}',
+            'item': _product_label(p) if p else f'#{pa.product_id}',
+            'tag': p.tag if p else '',
+            'category': p.category.name if p and p.category else '',
+            'date': pa.date_assigned.strftime('%d/%m/%Y') if pa.date_assigned else '',
+            'size_display': _product_size_display(p),
+            'power_display': _product_power_display(p),
+        })
+    return bow_rows, product_rows
+
+
+REPORT_DETAIL_LEVELS = ('summary', 'standard', 'full')
+
+
+def _report_title(kind, status_filter, usage_filter, state_filter, category_names):
+    parts = []
+    if kind == 'composites':
+        parts.append('Arcs')
+        if status_filter == 'club':
+            parts.append('au club')
+        elif status_filter == 'loan':
+            parts.append('prêtés')
+        if usage_filter == 'unassigned':
+            parts.append('(non prêtés)')
+        elif usage_filter == 'mounted':
+            parts.append('(montés)')
+    elif kind == 'products':
+        parts.append('Produits')
+        if category_names:
+            parts.append(' — ' + ', '.join(category_names))
+        if usage_filter == 'available':
+            parts.append('disponibles')
+        elif usage_filter == 'mounted':
+            parts.append('montés')
+        elif usage_filter == 'assigned':
+            parts.append('assignés')
+        if state_filter == 'stock':
+            parts.append('en stock')
+    elif kind == 'assignments':
+        parts.append('Prêts en cours')
+    return ' '.join(parts)
+
+
+def _render_report_pdf(html):
+    from io import BytesIO
+    from weasyprint import HTML, CSS
+    css = CSS(string='''
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+        h1 { font-size: 16px; margin: 0 0 4px; }
+        .meta { font-size: 10px; color: #555; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 5px 6px; text-align: left; vertical-align: top; }
+        th { background: #f3f4f6; font-weight: 600; }
+        tr:nth-child(even) td { background: #fafafa; }
+    ''')
+    buffer = BytesIO()
+    HTML(string=html).write_pdf(target=buffer, stylesheets=[css])
+    buffer.seek(0)
+    return buffer
+
+
 @app.route('/composites')
 @login_required
 def composites():
@@ -2187,72 +2477,7 @@ def composites():
     elif sort_by == 'name':
         comps = sorted(comps, key=lambda x: natural_sort_key(x.name))
     
-    # Résumé par arc : poignée, branche, puissance (branche), taille AMO = branche + poignée - 25
-    summaries = {}
-    for comp in comps:
-        handle = None
-        branch = None
-        handle_prod = None
-        branch_prod = None
-        for p in comp.components:
-            cname = (p.category.name or '').lower()
-            if 'poign' in cname or 'handle' in cname:
-                if not handle:
-                    parts = []
-                    if p.size:
-                        parts.append(str(p.size))
-                    if p.custom_values:
-                        for k in ('latéralité', 'lateralite', 'side', 'hand', 'lat'):
-                            if k in p.custom_values:
-                                parts.append(str(p.custom_values[k]))
-                                break
-                    handle = ' '.join(parts) if parts else p.brand or ''
-                if handle_prod is None:
-                    handle_prod = p
-            if 'branche' in cname or 'branch' in cname or 'limb' in cname:
-                if not branch:
-                    parts = []
-                    if p.model:
-                        parts.append(p.model)
-                    if p.size:
-                        parts.append(str(p.size))
-                    if p.power:
-                        parts.append(str(p.power))
-                    if p.custom_values and not parts:
-                        if 'size' in p.custom_values:
-                            parts.append(str(p.custom_values['size']))
-                        if 'power' in p.custom_values:
-                            parts.append(str(p.custom_values['power']))
-                    branch = ' '.join(parts) if parts else p.brand or ''
-                if branch_prod is None:
-                    branch_prod = p
-        handle_num = None
-        branch_num = None
-        if handle_prod:
-            handle_num = _first_int_from_text(handle_prod.size)
-            if handle_num is None and handle_prod.custom_values:
-                handle_num = _first_int_from_text(handle_prod.custom_values.get('size'))
-        if branch_prod:
-            branch_num = _first_int_from_text(branch_prod.size)
-            if branch_num is None and branch_prod.custom_values:
-                branch_num = _first_int_from_text(branch_prod.custom_values.get('size'))
-        taille = None
-        if handle_num is not None and branch_num is not None:
-            taille = branch_num + handle_num - 25
-        assigned = None
-        for a in comp.assignments:
-            if not a.date_returned:
-                assigned = a.archer.name if a.archer else 'Assigné'
-                break
-        summaries[comp.id] = {
-            'handle': handle,
-            'branch': branch,
-            'handle_size_display': _product_size_display(handle_prod),
-            'branch_size_display': _product_size_display(branch_prod),
-            'power_display': _product_power_display(branch_prod),
-            'taille': taille,
-            'assigned_to': assigned,
-        }
+    summaries = {comp.id: _composite_summary(comp) for comp in comps}
     return render_template('composites.html', composites=comps, composite_summaries=summaries, current_sort=sort_by)
 
 @app.route('/add_composite', methods=['GET', 'POST'])
@@ -3898,6 +4123,103 @@ def _collect_label_items(
         for c in sorted(cq.all(), key=lambda x: natural_sort_key(x.name)):
             _push_composite(c)
     return items
+
+
+@app.route('/impression')
+@app.route('/inventaire/impression')
+@login_required
+@require_permission('view_equipment')
+def impression():
+    """Hub impression : étiquettes et listes configurables."""
+    tab = (request.args.get('tab') or 'listes').lower()
+    if tab not in ('listes', 'etiquettes'):
+        tab = 'listes'
+    categories_for_labels = _categories_for_label_print()
+    branch_cat_ids = [
+        c['id'] for c in categories_for_labels
+        if _is_branches_category(Category.query.get(c['id']))
+    ]
+    return render_template(
+        'inventaire_impression.html',
+        tab=tab,
+        categories_for_labels=categories_for_labels,
+        branch_category_ids=branch_cat_ids,
+        composites_total=CompositeProduct.query.count(),
+        products_total=Product.query.count(),
+    )
+
+
+@app.route('/impression/rapport')
+@app.route('/inventaire/rapport')
+@login_required
+@require_permission('view_equipment')
+def impression_rapport():
+    """Génère un rapport liste (aperçu HTML ou PDF)."""
+    kind = (request.args.get('kind') or 'composites').lower()
+    if kind not in ('composites', 'products', 'assignments'):
+        kind = 'composites'
+    detail = (request.args.get('detail') or 'standard').lower()
+    if detail not in REPORT_DETAIL_LEVELS:
+        detail = 'standard'
+    output_format = (request.args.get('format') or 'html').lower()
+    status_filter = (request.args.get('status') or 'all').lower()
+    usage_filter = (request.args.get('usage') or 'all').lower()
+    state_filter = (request.args.get('state') or 'all').lower()
+
+    all_cat_ids = [c.id for c in Category.query.all()]
+    if request.args.get('cat_filter') == '1':
+        category_ids = [int(x) for x in request.args.getlist('category_ids') if str(x).strip().isdigit()]
+    else:
+        category_ids = all_cat_ids
+
+    category_names = []
+    if kind == 'products' and category_ids and len(category_ids) < len(all_cat_ids):
+        category_names = [
+            c.name for c in Category.query.filter(Category.id.in_(category_ids)).order_by(Category.name).all()
+        ]
+
+    if kind == 'composites':
+        rows = _collect_report_composites(status_filter, usage_filter)
+        assignment_bows = assignment_products = None
+    elif kind == 'products':
+        rows = _collect_report_products(category_ids, usage_filter, state_filter)
+        assignment_bows = assignment_products = None
+    else:
+        rows = None
+        assignment_bows, assignment_products = _collect_report_assignments()
+
+    title = _report_title(kind, status_filter, usage_filter, state_filter, category_names)
+    generated_at = datetime.now().strftime('%d/%m/%Y %H:%M')
+    pdf_params = request.args.to_dict(flat=False)
+    pdf_params['format'] = ['pdf']
+    pdf_params.pop('bare', None)
+    from urllib.parse import urlencode
+    pdf_url = url_for('impression_rapport') + '?' + urlencode(pdf_params, doseq=True)
+    context = {
+        'kind': kind,
+        'detail': detail,
+        'title': title,
+        'generated_at': generated_at,
+        'rows': rows,
+        'assignment_bows': assignment_bows,
+        'assignment_products': assignment_products,
+        'row_count': len(rows) if rows is not None else (len(assignment_bows or []) + len(assignment_products or [])),
+        'pdf_url': pdf_url,
+    }
+
+    if output_format == 'pdf':
+        try:
+            html = render_template('equipment_report_bare.html', auto_print=False, **context)
+            buffer = _render_report_pdf(html)
+            slug = kind.replace(' ', '_')
+            return send_file(buffer, as_attachment=True, download_name=f'rapport_{slug}.pdf', mimetype='application/pdf')
+        except Exception:
+            flash('Export PDF indisponible (WeasyPrint). Utilisez l’aperçu HTML et imprimez depuis le navigateur.', 'error')
+            return redirect(url_for('impression', tab='listes'))
+
+    if request.args.get('bare') == '1':
+        return render_template('equipment_report_bare.html', **context)
+    return render_template('equipment_report.html', **context)
 
 
 @app.route('/inventaire/etiquettes')

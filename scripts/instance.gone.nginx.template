@@ -1,0 +1,12 @@
+# Domaine AIM supprimé — renvoie 410 Gone (évite le fallback vers une autre instance).
+# Généré par scripts/delete-instance.sh
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{DOMAIN}};
+    default_type text/plain;
+    return 410 "Cette instance AIM a été supprimée.\n";
+}
+
+{{SSL_SERVER_BLOCK}}
