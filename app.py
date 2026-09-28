@@ -5480,25 +5480,34 @@ def export_courses_csv():
     output = StringIO()
     writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     
-    # Headers
-    writer.writerow(['ID', 'Nom', 'Jour', 'Heure de début', 'Heure de fin', 'Niveau', 'Nombre d\'archers inscrits', 'Capacité', 'Notes', 'Statut'])
-    
+    writer.writerow([
+        'ID cours', 'Cours', 'Jour', 'Heure de début', 'Heure de fin', 'Niveau',
+        'ID archer', 'Prénom', 'Nom', 'Licence', 'Email', 'Catégorie',
+    ])
+
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
     courses = Course.query.order_by(Course.day_of_week, Course.start_time).all()
     for course in courses:
         day = days_names[course.day_of_week] if course.day_of_week is not None and 0 <= course.day_of_week < len(days_names) else ''
-        writer.writerow([
-            course.id,
-            course.name or '',
-            day,
-            course.start_time or '',
-            course.end_time or '',
-            course.level or '',
-            len(course.archers),
-            course.max_archers if course.max_archers is not None else '',
-            course.notes or '',
-            'Actif' if course.active else 'Inactif'
-        ])
+        archers = sorted(
+            course.archers,
+            key=lambda a: ((a.last_name or '').lower(), (a.first_name or '').lower()),
+        )
+        for archer in archers:
+            writer.writerow([
+                course.id,
+                course.name or '',
+                day,
+                course.start_time or '',
+                course.end_time or '',
+                course.level or '',
+                archer.id,
+                archer.first_name or '',
+                archer.last_name or '',
+                archer.license_number or '',
+                archer.email or '',
+                archer.categorie or '',
+            ])
     
     buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
     buffer.seek(0)
