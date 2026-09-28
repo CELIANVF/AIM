@@ -5481,20 +5481,23 @@ def export_courses_csv():
     writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     
     # Headers
-    writer.writerow(['ID', 'Nom', 'Date', 'Heure', 'Lieu', 'Nombre d\'archers inscrits', 'Capacité', 'Statut'])
+    writer.writerow(['ID', 'Nom', 'Jour', 'Heure de début', 'Heure de fin', 'Niveau', 'Nombre d\'archers inscrits', 'Capacité', 'Notes', 'Statut'])
     
-    # Data
-    courses = Course.query.all()
+    days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+    courses = Course.query.order_by(Course.day_of_week, Course.start_time).all()
     for course in courses:
+        day = days_names[course.day_of_week] if course.day_of_week is not None and 0 <= course.day_of_week < len(days_names) else ''
         writer.writerow([
             course.id,
             course.name or '',
-            course.date.strftime('%d/%m/%Y') if hasattr(course, 'date') and course.date else '',
-            course.time.strftime('%H:%M') if hasattr(course, 'time') and course.time else '',
-            course.location or '',
-            len(course.archers) if hasattr(course, 'archers') else 0,
-            getattr(course, 'capacity', ''),
-            'Actif' if not hasattr(course, 'cancelled') or not course.cancelled else 'Annulé'
+            day,
+            course.start_time or '',
+            course.end_time or '',
+            course.level or '',
+            len(course.archers),
+            course.max_archers if course.max_archers is not None else '',
+            course.notes or '',
+            'Actif' if course.active else 'Inactif'
         ])
     
     buffer = BytesIO(output.getvalue().encode('utf-8-sig'))
