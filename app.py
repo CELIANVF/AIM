@@ -5486,7 +5486,7 @@ def export_courses_csv():
     ])
 
     days_names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-    courses = Course.query.order_by(Course.day_of_week, Course.start_time).all()
+    courses = Course.query.filter_by(active=True).order_by(Course.day_of_week, Course.start_time).all()
     for course in courses:
         day = days_names[course.day_of_week] if course.day_of_week is not None and 0 <= course.day_of_week < len(days_names) else ''
         archers = sorted(
