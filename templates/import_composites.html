@@ -1,69 +1,62 @@
 {% extends "layout.html" %}
-
 {% from "_icons.html" import icon %}
+
 {% block title %}Importer des arcs{% endblock %}
 
 {% block content %}
-<div style="max-width: 600px; margin: 0 auto;">
-    <h1><span class="with-icon">{{ icon("upload", 20) }} Importer des arcs (CSV)</span></h1>
+<div class="form-narrow">
+    <h1><span class="with-icon">{{ icon("upload", 20) }} Importer des arcs</span></h1>
 
     {% if success %}
-    <div class="alert alert-success" style="padding: 16px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0;"><span class="with-icon">{{ icon("circle-check", 20) }} Import terminé</span></h3>
+    <div class="import-banner import-banner--ok" role="status">
+        <h2 class="card-section-title"><span class="with-icon">{{ icon("circle-check", 20) }} Import terminé</span></h2>
         <p><strong>{{ imported }} ligne(s) traitée(s)</strong> (création ou mise à jour d’arc)</p>
         {% if notices %}
-            <p><strong>Créations automatiques ({{ notices|length }}) :</strong></p>
-            <ul style="margin: 8px 0; padding-left: 20px;">
-                {% for n in notices %}
-                    <li>{{ n }}</li>
-                {% endfor %}
-            </ul>
+        <p><strong>Créations automatiques ({{ notices|length }})</strong></p>
+        <ul>
+            {% for n in notices %}
+            <li>{{ n }}</li>
+            {% endfor %}
+        </ul>
         {% endif %}
         {% if errors %}
-            <p><strong>Avertissements / erreurs ({{ errors|length }}) :</strong></p>
-            <ul style="margin: 8px 0; padding-left: 20px;">
-                {% for error in errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
+        <p><strong>Avertissements / erreurs ({{ errors|length }})</strong></p>
+        <ul>
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
         {% endif %}
-        <a href="{{ url_for('composites') }}" class="btn btn-primary" style="margin-top: 12px;">Voir les arcs</a>
+        <a href="{{ url_for('composites') }}" class="btn btn-primary">Voir les arcs</a>
     </div>
     {% endif %}
 
     {% if error %}
-    <div class="alert alert-danger" style="padding: 16px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 16px;">
-        <h3 style="margin-top: 0;"><span class="with-icon">{{ icon('triangle-alert', 20) }} Erreur</span></h3>
+    <div class="import-banner import-banner--err" role="alert">
+        <h2 class="card-section-title"><span class="with-icon">{{ icon("triangle-alert", 20) }} Erreur</span></h2>
         <p>{{ error }}</p>
     </div>
     {% endif %}
 
-    <div class="card" style="padding: 24px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 24px;">
-        <h2 style="margin-top: 0;">Format</h2>
+    <div class="card stack-card">
+        <h2 class="card-section-title">Format</h2>
         <p>Idéal : réutiliser un fichier exporté via <strong>Exporter CSV</strong> sur la page des arcs, puis le modifier. Séparateur : point-virgule ou virgule (détection automatique). Encodage : UTF-8 (avec ou sans BOM), Windows-1252, etc.</p>
-        <ul style="background-color: #f5f5f5; padding: 12px; border-radius: 4px;">
-            <li><strong>ID</strong> — optionnel. S’il correspond à un arc <em>présent en base</em>, la ligne le <em>met à jour</em>. S’il est renseigné mais inconnu (autre base, ancien export), un <em>nouvel</em> arc est créé et l’ID du fichier est ignoré.</li>
-            <li><strong>Nom</strong> <span style="color: red;">*</span></li>
+        <ul class="field-list">
+            <li><strong>ID</strong> — optionnel. S’il correspond à un arc présent en base, la ligne le met à jour. S’il est renseigné mais inconnu, un nouvel arc est créé et l’ID du fichier est ignoré.</li>
+            <li><strong>Nom</strong> <span class="label-required" aria-hidden="true">*</span></li>
             <li><strong>Type</strong> — BB ou CL (insensible à la casse)</li>
             <li><strong>Statut</strong> — <code>club</code> / <code>loan</code> (ou équivalents : au club, en prêt…)</li>
-            <li><strong>Composants</strong> — comme à l’export : <code>Marque (Catégorie)</code> séparées par <code> | </code>. Si la pièce ou la catégorie n’existe pas en base, elle est <strong>créée</strong> (produit en stock au club).</li>
+            <li><strong>Composants</strong> — comme à l’export : <code>Marque (Catégorie)</code> séparées par <code> | </code>. Si la pièce ou la catégorie n’existe pas en base, elle est créée (produit en stock au club).</li>
         </ul>
-        <p><span style="color: red;">*</span> Obligatoire</p>
+        <p class="muted"><span class="label-required" aria-hidden="true">*</span> Obligatoire</p>
     </div>
 
-    <form method="post" enctype="multipart/form-data" style="background-color: #f9f9f9; padding: 24px; border-radius: 8px; border: 2px dashed #ddd;">
-        <div style="margin-bottom: 16px;">
-            <label for="file" style="display: block; font-weight: bold; margin-bottom: 8px;">Fichier CSV</label>
-            <input
-                type="file"
-                name="file"
-                id="file"
-                accept=".csv"
-                required
-                style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box;"
-            >
+    <form method="post" enctype="multipart/form-data" class="drop-zone">
+        <div class="form-group">
+            <label for="file">Fichier CSV</label>
+            <input type="file" name="file" id="file" accept=".csv" required>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;"><span class="with-icon">{{ icon("upload", 16) }} Importer</span></button>
+        <button type="submit" class="btn btn-primary btn-block"><span class="with-icon">{{ icon("upload", 16) }} Importer</span></button>
     </form>
 </div>
 {% endblock %}

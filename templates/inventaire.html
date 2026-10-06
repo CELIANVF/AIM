@@ -27,13 +27,14 @@
         padding: 14px 16px;
         border: 2px solid var(--border);
         border-radius: 10px;
-        background: var(--background);
+        background: var(--card);
         text-transform: uppercase;
     }
     .inv-scan-form input[name="q"]:focus {
-        outline: none;
-        border-color: var(--primary, #3b82f6);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        outline: 2px solid var(--text);
+        outline-offset: 0;
+        border-color: var(--text);
+        box-shadow: none;
     }
     .inv-cards-grid {
         display: grid;

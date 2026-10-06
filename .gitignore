@@ -45,3 +45,4 @@ instance/
 .env.local
 .deploy.local
 .venv
+.cursor/

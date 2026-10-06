@@ -60,11 +60,11 @@
                 <td style="text-align:right">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_category/{{ cat.id }}" style="padding:6px 10px;font-size:13px"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
+                        <a class="btn btn-outline btn-sm" href="/edit_category/{{ cat.id }}"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_category/{{ cat.id }}" style="display:inline;margin:0" onsubmit="return confirm('Supprimer cette catégorie et tous ses produits ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
+                        <form method="POST" action="/delete_category/{{ cat.id }}" class="form-inline" onsubmit="return confirm('Supprimer cette catégorie et tous ses produits ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer {{ cat.name }}"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
                         </form>
                         {% endif %}
                     </div>
@@ -75,9 +75,9 @@
     </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center;padding:48px 24px">
+<div class="card empty-state">
     <p class="muted">Aucune catégorie créée pour le moment</p>
-    <a href="/add_category" class="btn btn-primary" style="margin-top:16px"><span class="with-icon">{{ icon("plus", 16) }} Créer la première catégorie</span></a>
+    <a href="/add_category" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Créer la première catégorie</span></a>
 </div>
 {% endif %}
 

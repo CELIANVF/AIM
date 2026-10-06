@@ -2,129 +2,98 @@
 {% from "_icons.html" import icon %}
 {% import '_entity_refs.html' as er with context %}
 
+{% block title %}Utilisateurs{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <h1>Gestion des utilisateurs</h1>
-        </div>
-        <div class="col-md-4 text-end">
-            <a href="{{ url_for('add_user') }}" class="btn btn-success">
-                <i class="bi bi-plus-circle"></i> Créer un utilisateur
-            </a>
-            <a href="{{ url_for('export_users_csv') }}" class="btn btn-outline"><span class="with-icon">{{ icon('chart-bar', 16) }} Exporter CSV</span></a>
-        </div>
+<div class="header-with-actions">
+    <div>
+        <h1><span class="with-icon">{{ icon("user", 20) }} Utilisateurs</span></h1>
+        <p class="muted">Comptes du club et niveaux d'accès</p>
     </div>
+    <div class="action-group">
+        <a href="{{ url_for('add_user') }}" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Créer un utilisateur</span></a>
+        <a href="{{ url_for('export_users_csv') }}" class="btn btn-outline"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter CSV</span></a>
+    </div>
+</div>
 
-    {% if get_flashed_messages() %}
-        {% for message in get_flashed_messages(with_categories=true) %}
-            <div class="alert alert-{{ message[0] }} alert-dismissible fade show" role="alert">
-                {{ message[1] }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        {% endfor %}
-    {% endif %}
+{% if users %}
+<div class="table-responsive">
+    <table class="table table-sortable">
+        <thead>
+            <tr>
+                <th class="th-id" data-sort="number">ID</th>
+                <th>Nom d'utilisateur</th>
+                <th>Rôle</th>
+                <th class="th-actions" data-sort="disable">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td class="small muted td-tabular">{{ er.ref_user(user.id, user.id) }}</td>
+                <td>
+                    <div class="user-cell">
+                        <span class="avatar" aria-hidden="true">{{ user.username[0]|upper }}</span>
+                        <div>
+                            <strong>{{ er.ref_user(user.id, user.username) }}</strong>
+                            {% if user.id == current_user.id %}
+                            <span class="badge badge-info badge--inline">Vous</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if user.role == 'admin' %}
+                    <span class="badge badge-danger role-chip">{{ icon("crown", 14) }} Admin</span>
+                    {% elif user.role == 'responsable' %}
+                    <span class="badge badge-warning role-chip">{{ icon("clipboard-list", 14) }} Responsable</span>
+                    {% elif user.role == 'lecteur' %}
+                    <span class="badge badge-secondary role-chip">{{ icon("eye", 14) }} Lecteur</span>
+                    {% elif user.role == 'entraineur' %}
+                    <span class="badge badge-info role-chip">{{ icon("trophy", 14) }} Entraîneur</span>
+                    {% else %}
+                    <span class="badge badge-secondary role-chip">{{ user.role }}</span>
+                    {% endif %}
+                </td>
+                <td class="td-actions">
+                    <div class="table-row-actions">
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-outline btn-sm"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
+                        {% if user.id != current_user.id %}
+                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="form-inline" onsubmit="return confirm('Supprimer cet utilisateur ?');">
+                            <button type="submit" class="btn btn-danger btn-sm"><span class="with-icon">{{ icon("trash-2", 16) }} Supprimer</span></button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card empty-state">
+    <p class="muted">Aucun utilisateur trouvé.</p>
+    <a href="{{ url_for('add_user') }}" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Créer un utilisateur</span></a>
+</div>
+{% endif %}
 
-    {% if users %}
-        <div class="table-responsive">
-            <table class="table table-sortable">
-                <thead>
-                    <tr>
-                        <th style="width: 1%; white-space: nowrap;" data-sort="number">ID</th>
-                        <th style="width: 40%;">Nom d'utilisateur</th>
-                        <th style="width: 30%;">Rôle</th>
-                        <th style="width: 30%; text-align: right;" data-sort="disable">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                        <tr>
-                            <td class="small td-tabular" style="color:var(--muted)">{{ er.ref_user(user.id, user.id) }}</td>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--primary);">
-                                        {{ user.username[0]|upper }}
-                                    </div>
-                                    <div>
-                                        <strong style="font-size: 15px;">{{ er.ref_user(user.id, user.username) }}</strong>
-                                        {% if user.id == current_user.id %}
-                                            <span class="badge" style="background: #e0f2fe; color: #0369a1; margin-left: 8px;">Vous</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if user.role == 'admin' %}
-                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fee2e2; color: #991b1b; font-size: 13px; font-weight: 600;">
-                                        <span>{{ icon("crown", 16) }}</span> Admin
-                                    </span>
-                                {% elif user.role == 'responsable' %}
-                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 600;">
-                                        <span>{{ icon("clipboard-list", 16) }}</span> Responsable
-                                    </span>
-                                {% elif user.role == 'lecteur' %}
-                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e5e7eb; color: #374151; font-size: 13px; font-weight: 600;">
-                                        <span>{{ icon("eye", 16) }}</span> Lecteur
-                                    </span>
-                                {% elif user.role == 'entraineur' %}
-                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #e0f2fe; color: #0369a1; font-size: 13px; font-weight: 600;">
-                                        <span>{{ icon("trophy", 16) }}</span> Entraîneur
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td style="text-align: right;">
-                                <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn" style="background: var(--primary); color: white; padding: 8px 14px; font-size: 13px;"><span class="with-icon">{{ icon('pencil', 16) }} Modifier</span></a>
-                                    {% if user.id != current_user.id %}
-                                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur?');">
-                                            <button type="submit" class="btn" style="background: var(--danger); color: white; padding: 8px 14px; font-size: 13px;"><span class="with-icon">{{ icon('trash-2', 16) }} Supprimer</span></button>
-                                        </form>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="alert alert-info">
-            Aucun utilisateur trouvé. <a href="{{ url_for('add_user') }}">Créer un utilisateur</a>
-        </div>
-    {% endif %}
-
-    <div style="margin-top: 40px;">
-        <h3 style="margin-bottom: 20px;"><span class="with-icon">{{ icon("clipboard-list", 20) }} Niveaux de permission</span></h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">{{ icon("crown", 28) }}</span>
-                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Admin</h4>
-                </div>
-                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Accès complet + gestion des utilisateurs</p>
-            </div>
-            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">{{ icon("clipboard-list", 28) }}</span>
-                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Responsable</h4>
-                </div>
-                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion complète (archers, équipements, cours + assignations)</p>
-            </div>
-            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">{{ icon("eye", 28) }}</span>
-                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Lecteur</h4>
-                </div>
-                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Consultation uniquement (historique inclus)</p>
-            </div>
-            <div style="background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <span style="font-size: 28px;">{{ icon("trophy", 28) }}</span>
-                    <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">Entraîneur</h4>
-                </div>
-                <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">Gestion des cours, présences et assignation du matériel</p>
-            </div>
-        </div>
+<h2 class="h3-spaced">Niveaux de permission</h2>
+<div class="quick-grid">
+    <div class="card">
+        <h3 class="card-section-title"><span class="with-icon">{{ icon("crown", 18) }} Admin</span></h3>
+        <p class="muted">Accès complet et gestion des utilisateurs.</p>
+    </div>
+    <div class="card">
+        <h3 class="card-section-title"><span class="with-icon">{{ icon("clipboard-list", 18) }} Responsable</span></h3>
+        <p class="muted">Archers, équipements, cours et assignations.</p>
+    </div>
+    <div class="card">
+        <h3 class="card-section-title"><span class="with-icon">{{ icon("eye", 18) }} Lecteur</span></h3>
+        <p class="muted">Consultation uniquement, historique inclus.</p>
+    </div>
+    <div class="card">
+        <h3 class="card-section-title"><span class="with-icon">{{ icon("trophy", 18) }} Entraîneur</span></h3>
+        <p class="muted">Cours, présences et assignation du matériel.</p>
     </div>
 </div>
 {% endblock %}

@@ -15,9 +15,15 @@
 
   /* ---------- Theme ---------- */
   var THEME_KEY = 'aim:theme';
-  function applyTheme(theme) {
+  function resolveTheme(pref) {
+    if (pref === 'dark') return 'dark';
+    if (pref === 'light') return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function applyTheme(pref) {
     var root = document.documentElement;
-    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-theme-pref', pref);
+    root.setAttribute('data-theme', resolveTheme(pref));
   }
   function nextTheme(current) {
     if (current === 'light') return 'dark';
@@ -27,12 +33,20 @@
   function initTheme() {
     var saved = null;
     try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
-    applyTheme(saved || 'auto');
+    var pref = saved || 'auto';
+    applyTheme(pref);
+
+    try {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+        var p = document.documentElement.getAttribute('data-theme-pref') || 'auto';
+        if (p === 'auto') applyTheme('auto');
+      });
+    } catch (e) {}
 
     document.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-theme-toggle]');
       if (!btn) return;
-      var current = document.documentElement.getAttribute('data-theme') || 'auto';
+      var current = document.documentElement.getAttribute('data-theme-pref') || 'auto';
       var next = nextTheme(current);
       applyTheme(next);
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
@@ -42,7 +56,7 @@
 
     var btn = document.querySelector('[data-theme-toggle]');
     if (btn) {
-      var current = document.documentElement.getAttribute('data-theme') || 'auto';
+      var current = document.documentElement.getAttribute('data-theme-pref') || 'auto';
       btn.setAttribute('title', themeLabel(current));
       btn.setAttribute('aria-label', themeLabel(current));
     }
@@ -60,11 +74,19 @@
     if (!btn) return;
     var saved = null;
     try { saved = localStorage.getItem(SIDEBAR_KEY); } catch (e) {}
+    function syncSidebarButton(isOn) {
+      btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+      btn.setAttribute('aria-label', isOn ? 'Agrandir le menu latéral' : 'Réduire le menu latéral');
+      var label = btn.querySelector('.sidebar-collapse-label');
+      if (label) label.textContent = isOn ? 'Agrandir' : 'Réduire';
+    }
     if (saved === '1' && window.innerWidth > 1024) {
       document.body.classList.add('sidebar-collapsed');
     }
+    syncSidebarButton(document.body.classList.contains('sidebar-collapsed'));
     btn.addEventListener('click', function () {
       var isOn = document.body.classList.toggle('sidebar-collapsed');
+      syncSidebarButton(isOn);
       try { localStorage.setItem(SIDEBAR_KEY, isOn ? '1' : '0'); } catch (e) {}
     });
   }

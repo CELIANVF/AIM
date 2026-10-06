@@ -5,90 +5,6 @@
 {% block title %}Produits{% endblock %}
 
 {% block content %}
-<style>
-    .accordion {
-        margin-bottom: 16px;
-        border: 1px solid var(--border-light);
-        border-radius: 8px;
-        overflow: hidden;
-    }
-
-    .accordion-header {
-        background-color: var(--background-secondary, #f5f5f5);
-        padding: 16px;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-weight: 600;
-        transition: background-color 0.2s;
-        border-bottom: 1px solid var(--border-light);
-    }
-
-    /* tabs for categories */
-    .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 16px;
-    }
-    .tabs .tab {
-        padding: 6px 12px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: var(--background-secondary);
-        cursor: pointer;
-        font-size: 14px;
-    }
-    .tabs .tab.active {
-        background: var(--primary);
-        color: #fff;
-        border-color: var(--primary);
-    }
-
-    .accordion-header:hover {
-        background-color: var(--background-tertiary, #efefef);
-    }
-
-    .accordion-header.collapsed {
-        border-bottom: none;
-    }
-    .accordion-controls.collapsed {
-        max-height: 0;
-        padding: 0 !important;
-        overflow: hidden;
-        border: none !important;
-    }
-
-    .accordion-icon {
-        transition: transform 0.2s;
-        display: inline-block;
-    }
-
-    .accordion-header.collapsed .accordion-icon {
-        transform: rotate(-90deg);
-    }
-
-    .accordion-content {
-        padding: 0;
-        max-height: 10000px;
-        overflow: hidden;
-        transition: max-height 0.3s ease-in-out;
-    }
-    .accordion-content .table-responsive { margin: 0; }
-    .accordion-content .table { margin: 0; font-size: 14px; }
-    .accordion-content .table th,
-    .accordion-content .table td { padding: 10px 12px; vertical-align: top; }
-    .accordion .item .table-row-actions { justify-content: flex-start; }
-    .accordion .item .table-row-actions a.btn,
-    .accordion .item .table-row-actions button.btn { padding: 6px 10px; font-size: 13px; }
-
-    .accordion-content.collapsed {
-        max-height: 0;
-        padding: 0;
-    }
-</style>
-
 <div class="header-with-actions">
     <div>
         <h1><span class="with-icon">{{ icon("package", 20) }} Produits unitaires</span></h1>
@@ -105,14 +21,14 @@
 </div>
 
 <div id="product-tabs-container">
-    <label style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
+    <label class="check-row" for="unassigned-checkbox">
         <input type="checkbox" id="unassigned-checkbox">
         <span>Afficher uniquement les produits non attribués</span>
     </label>
-    <div id="product-tabs" class="tabs">
-        <button class="tab active" data-filter="all">Tous</button>
+    <div id="product-tabs" class="tabs" role="group" aria-label="Filtrer par catégorie">
+        <button type="button" class="tab active" data-filter="all" aria-pressed="true">Tous</button>
         {% for cat in categories %}
-            <button class="tab" data-filter="{{ cat.name|e }}">{{ cat.name }}</button>
+            <button type="button" class="tab" data-filter="{{ cat.name|e }}" aria-pressed="false">{{ cat.name }}</button>
         {% endfor %}
     </div>
 </div>
@@ -123,31 +39,31 @@
         {% set products_by_category = grouped_products.get(cat.name, []) %}
         {% if products_by_category %}
         <div class="accordion" data-category="{{ cat.name|e }}">
-        <div class="accordion-header" onclick="toggleAccordion(this)">
+        <button type="button" class="accordion-header" aria-expanded="true">
             <span>{{ cat.name }} ({{ products_by_category|length }})</span>
-            <span class="accordion-icon">{{ icon("chevron-down", 14) }}</span>
-        </div>
-        <div class="accordion-controls" style="padding:8px 12px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <label class="small muted" style="margin-right:6px">Trier:</label>
-            <select class="sort-select" style="padding:6px;border-radius:8px;border:1px solid var(--border);">
+            <span class="accordion-icon" aria-hidden="true">{{ icon("chevron-down", 14) }}</span>
+        </button>
+        <div class="accordion-controls">
+            <label class="small muted" for="sort-{{ cat.id }}">Trier</label>
+            <select id="sort-{{ cat.id }}" class="sort-select">
                 <option value="brand">Marque</option>
                 <option value="state">État</option>
                 <option value="size">Taille</option>
                 <option value="model">Modèle</option>
             </select>
 
-            <label class="small muted" style="margin-left:8px">Filtrer:</label>
-            <select class="filter-field" style="padding:6px;border-radius:8px;border:1px solid var(--border);">
+            <label class="small muted" for="filter-field-{{ cat.id }}">Filtrer</label>
+            <select id="filter-field-{{ cat.id }}" class="filter-field">
                 <option value="any">Texte</option>
                 <option value="brand">Marque</option>
                 <option value="state">État</option>
                 <option value="size">Taille</option>
                 <option value="model">Modèle</option>
             </select>
-            <input class="filter-value-input" type="text" placeholder="Valeur libre (ex: 23 gauchère)" style="padding:6px;border-radius:8px;border:1px solid var(--border);min-width:180px;display:inline-block">
-            <select class="filter-value-select" style="padding:6px;border-radius:8px;border:1px solid var(--border);min-width:180px;display:none"></select>
-            <button class="btn btn-outline btn-apply-filter">Appliquer</button>
-            <button class="btn btn-outline btn-clear-filter">Réinitialiser</button>
+            <input class="filter-value-input" type="text" placeholder="Valeur libre (ex: 23 gauchère)" aria-label="Valeur du filtre pour {{ cat.name }}">
+            <select class="filter-value-select" aria-label="Valeur du filtre pour {{ cat.name }}"></select>
+            <button type="button" class="btn btn-outline btn-sm btn-apply-filter">Appliquer</button>
+            <button type="button" class="btn btn-outline btn-sm btn-clear-filter">Réinitialiser</button>
         </div>
         <div class="accordion-content">
             <div class="table-responsive">
@@ -283,12 +199,12 @@
                 <td style="text-align:right">
                     <div class="table-row-actions">
                         {% if current_user.can_edit() %}
-                        <a class="btn btn-outline" href="/edit_product/{{ p.id }}"><span class="with-icon">{{ icon("pencil", 16) }}</span></a>
-                        <a class="btn btn-secondary" href="/duplicate_product/{{ p.id }}"><span class="with-icon">{{ icon("clipboard-list", 16) }}</span></a>
+                        <a class="btn btn-outline btn-sm" href="/edit_product/{{ p.id }}" aria-label="Modifier {{ p.brand or 'ce produit' }}"><span class="with-icon">{{ icon("pencil", 16) }} Modifier</span></a>
+                        <a class="btn btn-secondary btn-sm" href="/duplicate_product/{{ p.id }}" aria-label="Dupliquer {{ p.brand or 'ce produit' }}"><span class="with-icon">{{ icon("clipboard-list", 16) }} Dupliquer</span></a>
                         {% endif %}
                         {% if current_user.can_delete() %}
-                        <form method="POST" action="/delete_product/{{ p.id }}" style="display:inline;margin:0" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-danger"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
+                        <form method="POST" action="/delete_product/{{ p.id }}" class="form-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.');">
+                            <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer {{ p.brand or 'ce produit' }}"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
                         </form>
                         {% endif %}
                     </div>
@@ -303,10 +219,10 @@
         {% endif %}
     {% endfor %}
 {% else %}
-    <div class="card" style="text-align:center;padding:48px 24px">
+    <div class="card empty-state">
         <p class="muted">Aucun produit enregistré pour le moment</p>
         {% if current_user.can_edit() %}
-        <a href="/add_product" class="btn btn-primary" style="margin-top:16px"><span class="with-icon">{{ icon("plus", 16) }} Ajouter le premier produit</span></a>
+        <a href="/add_product" class="btn btn-primary"><span class="with-icon">{{ icon("plus", 16) }} Ajouter le premier produit</span></a>
         {% endif %}
     </div>
 {% endif %}
@@ -314,11 +230,13 @@
 <script>
 function toggleAccordion(header) {
     const acc = header.closest('.accordion');
+    if (!acc) return;
     const controls = acc.querySelector('.accordion-controls');
     const content = acc.querySelector('.accordion-content');
-    header.classList.toggle('collapsed');
-    if (controls) controls.classList.toggle('collapsed');
-    if (content) content.classList.toggle('collapsed');
+    const collapsed = header.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (controls) controls.classList.toggle('collapsed', collapsed);
+    if (content) content.classList.toggle('collapsed', collapsed);
 }
 </script>
 <script>
@@ -332,9 +250,18 @@ document.addEventListener('DOMContentLoaded', function(){
     const buttons = Array.from(tabContainer.querySelectorAll('button[data-filter]'));
     const accordions = Array.from(document.querySelectorAll('.accordion[data-category]'));
 
+    document.querySelectorAll('.accordion-header').forEach((header) => {
+        header.addEventListener('click', () => toggleAccordion(header));
+    });
+
     function setActive(btn){
-        buttons.forEach(b=>b.classList.remove('active'));
-        if(btn) btn.classList.add('active');
+        buttons.forEach((b) => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+        });
+        if (!btn) return;
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
     }
 
     function applyFilters(){
