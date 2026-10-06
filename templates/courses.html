@@ -14,6 +14,9 @@
         {% if current_user.can_manage_courses() %}
         <a class="btn btn-primary" href="/add_course"><span class="with-icon">{{ icon("plus", 16) }} Nouveau cours</span></a>
         {% endif %}
+        {% if current_user.can_manage_attendance() %}
+        <a class="btn btn-outline" href="{{ url_for('courses_attendance_sheets') }}"><span class="with-icon">{{ icon("printer", 16) }} Feuilles de présence</span></a>
+        {% endif %}
         <a class="btn btn-outline" href="/export_courses_csv"><span class="with-icon">{{ icon("chart-bar", 16) }} Exporter CSV</span></a>
     </div>
 </div>
@@ -49,12 +52,14 @@
                         {% if current_user.can_manage_courses() %}
                         <a class="btn btn-outline" href="/course/{{ course.id }}/archers" style="padding:6px 10px;font-size:13px"><span class="with-icon">{{ icon("users", 16) }} Archers</span></a>
                         <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="padding:6px 10px;font-size:13px"><span class="with-icon">{{ icon("check", 16) }} Présences</span></a>
+                        <a class="btn btn-outline" href="{{ url_for('course_attendance_sheet', course_id=course.id) }}" style="padding:6px 10px;font-size:13px" title="Imprimer la feuille de présence"><span class="with-icon">{{ icon("printer", 16) }} Feuille</span></a>
                         <a class="btn btn-outline" href="/edit_course/{{ course.id }}" style="padding:6px 10px;font-size:13px"><span class="with-icon">{{ icon("pencil", 16) }}</span></a>
                         <form method="POST" action="/delete_course/{{ course.id }}" style="display:inline;margin:0" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce cours ?');">
                             <button type="submit" class="btn btn-danger" style="padding:6px 10px;font-size:13px;cursor:pointer"><span class="with-icon">{{ icon("trash-2", 16) }}</span></button>
                         </form>
                         {% elif current_user.can_manage_attendance() %}
                         <a class="btn btn-outline" href="/course/{{ course.id }}/attendance" style="padding:6px 10px;font-size:13px"><span class="with-icon">{{ icon("check", 16) }} Présences</span></a>
+                        <a class="btn btn-outline" href="{{ url_for('course_attendance_sheet', course_id=course.id) }}" style="padding:6px 10px;font-size:13px" title="Imprimer la feuille de présence"><span class="with-icon">{{ icon("printer", 16) }} Feuille</span></a>
                         {% endif %}
                     </div>
                 </td>

@@ -4436,6 +4436,175 @@ def history():
         product_events=product_events
     )
 
+_ATTENDANCE_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+_ATTENDANCE_MONTHS = [
+    '', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+]
+
+
+def _parse_attendance_month(raw):
+    """Retourne (année, mois) depuis YYYY-MM, sinon le mois courant."""
+    today = date.today()
+    if raw:
+        match = re.fullmatch(r'(\d{4})-(\d{2})', raw.strip())
+        if match:
+            year, month = int(match.group(1)), int(match.group(2))
+            if 2000 <= year <= 2100 and 1 <= month <= 12:
+                return year, month
+    return today.year, today.month
+
+
+def _shift_month(year, month, delta):
+    index = year * 12 + (month - 1) + delta
+    return index // 12, index % 12 + 1
+
+
+def _course_session_dates(day_of_week, year, month):
+    from calendar import monthrange
+    if day_of_week is None or not 0 <= day_of_week <= 6:
+        return []
+    last_day = monthrange(year, month)[1]
+    return [
+        date(year, month, day)
+        for day in range(1, last_day + 1)
+        if date(year, month, day).weekday() == day_of_week
+    ]
+
+
+def _attendance_filename_slug(text):
+    normalized = unicodedata.normalize('NFKD', text or '')
+    ascii_text = ''.join(ch for ch in normalized if not unicodedata.combining(ch))
+    slug = re.sub(r'[^A-Za-z0-9]+', '-', ascii_text).strip('-').lower()
+    return slug or 'cours'
+
+
+def _attendance_sheet_for(course, year, month):
+    archers = sorted(
+        course.archers,
+        key=lambda archer: (
+            (archer.last_name or '').casefold(),
+            (archer.first_name or '').casefold(),
+            archer.id,
+        ),
+    )
+    day = course.day_of_week
+    day_label = _ATTENDANCE_DAYS[day] if day is not None and 0 <= day <= 6 else ''
+    return {
+        'course': course,
+        'archers': archers,
+        'sessions': _course_session_dates(day, year, month),
+        'day_label': day_label,
+        'blank_rows': 3 if archers else 10,
+    }
+
+
+def _render_attendance_pdf(html):
+    from io import BytesIO
+    from weasyprint import HTML
+    buffer = BytesIO()
+    HTML(string=html).write_pdf(target=buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def _attendance_course_ids():
+    """Identifiants de cours demandés via ?course=1&course=2."""
+    ids = []
+    for value in request.args.getlist('course'):
+        if str(value).isdigit():
+            ids.append(int(value))
+    return ids
+
+
+def _render_attendance_sheets(sheets, year, month, back_url):
+    from urllib.parse import urlencode
+    month_value = f'{year:04d}-{month:02d}'
+    prev_year, prev_month = _shift_month(year, month, -1)
+    next_year, next_month = _shift_month(year, month, 1)
+    if len(sheets) == 1:
+        title = f"Feuille de présence — {sheets[0]['course'].name}"
+    else:
+        title = f"Feuilles de présence — {_ATTENDANCE_MONTHS[month]} {year}"
+    context = {
+        'sheets': sheets,
+        'year': year,
+        'month': month,
+        'month_value': month_value,
+        'month_label': f'{_ATTENDANCE_MONTHS[month].capitalize()} {year}',
+        'title': title,
+        'generated_at': datetime.now().strftime('%d/%m/%Y'),
+        'back_url': back_url,
+        'club_name': 'ANC93',
+        'prev_month': f'{prev_year:04d}-{prev_month:02d}',
+        'next_month': f'{next_year:04d}-{next_month:02d}',
+        'selected_ids': _attendance_course_ids(),
+    }
+    output_format = (request.args.get('format') or 'html').lower()
+    if output_format == 'pdf':
+        try:
+            html = render_template('attendance_sheet_bare.html', auto_print=False, **context)
+            buffer = _render_attendance_pdf(html)
+            if len(sheets) == 1:
+                filename = f"feuille_{_attendance_filename_slug(sheets[0]['course'].name)}_{month_value}.pdf"
+            else:
+                filename = f'feuilles_presence_{month_value}.pdf'
+            return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+        except Exception:
+            flash('Export PDF indisponible. Utilisez l’aperçu et imprimez depuis le navigateur.', 'error')
+            params = request.args.to_dict(flat=True)
+            params.pop('format', None)
+            params.pop('bare', None)
+            target = request.path
+            if params:
+                target += '?' + urlencode(params)
+            return redirect(target)
+
+    if request.args.get('bare') == '1':
+        return render_template('attendance_sheet_bare.html', auto_print=True, **context)
+
+    view_args = dict(request.view_args or {})
+    context['prev_url'] = url_for(request.endpoint, **view_args, month=context['prev_month'])
+    context['next_url'] = url_for(request.endpoint, **view_args, month=context['next_month'])
+    context['single_course'] = len(sheets) == 1
+    pdf_params = request.args.to_dict(flat=False)
+    pdf_params['format'] = ['pdf']
+    pdf_params.pop('bare', None)
+    context['pdf_url'] = request.path + '?' + urlencode(pdf_params, doseq=True)
+    return render_template('attendance_sheet.html', **context)
+
+
+@app.route('/courses/feuilles')
+@login_required
+@require_permission('manage_attendance')
+def courses_attendance_sheets():
+    """Aperçu imprimable des feuilles de présence de tous les cours actifs."""
+    year, month = _parse_attendance_month(request.args.get('month'))
+    courses_list = Course.query.filter_by(active=True).order_by(Course.day_of_week, Course.start_time).all()
+    selected = _attendance_course_ids()
+    printing = request.args.get('bare') == '1' or (request.args.get('format') or '').lower() == 'pdf'
+    if printing and selected:
+        wanted = set(selected)
+        courses_list = [course for course in courses_list if course.id in wanted]
+    sheets = [_attendance_sheet_for(course, year, month) for course in courses_list]
+    return _render_attendance_sheets(sheets, year, month, url_for('courses'))
+
+
+@app.route('/course/<int:course_id>/feuille')
+@login_required
+@require_permission('manage_attendance')
+def course_attendance_sheet(course_id):
+    """Aperçu imprimable de la feuille de présence d'un cours, pour un mois."""
+    course = Course.query.get_or_404(course_id)
+    year, month = _parse_attendance_month(request.args.get('month'))
+    return _render_attendance_sheets(
+        [_attendance_sheet_for(course, year, month)],
+        year,
+        month,
+        url_for('course_attendance', course_id=course.id),
+    )
+
+
 @app.route('/courses')
 @login_required
 @require_permission('view_courses')

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <style>
+        /* Marge @page à 0 : Chrome n'a plus de place pour l'URL et les en-têtes. */
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        html, body { margin: 0; padding: 0; background: #fff; }
+        .attendance-sheet {
+            padding: 10mm;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    {% include '_attendance_sheet_body.html' %}
+    {% if auto_print %}
+    <script>window.addEventListener('load', function(){ window.print(); });</script>
+    {% endif %}
+</body>
+</html>

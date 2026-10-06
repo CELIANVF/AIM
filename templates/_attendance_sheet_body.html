@@ -1,0 +1,144 @@
+<style>
+    .attendance-sheet {
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111;
+        font-size: 11px;
+        background: #fff;
+    }
+    .attendance-sheet + .attendance-sheet { margin-top: 28px; }
+    .attendance-sheet__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        border-bottom: 2px solid #111;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+    }
+    .attendance-sheet__club {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #444;
+    }
+    .attendance-sheet h1 {
+        margin: 2px 0 0;
+        font-size: 18px;
+        font-weight: 700;
+    }
+    .attendance-sheet__month {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .attendance-sheet__meta,
+    .attendance-sheet__notes,
+    .attendance-sheet__hint,
+    .attendance-sheet__empty {
+        margin: 0 0 8px;
+    }
+    .attendance-sheet__notes,
+    .attendance-sheet__hint { color: #444; }
+    .attendance-sheet table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 4px;
+    }
+    .attendance-sheet th,
+    .attendance-sheet td {
+        border: 1px solid #222;
+        padding: 4px 6px;
+        text-align: left;
+        vertical-align: middle;
+    }
+    .attendance-sheet th {
+        background: #f3f4f6;
+        font-weight: 700;
+        text-align: center;
+    }
+    .attendance-sheet td { height: 22px; }
+    .attendance-sheet .col-n { width: 28px; text-align: center; }
+    .attendance-sheet .col-lic { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .attendance-sheet .col-tick { width: 46px; text-align: center; }
+    .attendance-sheet__edited {
+        margin: 10px 0 0;
+        font-size: 9px;
+        color: #666;
+    }
+    @media print {
+        .attendance-sheet + .attendance-sheet {
+            margin-top: 0;
+            break-before: page;
+        }
+        .attendance-sheet thead { display: table-header-group; }
+        .attendance-sheet tr { break-inside: avoid; }
+    }
+</style>
+
+{% for sheet in sheets %}
+<article class="attendance-sheet" data-course-id="{{ sheet.course.id }}"{% if selected_ids and sheet.course.id not in selected_ids %} hidden{% endif %}>
+    <header class="attendance-sheet__head">
+        <div>
+            <p class="attendance-sheet__club">{{ club_name }}</p>
+            <h1>Feuille de présence</h1>
+        </div>
+        <p class="attendance-sheet__month">{{ month_label }}</p>
+    </header>
+    <p class="attendance-sheet__meta">
+        <strong>{{ sheet.course.name }}</strong>
+        — {{ sheet.day_label }} {{ sheet.course.start_time }}–{{ sheet.course.end_time }}
+        {% if sheet.course.level %} — {{ sheet.course.level }}{% endif %}
+        — {{ sheet.archers|length }} inscrit(s)
+    </p>
+    {% if sheet.course.notes %}
+    <p class="attendance-sheet__notes">{{ sheet.course.notes }}</p>
+    {% endif %}
+    {% if sheet.sessions %}
+    <p class="attendance-sheet__hint">Cochez la case du jour pour chaque archer présent. Les lignes vides servent aux archers non inscrits.</p>
+    <table>
+        <thead>
+            <tr>
+                <th class="col-n">N°</th>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th>Licence</th>
+                {% for session in sheet.sessions %}
+                <th class="col-tick">{{ session.strftime('%d/%m') }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for archer in sheet.archers %}
+            <tr>
+                <td class="col-n">{{ loop.index }}</td>
+                <td>{{ archer.last_name }}</td>
+                <td>{{ archer.first_name or '' }}</td>
+                <td class="col-lic">{{ archer.license_number }}</td>
+                {% for session in sheet.sessions %}
+                <td class="col-tick"></td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            {% for _ in range(sheet.blank_rows) %}
+            <tr>
+                <td class="col-n">{{ sheet.archers|length + loop.index }}</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                {% for session in sheet.sessions %}
+                <td class="col-tick"></td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="attendance-sheet__empty">Aucune séance ce mois-ci pour ce créneau.</p>
+    {% endif %}
+    <p class="attendance-sheet__edited">Édité le {{ generated_at }}</p>
+</article>
+{% else %}
+<p class="muted">Aucun cours actif à imprimer.</p>
+{% endfor %}
