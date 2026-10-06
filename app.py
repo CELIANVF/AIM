@@ -4441,23 +4441,35 @@ _ATTENDANCE_MONTHS = [
     '', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
     'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
 ]
+_ATTENDANCE_MONTHS_SHORT = [
+    '', 'Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin',
+    'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.',
+]
 
 
-def _parse_attendance_month(raw):
-    """Retourne (année, mois) depuis YYYY-MM, sinon le mois courant."""
+def _parse_attendance_year():
+    """Année de début de saison (septembre → août) via ?year=2026."""
     today = date.today()
-    if raw:
-        match = re.fullmatch(r'(\d{4})-(\d{2})', raw.strip())
-        if match:
-            year, month = int(match.group(1)), int(match.group(2))
-            if 2000 <= year <= 2100 and 1 <= month <= 12:
-                return year, month
-    return today.year, today.month
+    default = today.year if today.month >= 9 else today.year - 1
+    raw = (request.args.get('year') or '').strip()
+    if re.fullmatch(r'\d{4}', raw):
+        year = int(raw)
+        if 2000 <= year <= 2100:
+            return year
+    month_raw = (request.args.get('month') or '').strip()
+    match = re.fullmatch(r'(\d{4})-(\d{2})', month_raw)
+    if match:
+        year, month = int(match.group(1)), int(match.group(2))
+        if 2000 <= year <= 2100 and 1 <= month <= 12:
+            return year if month >= 9 else year - 1
+    return default
 
 
-def _shift_month(year, month, delta):
-    index = year * 12 + (month - 1) + delta
-    return index // 12, index % 12 + 1
+def _season_month_span(start_year):
+    """Mois de septembre start_year à août start_year+1, inclus."""
+    span = [(start_year, month) for month in range(9, 13)]
+    span.extend((start_year + 1, month) for month in range(1, 9))
+    return span
 
 
 def _course_session_dates(day_of_week, year, month):
@@ -4479,21 +4491,32 @@ def _attendance_filename_slug(text):
     return slug or 'cours'
 
 
-def _attendance_sheet_for(course, year, month):
+def _attendance_sheet_for(course, year):
     archers = sorted(
         course.archers,
         key=lambda archer: (
-            (archer.last_name or '').casefold(),
             (archer.first_name or '').casefold(),
+            (archer.last_name or '').casefold(),
             archer.id,
         ),
     )
     day = course.day_of_week
     day_label = _ATTENDANCE_DAYS[day] if day is not None and 0 <= day <= 6 else ''
+    months = []
+    for season_year, month in _season_month_span(year):
+        sessions = _course_session_dates(day, season_year, month)
+        if not sessions:
+            continue
+        label = _ATTENDANCE_MONTHS[month].capitalize()
+        months.append({
+            'label': label,
+            'short': _ATTENDANCE_MONTHS_SHORT[month],
+            'sessions': sessions,
+        })
     return {
         'course': course,
         'archers': archers,
-        'sessions': _course_session_dates(day, year, month),
+        'months': months,
         'day_label': day_label,
         'blank_rows': 3 if archers else 10,
     }
@@ -4517,27 +4540,19 @@ def _attendance_course_ids():
     return ids
 
 
-def _render_attendance_sheets(sheets, year, month, back_url):
+def _render_attendance_sheets(sheets, year, back_url):
     from urllib.parse import urlencode
-    month_value = f'{year:04d}-{month:02d}'
-    prev_year, prev_month = _shift_month(year, month, -1)
-    next_year, next_month = _shift_month(year, month, 1)
     if len(sheets) == 1:
         title = f"Feuille de présence — {sheets[0]['course'].name}"
     else:
-        title = f"Feuilles de présence — {_ATTENDANCE_MONTHS[month]} {year}"
+        title = f"Feuilles de présence — {year}–{year + 1}"
     context = {
         'sheets': sheets,
         'year': year,
-        'month': month,
-        'month_value': month_value,
-        'month_label': f'{_ATTENDANCE_MONTHS[month].capitalize()} {year}',
         'title': title,
         'generated_at': datetime.now().strftime('%d/%m/%Y'),
         'back_url': back_url,
         'club_name': 'ANC93',
-        'prev_month': f'{prev_year:04d}-{prev_month:02d}',
-        'next_month': f'{next_year:04d}-{next_month:02d}',
         'selected_ids': _attendance_course_ids(),
     }
     output_format = (request.args.get('format') or 'html').lower()
@@ -4546,9 +4561,9 @@ def _render_attendance_sheets(sheets, year, month, back_url):
             html = render_template('attendance_sheet_bare.html', auto_print=False, **context)
             buffer = _render_attendance_pdf(html)
             if len(sheets) == 1:
-                filename = f"feuille_{_attendance_filename_slug(sheets[0]['course'].name)}_{month_value}.pdf"
+                filename = f"feuille_{_attendance_filename_slug(sheets[0]['course'].name)}_{year}-{year + 1}.pdf"
             else:
-                filename = f'feuilles_presence_{month_value}.pdf'
+                filename = f'feuilles_presence_{year}-{year + 1}.pdf'
             return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
         except Exception:
             flash('Export PDF indisponible. Utilisez l’aperçu et imprimez depuis le navigateur.', 'error')
@@ -4564,8 +4579,8 @@ def _render_attendance_sheets(sheets, year, month, back_url):
         return render_template('attendance_sheet_bare.html', auto_print=True, **context)
 
     view_args = dict(request.view_args or {})
-    context['prev_url'] = url_for(request.endpoint, **view_args, month=context['prev_month'])
-    context['next_url'] = url_for(request.endpoint, **view_args, month=context['next_month'])
+    context['prev_url'] = url_for(request.endpoint, **view_args, year=year - 1)
+    context['next_url'] = url_for(request.endpoint, **view_args, year=year + 1)
     context['single_course'] = len(sheets) == 1
     pdf_params = request.args.to_dict(flat=False)
     pdf_params['format'] = ['pdf']
@@ -4579,28 +4594,27 @@ def _render_attendance_sheets(sheets, year, month, back_url):
 @require_permission('manage_attendance')
 def courses_attendance_sheets():
     """Aperçu imprimable des feuilles de présence de tous les cours actifs."""
-    year, month = _parse_attendance_month(request.args.get('month'))
+    year = _parse_attendance_year()
     courses_list = Course.query.filter_by(active=True).order_by(Course.day_of_week, Course.start_time).all()
     selected = _attendance_course_ids()
     printing = request.args.get('bare') == '1' or (request.args.get('format') or '').lower() == 'pdf'
     if printing and selected:
         wanted = set(selected)
         courses_list = [course for course in courses_list if course.id in wanted]
-    sheets = [_attendance_sheet_for(course, year, month) for course in courses_list]
-    return _render_attendance_sheets(sheets, year, month, url_for('courses'))
+    sheets = [_attendance_sheet_for(course, year) for course in courses_list]
+    return _render_attendance_sheets(sheets, year, url_for('courses'))
 
 
 @app.route('/course/<int:course_id>/feuille')
 @login_required
 @require_permission('manage_attendance')
 def course_attendance_sheet(course_id):
-    """Aperçu imprimable de la feuille de présence d'un cours, pour un mois."""
+    """Aperçu imprimable de la feuille de présence d'un cours, pour une année."""
     course = Course.query.get_or_404(course_id)
-    year, month = _parse_attendance_month(request.args.get('month'))
+    year = _parse_attendance_year()
     return _render_attendance_sheets(
-        [_attendance_sheet_for(course, year, month)],
+        [_attendance_sheet_for(course, year)],
         year,
-        month,
         url_for('course_attendance', course_id=course.id),
     )
 

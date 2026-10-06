@@ -7,19 +7,19 @@
 <div class="header-with-actions" style="align-items:flex-end">
     <div>
         <h1 style="margin:0"><span class="with-icon">{{ icon("printer", 20) }} {{ title }}</span></h1>
-        <p class="muted" style="margin:4px 0 0">{{ month_label }} — {{ sheets|length }} feuille(s), cases à cocher à la main</p>
+        <p class="muted" style="margin:4px 0 0">Septembre {{ year }} – août {{ year + 1 }} — {{ sheets|length }} feuille(s)</p>
     </div>
     <div class="action-group">
         <a class="btn btn-outline" href="{{ back_url }}">Retour</a>
-        <a class="btn btn-outline" href="{{ prev_url }}" title="Mois précédent" aria-label="Mois précédent">‹</a>
+        <a class="btn btn-outline" href="{{ prev_url }}" title="Année précédente" aria-label="Année précédente">‹</a>
         <form method="get" action="{{ request.path }}" style="display:flex;gap:8px;align-items:center;margin:0">
-            <label for="month" class="small muted" style="margin:0">Mois</label>
-            <input type="month" id="month" name="month" value="{{ month_value }}" required>
+            <label for="year" class="small muted" style="margin:0">Saison</label>
+            <input type="number" id="year" name="year" min="2000" max="2100" value="{{ year }}" required style="width:90px">
             <button type="submit" class="btn btn-outline">Afficher</button>
         </form>
-        <a class="btn btn-outline" href="{{ next_url }}" title="Mois suivant" aria-label="Mois suivant">›</a>
+        <a class="btn btn-outline" href="{{ next_url }}" title="Année suivante" aria-label="Année suivante">›</a>
         {% if single_course %}
-        <a class="btn btn-outline" href="{{ url_for('courses_attendance_sheets', month=month_value) }}">Tous les cours</a>
+        <a class="btn btn-outline" href="{{ url_for('courses_attendance_sheets', year=year) }}">Tous les cours</a>
         {% endif %}
         <button type="button" class="btn btn-outline" id="sheet-pdf-btn">PDF</button>
         <button type="button" class="btn btn-primary" id="sheet-print-btn"><span class="with-icon">{{ icon("printer", 16) }} Imprimer</span></button>

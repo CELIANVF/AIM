@@ -45,11 +45,13 @@
         width: 100%;
         border-collapse: collapse;
         margin-top: 4px;
+        table-layout: fixed;
+        font-size: 8px;
     }
     .attendance-sheet th,
     .attendance-sheet td {
         border: 1px solid #222;
-        padding: 4px 6px;
+        padding: 1px 2px;
         text-align: left;
         vertical-align: middle;
     }
@@ -58,10 +60,27 @@
         font-weight: 700;
         text-align: center;
     }
-    .attendance-sheet td { height: 22px; }
-    .attendance-sheet .col-n { width: 28px; text-align: center; }
-    .attendance-sheet .col-lic { white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .attendance-sheet .col-tick { width: 46px; text-align: center; }
+    .attendance-sheet td { height: 16px; }
+    .attendance-sheet .col-n { width: 4%; text-align: center; }
+    .attendance-sheet .col-name {
+        width: 16%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .attendance-sheet .col-month {
+        font-size: 8px;
+        padding: 3px 0 1px;
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+    .attendance-sheet .col-day,
+    .attendance-sheet .col-tick {
+        padding: 0;
+        text-align: center;
+        font-size: 7px;
+        font-weight: 600;
+    }
     .attendance-sheet__edited {
         margin: 10px 0 0;
         font-size: 9px;
@@ -84,7 +103,7 @@
             <p class="attendance-sheet__club">{{ club_name }}</p>
             <h1>Feuille de présence</h1>
         </div>
-        <p class="attendance-sheet__month">{{ month_label }}</p>
+        <p class="attendance-sheet__month">{{ year }}–{{ year + 1 }}</p>
     </header>
     <p class="attendance-sheet__meta">
         <strong>{{ sheet.course.name }}</strong>
@@ -95,17 +114,22 @@
     {% if sheet.course.notes %}
     <p class="attendance-sheet__notes">{{ sheet.course.notes }}</p>
     {% endif %}
-    {% if sheet.sessions %}
+    {% if sheet.months %}
     <p class="attendance-sheet__hint">Cochez la case du jour pour chaque archer présent. Les lignes vides servent aux archers non inscrits.</p>
     <table>
         <thead>
             <tr>
-                <th class="col-n">N°</th>
-                <th>Nom</th>
-                <th>Prénom</th>
-                <th>Licence</th>
-                {% for session in sheet.sessions %}
-                <th class="col-tick">{{ session.strftime('%d/%m') }}</th>
+                <th class="col-n" rowspan="2">N°</th>
+                <th class="col-name" rowspan="2">Prénom</th>
+                {% for block in sheet.months %}
+                <th class="col-month" colspan="{{ block.sessions|length }}">{{ block.label }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                {% for block in sheet.months %}
+                    {% for session in block.sessions %}
+                    <th class="col-day">{{ session.strftime('%d') }}</th>
+                    {% endfor %}
                 {% endfor %}
             </tr>
         </thead>
@@ -113,29 +137,29 @@
             {% for archer in sheet.archers %}
             <tr>
                 <td class="col-n">{{ loop.index }}</td>
-                <td>{{ archer.last_name }}</td>
-                <td>{{ archer.first_name or '' }}</td>
-                <td class="col-lic">{{ archer.license_number }}</td>
-                {% for session in sheet.sessions %}
-                <td class="col-tick"></td>
+                <td class="col-name">{{ archer.first_name or '' }}</td>
+                {% for block in sheet.months %}
+                    {% for session in block.sessions %}
+                    <td class="col-tick"></td>
+                    {% endfor %}
                 {% endfor %}
             </tr>
             {% endfor %}
             {% for _ in range(sheet.blank_rows) %}
             <tr>
                 <td class="col-n">{{ sheet.archers|length + loop.index }}</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                {% for session in sheet.sessions %}
-                <td class="col-tick"></td>
+                <td class="col-name"></td>
+                {% for block in sheet.months %}
+                    {% for session in block.sessions %}
+                    <td class="col-tick"></td>
+                    {% endfor %}
                 {% endfor %}
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p class="attendance-sheet__empty">Aucune séance ce mois-ci pour ce créneau.</p>
+    <p class="attendance-sheet__empty">Aucune séance cette année pour ce créneau.</p>
     {% endif %}
     <p class="attendance-sheet__edited">Édité le {{ generated_at }}</p>
 </article>
